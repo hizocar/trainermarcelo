@@ -20,6 +20,16 @@ export interface TrainingDay {
   plan_id: string;
   day_number: number;
   name: string;
+  week_day?: number; // 0=Dom 1=Lun 2=Mar 3=Mié 4=Jue 5=Vie 6=Sáb
+}
+
+export interface Invitation {
+  id: string;
+  coach_id: string;
+  email: string;
+  name: string;
+  status: 'pending' | 'accepted';
+  created_at: string;
 }
 
 export interface Exercise {

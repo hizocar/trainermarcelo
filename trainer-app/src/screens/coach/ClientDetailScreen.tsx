@@ -62,10 +62,17 @@ export default function ClientDetailScreen() {
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.actionBtn}
+              onPress={() => navigation.navigate('PlanEditor', { client })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.actionBtnText}>✏ EDITAR PLAN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnSecondary]}
               onPress={() => navigation.navigate('ClientProgress', { client })}
               activeOpacity={0.8}
             >
-              <Text style={styles.actionBtnText}>VER PROGRESO</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>📈 VER PROGRESO</Text>
             </TouchableOpacity>
           </View>
 
@@ -130,6 +137,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   actionBtn: {
     backgroundColor: colors.accent,
@@ -137,11 +145,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
+  actionBtnSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   actionBtnText: {
     color: colors.background,
     fontWeight: '900',
     fontSize: 13,
     letterSpacing: 2,
+  },
+  actionBtnTextSecondary: {
+    color: colors.textPrimary,
   },
   sectionLabel: {
     ...typography.label,

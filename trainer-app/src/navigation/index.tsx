@@ -2,100 +2,84 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
 
-// Screens
+// Auth
 import LoginScreen from '../screens/auth/LoginScreen';
+
+// Coach
 import ClientListScreen from '../screens/coach/ClientListScreen';
 import ClientDetailScreen from '../screens/coach/ClientDetailScreen';
 import DayExercisesScreen from '../screens/coach/DayExercisesScreen';
+import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
+import InviteClientScreen from '../screens/coach/InviteClientScreen';
+
+// Client
 import TodayScreen from '../screens/client/TodayScreen';
 import WorkoutLogScreen from '../screens/client/WorkoutLogScreen';
 import ProgressScreen from '../screens/client/ProgressScreen';
+import CoachProfileScreen from '../screens/client/CoachProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  return (
-    <View style={tabStyles.iconContainer}>
-      <Text style={[tabStyles.iconText, focused && tabStyles.iconTextActive]}>{label}</Text>
-    </View>
-  );
+function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+  return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.35 }}>{emoji}</Text>;
 }
+
+// ── Coach ────────────────────────────────────────────────────────────────────
 
 function CoachTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: tabStyles.tabBar,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: tabStyles.tabLabel,
-      }}
-    >
+    <Tab.Navigator screenOptions={{ headerShown: false, tabBarStyle: tabStyles.bar, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.textMuted, tabBarLabelStyle: tabStyles.label }}>
       <Tab.Screen
         name="Clients"
         component={ClientListScreen}
-        options={{
-          tabBarLabel: 'CLIENTES',
-          tabBarIcon: ({ focused }) => <TabIcon label="👥" focused={focused} />,
-        }}
+        options={{ tabBarLabel: 'CLIENTES', tabBarIcon: ({ focused }) => <TabIcon emoji="👥" focused={focused} /> }}
       />
       <Tab.Screen
         name="CoachProgress"
-        component={CoachProgressWrapper}
-        options={{
-          tabBarLabel: 'PROGRESO',
-          tabBarIcon: ({ focused }) => <TabIcon label="📈" focused={focused} />,
-        }}
+        component={CoachProgressScreen}
+        options={{ tabBarLabel: 'PROGRESO', tabBarIcon: ({ focused }) => <TabIcon emoji="📈" focused={focused} /> }}
       />
     </Tab.Navigator>
   );
 }
 
-function CoachProgressWrapper() {
-  const { user } = useAuth();
+function CoachProgressScreen() {
   return <ProgressScreen />;
 }
 
+// ── Client ───────────────────────────────────────────────────────────────────
+
 function ClientTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: tabStyles.tabBar,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: tabStyles.tabLabel,
-      }}
-    >
+    <Tab.Navigator screenOptions={{ headerShown: false, tabBarStyle: tabStyles.bar, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.textMuted, tabBarLabelStyle: tabStyles.label }}>
       <Tab.Screen
         name="Today"
         component={TodayScreen}
-        options={{
-          tabBarLabel: 'HOY',
-          tabBarIcon: ({ focused }) => <TabIcon label="🏋️" focused={focused} />,
-        }}
+        options={{ tabBarLabel: 'HOY', tabBarIcon: ({ focused }) => <TabIcon emoji="🏋️" focused={focused} /> }}
       />
       <Tab.Screen
         name="Progress"
         component={ProgressScreen}
-        options={{
-          tabBarLabel: 'PROGRESO',
-          tabBarIcon: ({ focused }) => <TabIcon label="📈" focused={focused} />,
-        }}
+        options={{ tabBarLabel: 'PROGRESO', tabBarIcon: ({ focused }) => <TabIcon emoji="📈" focused={focused} /> }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={CoachProfileScreen}
+        options={{ tabBarLabel: 'PERFIL', tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} /> }}
       />
     </Tab.Navigator>
   );
 }
 
+// ── Root ─────────────────────────────────────────────────────────────────────
+
 export default function AppNavigator() {
   const { session, user, loading } = useAuth();
-
   if (loading) return null;
 
   return (
@@ -109,6 +93,8 @@ export default function AppNavigator() {
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
             <Stack.Screen name="DayExercises" component={DayExercisesScreen} />
             <Stack.Screen name="ClientProgress" component={ProgressScreen} />
+            <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
+            <Stack.Screen name="InviteClient" component={InviteClientScreen} />
           </>
         ) : (
           <>
@@ -122,7 +108,7 @@ export default function AppNavigator() {
 }
 
 const tabStyles = StyleSheet.create({
-  tabBar: {
+  bar: {
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
     borderTopWidth: 1,
@@ -130,12 +116,5 @@ const tabStyles = StyleSheet.create({
     paddingBottom: 16,
     paddingTop: 8,
   },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  iconContainer: { alignItems: 'center' },
-  iconText: { fontSize: 20, opacity: 0.4 },
-  iconTextActive: { opacity: 1 },
+  label: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 });

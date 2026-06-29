@@ -43,9 +43,17 @@ export default function ClientListScreen() {
           <Text style={styles.greeting}>HOLA,</Text>
           <Text style={styles.coachName}>{user?.name?.toUpperCase()}</Text>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>SALIR</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('InviteClient')}
+            style={styles.inviteBtn}
+          >
+            <Text style={styles.inviteBtnText}>+ CLIENTE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={signOut} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>SALIR</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Text style={styles.sectionLabel}>CLIENTES</Text>
@@ -106,6 +114,23 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: colors.accent,
     letterSpacing: -1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  inviteBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+  inviteBtnText: {
+    color: colors.background,
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 1,
   },
   logoutBtn: {
     paddingVertical: spacing.xs,
