@@ -27,20 +27,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setUser(null); // limpiar siempre antes de cargar el nuevo perfil
       if (session) fetchProfile(session.user.id);
-      else { setUser(null); setLoading(false); }
+      else setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
       .single();
-    setUser(data);
+
+    if (error) {
+      console.error('[AuthContext] fetchProfile error:', error.message, error.code);
+      // Si RLS bloquea la lectura, intentar con el email del session
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser?.user_metadata?.role) {
+        setUser({
+          id: userId,
+          name: authUser.user_metadata.name ?? authUser.email ?? '',
+          email: authUser.email ?? '',
+          role: authUser.user_metadata.role,
+        });
+      }
+    } else {
+      setUser(data);
+    }
     setLoading(false);
   }
 

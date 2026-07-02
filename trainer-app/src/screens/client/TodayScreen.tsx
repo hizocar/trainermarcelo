@@ -24,7 +24,7 @@ export default function TodayScreen() {
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
   const currentWeek = getCurrentWeek();
 
-  useEffect(() => { fetchPlan(); }, []);
+  useEffect(() => { if (user?.id) fetchPlan(); }, [user?.id]);
   useEffect(() => { if (selectedDay) fetchExercises(selectedDay.id); }, [selectedDay]);
 
   async function fetchPlan() {
@@ -68,7 +68,7 @@ export default function TodayScreen() {
           </Text>
           <Text style={styles.userName}>{user?.name?.split(' ')[0].toUpperCase()}</Text>
         </View>
-        <View style={[styles.weekBadge, isToday(selectedDay!) && styles.weekBadgeToday]}>
+        <View style={[styles.weekBadge, selectedDay ? isToday(selectedDay) && styles.weekBadgeToday : false]}>
           <Text style={styles.weekBadgeText}>S{currentWeek}</Text>
         </View>
       </View>
