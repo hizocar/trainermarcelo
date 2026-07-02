@@ -17,15 +17,16 @@ export default function ClientListScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    if (user?.id) fetchClients();
+  }, [user?.id]);
 
   async function fetchClients() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('role', 'client')
       .eq('coach_id', user?.id);
+    console.log('[ClientList] data:', JSON.stringify(data), 'error:', error?.message);
     setClients(data ?? []);
     setLoading(false);
   }
