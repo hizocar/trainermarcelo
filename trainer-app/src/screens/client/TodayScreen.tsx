@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TrainingDay, Exercise } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
-import { WEEK_DAYS, WEEK_DAYS_SHORT, getCurrentWeek } from '../../lib/weeks';
+import { WEEK_DAYS, getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
 export default function TodayScreen() {
   const { user } = useAuth();
@@ -93,13 +93,17 @@ export default function TodayScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>
-            {WEEK_DAYS[todayWeekDay].toUpperCase()} · SEMANA {currentWeek}
+            {formatShortDate(new Date().toISOString()).toUpperCase()}
           </Text>
           <Text style={styles.userName}>{user?.name?.split(' ')[0].toUpperCase()}</Text>
         </View>
-        <View style={[styles.weekBadge, selectedDay ? isToday(selectedDay) && styles.weekBadgeToday : false]}>
-          <Text style={styles.weekBadgeText}>S{currentWeek}</Text>
-        </View>
+        {selectedDay && (
+          <View style={[styles.weekBadge, isToday(selectedDay) && styles.weekBadgeToday]}>
+            <Text style={[styles.weekBadgeText, !isToday(selectedDay) && styles.weekBadgeTextIdle]}>
+              D{selectedDay.day_number}
+            </Text>
+          </View>
+        )}
       </View>
 
       {loading ? (
@@ -129,7 +133,7 @@ export default function TodayScreen() {
                 >
                   {isCurrentDay && <View style={styles.todayDot} />}
                   <Text style={[styles.dayTabNum, active && styles.dayTabNumActive]}>
-                    {day.week_day != null ? WEEK_DAYS_SHORT[day.week_day] : `D${day.day_number}`}
+                    DÍA {day.day_number}
                   </Text>
                   <Text style={[styles.dayTabName, active && styles.dayTabNameActive]} numberOfLines={1}>
                     {day.name.toUpperCase()}
@@ -144,7 +148,11 @@ export default function TodayScreen() {
             <View style={styles.dayIndicator}>
               <View style={[styles.dayIndicatorDot, isToday(selectedDay) && styles.dayIndicatorDotActive]} />
               <Text style={styles.dayIndicatorText}>
-                {isToday(selectedDay) ? 'HOY ES TU DÍA DE ENTRENAMIENTO' : `TU DÍA ES EL ${selectedDay.week_day != null ? WEEK_DAYS[selectedDay.week_day].toUpperCase() : ''}`}
+                {isToday(selectedDay)
+                  ? 'SUGERIDO PARA HOY'
+                  : selectedDay.week_day != null
+                    ? `SUGERIDO PARA EL ${WEEK_DAYS[selectedDay.week_day].toUpperCase()} · ENTRENA CUANDO PUEDAS`
+                    : 'ENTRENA CUANDO PUEDAS'}
               </Text>
               {exercises.length > 0 && (
                 <Text style={styles.dayProgress}>
@@ -240,6 +248,7 @@ const styles = StyleSheet.create({
   },
   weekBadgeToday: { backgroundColor: colors.accent, borderColor: colors.accent },
   weekBadgeText: { color: colors.background, fontWeight: '900', fontSize: 16 },
+  weekBadgeTextIdle: { color: colors.accent },
 
   dayTabsScroll: { flexGrow: 0 },
   dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, paddingBottom: spacing.sm, alignItems: 'center' },

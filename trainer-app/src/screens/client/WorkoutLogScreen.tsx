@@ -12,6 +12,7 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import { showAlert } from '../../lib/alert';
+import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
 type RouteParams = { exercise: Exercise; week: number };
 
@@ -144,7 +145,11 @@ export default function WorkoutLogScreen() {
           <Text style={styles.backText}>ATRÁS</Text>
         </TouchableOpacity>
         <Text style={styles.exerciseName}>{exercise.name.toUpperCase()}</Text>
-        <Text style={styles.meta}>SEMANA {week} · {exercise.reps_objective} REPS · {exercise.unit.toUpperCase()}</Text>
+        <Text style={styles.meta}>
+          {week === getCurrentWeek()
+            ? formatShortDate(new Date().toISOString()).toUpperCase()
+            : `EDITANDO REGISTRO ANTERIOR`} · {exercise.reps_objective} REPS · {exercise.unit.toUpperCase()}
+        </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

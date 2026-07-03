@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Exercise, TrainingDay } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
-import { WEEK_DAYS_SHORT, getCurrentWeek } from '../../lib/weeks';
+import { formatShortDate, formatMonthYear } from '../../lib/weeks';
 
 interface LogRow {
   id: string;
@@ -18,12 +18,22 @@ interface LogRow {
   week_number: number;
   weight: number;
   reps: number;
+  logged_at: string;
 }
 
 interface SeriesRow {
   id: string;
   exercise_id: string;
   series_number: number;
+}
+
+// Una sesión = un día del plan entrenado en una semana concreta, con su fecha real
+interface Session {
+  key: string;
+  day: TrainingDay;
+  week: number;
+  date: string; // logged_at más antiguo de la sesión
+  exercises: { exercise: Exercise; sets: { seriesNum: number; weight: number; reps: number }[] }[];
 }
 
 export default function HistoryScreen() {
@@ -34,7 +44,6 @@ export default function HistoryScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   // recargar al volver de editar un registro
@@ -48,7 +57,7 @@ export default function HistoryScreen() {
 
     const { data: daysData } = await supabase
       .from('training_days').select('*')
-      .eq('plan_id', plan.id).order('week_day', { nullsFirst: false });
+      .eq('plan_id', plan.id).order('day_number');
     const dayList = daysData ?? [];
     setDays(dayList);
 
@@ -67,117 +76,101 @@ export default function HistoryScreen() {
 
     const { data: lData } = await supabase
       .from('workout_logs')
-      .select('id, series_id, week_number, weight, reps')
+      .select('id, series_id, week_number, weight, reps, logged_at')
       .in('series_id', sList.map(s => s.id));
     setLogs(lData ?? []);
     setLoading(false);
   }
 
-  const weeks = useMemo(
-    () => [...new Set(logs.map(l => l.week_number))].sort((a, b) => b - a),
-    [logs],
-  );
-  const week = selectedWeek ?? weeks[0] ?? null;
-
-  // logs de la semana agrupados por ejercicio, ordenados por día y orden del plan
-  const weekData = useMemo(() => {
-    if (week == null) return [];
+  // ── sesiones ordenadas por fecha real (más reciente primero) ──────────────
+  const sessions = useMemo<Session[]>(() => {
     const seriesById = Object.fromEntries(series.map(s => [s.id, s]));
-    const byExercise: Record<string, { seriesNum: number; weight: number; reps: number }[]> = {};
-    logs.filter(l => l.week_number === week).forEach(l => {
+    const exById = Object.fromEntries(exercises.map(e => [e.id, e]));
+    const dayById = Object.fromEntries(days.map(d => [d.id, d]));
+
+    const byKey: Record<string, { day: TrainingDay; week: number; date: string; byEx: Record<string, { seriesNum: number; weight: number; reps: number }[]> }> = {};
+
+    logs.forEach(l => {
       const s = seriesById[l.series_id];
-      if (!s) return;
-      (byExercise[s.exercise_id] ??= []).push({ seriesNum: s.series_number, weight: l.weight, reps: l.reps });
+      const ex = s && exById[s.exercise_id];
+      const day = ex && dayById[ex.day_id];
+      if (!day) return;
+      const key = `${day.id}|${l.week_number}`;
+      const g = (byKey[key] ??= { day, week: l.week_number, date: l.logged_at, byEx: {} });
+      if (l.logged_at < g.date) g.date = l.logged_at;
+      (g.byEx[ex.id] ??= []).push({ seriesNum: s.series_number, weight: l.weight, reps: l.reps });
     });
 
-    return days.map(day => ({
-      day,
-      exercises: exercises
-        .filter(e => e.day_id === day.id && byExercise[e.id])
-        .map(e => ({
-          exercise: e,
-          sets: byExercise[e.id].sort((a, b) => a.seriesNum - b.seriesNum),
-        })),
-    })).filter(g => g.exercises.length > 0);
-  }, [week, logs, series, exercises, days]);
+    return Object.entries(byKey)
+      .map(([key, g]) => ({
+        key,
+        day: g.day,
+        week: g.week,
+        date: g.date,
+        exercises: exercises
+          .filter(e => e.day_id === g.day.id && g.byEx[e.id])
+          .map(e => ({ exercise: e, sets: g.byEx[e.id].sort((a, b) => a.seriesNum - b.seriesNum) })),
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [logs, series, exercises, days]);
 
-  const currentWeek = getCurrentWeek();
-  const weekIdx = week != null ? weeks.indexOf(week) : -1;
-  const weekSets = useMemo(
-    () => weekData.reduce((acc, g) => acc + g.exercises.reduce((a, e) => a + e.sets.length, 0), 0),
-    [weekData],
-  );
+  // agrupar por mes para los separadores
+  const sections = useMemo(() => {
+    const out: { month: string; sessions: Session[] }[] = [];
+    sessions.forEach(s => {
+      const month = formatMonthYear(s.date);
+      const last = out[out.length - 1];
+      if (last && last.month === month) last.sessions.push(s);
+      else out.push({ month, sessions: [s] });
+    });
+    return out;
+  }, [sessions]);
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View>
           <Text style={styles.headerLabel}>HISTORIAL</Text>
-          <Text style={styles.headerName}>MIS REGISTROS</Text>
+          <Text style={styles.headerName}>MIS ENTRENAMIENTOS</Text>
         </View>
 
         {loading ? (
           <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
-        ) : weeks.length === 0 ? (
+        ) : sessions.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Ionicons name="time-outline" size={40} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>SIN REGISTROS</Text>
-            <Text style={styles.emptyText}>Cuando registres entrenamientos, aparecerán aquí para revisarlos y corregirlos.</Text>
+            <Text style={styles.emptyText}>Cuando registres entrenamientos, aparecerán aquí ordenados por fecha.</Text>
           </Card>
         ) : (
-          <>
-            {/* navegador de semanas: ← SEMANA N → */}
-            <Card style={styles.weekPager}>
-              <TouchableOpacity
-                style={[styles.pagerBtn, weekIdx >= weeks.length - 1 && styles.pagerBtnDisabled]}
-                disabled={weekIdx >= weeks.length - 1}
-                onPress={() => setSelectedWeek(weeks[weekIdx + 1])}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <Ionicons name="chevron-back" size={22} color={weekIdx >= weeks.length - 1 ? colors.border : colors.accent} />
-              </TouchableOpacity>
+          sections.map(section => (
+            <View key={section.month} style={styles.monthBlock}>
+              <Text style={styles.monthLabel}>{section.month.toUpperCase()}</Text>
 
-              <View style={styles.pagerCenter}>
-                <Text style={styles.pagerWeek}>SEMANA {week}</Text>
-                <Text style={styles.pagerSub}>
-                  {week === currentWeek ? 'SEMANA ACTUAL · ' : ''}
-                  {weekData.length} día{weekData.length !== 1 ? 's' : ''} · {weekSets} series
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.pagerBtn, weekIdx <= 0 && styles.pagerBtnDisabled]}
-                disabled={weekIdx <= 0}
-                onPress={() => setSelectedWeek(weeks[weekIdx - 1])}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <Ionicons name="chevron-forward" size={22} color={weekIdx <= 0 ? colors.border : colors.accent} />
-              </TouchableOpacity>
-            </Card>
-
-            {weekData.map(({ day, exercises: exs }) => (
-              <View key={day.id} style={styles.dayBlock}>
-                <View style={styles.dayHeader}>
-                  <View style={styles.dayBadge}>
-                    <Text style={styles.dayBadgeText}>
-                      {day.week_day != null ? WEEK_DAYS_SHORT[day.week_day].toUpperCase() : `D${day.day_number}`}
-                    </Text>
+              {section.sessions.map(session => (
+                <Card key={session.key} style={styles.sessionCard}>
+                  <View style={styles.sessionHeader}>
+                    <View style={styles.dayBadge}>
+                      <Text style={styles.dayBadgeText}>DÍA {session.day.day_number}</Text>
+                    </View>
+                    <Text style={styles.sessionName}>{session.day.name.toUpperCase()}</Text>
+                    <View style={styles.sessionDate}>
+                      <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                      <Text style={styles.sessionDateText}>{formatShortDate(session.date)}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.dayName}>{day.name.toUpperCase()}</Text>
-                </View>
 
-                {exs.map(({ exercise, sets }) => (
-                  <TouchableOpacity
-                    key={exercise.id}
-                    onPress={() => navigation.navigate('WorkoutLog', { exercise, week })}
-                    activeOpacity={0.7}
-                  >
-                    <Card style={styles.exCard}>
+                  {session.exercises.map(({ exercise, sets }) => (
+                    <TouchableOpacity
+                      key={exercise.id}
+                      style={styles.exBlock}
+                      onPress={() => navigation.navigate('WorkoutLog', { exercise, week: session.week })}
+                      activeOpacity={0.7}
+                    >
                       <View style={styles.exHeader}>
-                        <Text style={styles.exName}>{exercise.name}</Text>
+                        <Text style={styles.exName} numberOfLines={1}>{exercise.name}</Text>
                         <View style={styles.editHint}>
-                          <Ionicons name="pencil" size={12} color={colors.accent} />
-                          <Text style={styles.editHintText}>EDITAR</Text>
+                          <Ionicons name="pencil" size={11} color={colors.accent} />
                         </View>
                       </View>
                       <View style={styles.setsRow}>
@@ -190,12 +183,12 @@ export default function HistoryScreen() {
                           </View>
                         ))}
                       </View>
-                    </Card>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-          </>
+                    </TouchableOpacity>
+                  ))}
+                </Card>
+              ))}
+            </View>
+          ))
         )}
       </ScrollView>
     </View>
@@ -208,44 +201,37 @@ const styles = StyleSheet.create({
   headerLabel: { ...typography.label, letterSpacing: 3, color: colors.textMuted },
   headerName: { ...typography.display, fontSize: 30 },
 
-  weekPager: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  pagerBtn: {
-    width: 40, height: 40, borderRadius: radius.full,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  pagerBtnDisabled: { opacity: 0.4 },
-  pagerCenter: { alignItems: 'center', gap: 2 },
-  pagerWeek: { ...typography.displaySm, fontSize: 20 },
-  pagerSub: { ...typography.caption, fontSize: 10, letterSpacing: 1 },
+  monthBlock: { gap: spacing.sm },
+  monthLabel: { ...typography.label, letterSpacing: 3, marginTop: spacing.sm },
 
-  dayBlock: { gap: spacing.sm },
-  dayHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  sessionCard: { gap: spacing.md },
+  sessionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   dayBadge: {
-    backgroundColor: colors.accentSoft, borderRadius: radius.sm,
+    backgroundColor: colors.accent, borderRadius: radius.sm,
     paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderWidth: 1, borderColor: colors.accent + '44',
   },
-  dayBadgeText: { color: colors.accent, fontWeight: '900', fontSize: 11, letterSpacing: 1 },
-  dayName: { ...typography.h3 },
+  dayBadgeText: { color: colors.background, fontWeight: '900', fontSize: 10, letterSpacing: 1 },
+  sessionName: { ...typography.h3, fontSize: 14, flex: 1 },
+  sessionDate: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sessionDateText: { ...typography.caption, fontSize: 11 },
 
-  exCard: { gap: spacing.sm },
-  exHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  exName: { ...typography.h3, fontSize: 15, flex: 1 },
-  editHint: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  editHintText: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, color: colors.accent },
-  setsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  exBlock: {
+    gap: spacing.xs,
+    borderTopWidth: 1, borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+  },
+  exHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  exName: { ...typography.caption, color: colors.textSecondary, fontWeight: '700', flex: 1 },
+  editHint: { padding: 2 },
+  setsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
   setPill: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
     backgroundColor: colors.surface, borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm, paddingVertical: 4,
+    paddingHorizontal: spacing.sm, paddingVertical: 3,
     borderWidth: 1, borderColor: colors.border,
   },
-  setPillLabel: { fontSize: 10, fontWeight: '900', color: colors.accent },
-  setPillValue: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
+  setPillLabel: { fontSize: 9, fontWeight: '900', color: colors.accent },
+  setPillValue: { fontSize: 11, color: colors.textPrimary, fontWeight: '600' },
 
   emptyCard: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
   emptyTitle: { ...typography.h3, color: colors.textMuted },
