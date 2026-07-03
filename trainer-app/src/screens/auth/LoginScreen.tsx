@@ -59,8 +59,8 @@ export default function LoginScreen() {
             <View style={styles.brandBar} />
             <Text style={styles.brandKicker}>ENTRENAMIENTO PERSONALIZADO</Text>
           </View>
-          <Text style={styles.logo} numberOfLines={1} adjustsFontSizeToFit>MARCELO</Text>
-          <Text style={styles.logoAccent} numberOfLines={1} adjustsFontSizeToFit>HERRERA</Text>
+          <Text style={styles.logo}>MARCELO</Text>
+          <Text style={styles.logoAccent}>HERRERA</Text>
           <Text style={styles.subtitle}>COACH · THERAPIST</Text>
         </View>
 
@@ -147,16 +147,15 @@ const styles = StyleSheet.create({
   },
   logo: {
     ...typography.display,
-    fontSize: 48,
-    lineHeight: 62,
+    fontSize: 46,
+    lineHeight: 58,
     color: colors.textPrimary,
   },
   logoAccent: {
     ...typography.display,
-    fontSize: 48,
-    lineHeight: 62,
+    fontSize: 46,
+    lineHeight: 58,
     color: colors.accent,
-    marginTop: -spacing.sm,
   },
   subtitle: {
     ...typography.label,

@@ -102,6 +102,11 @@ export default function HistoryScreen() {
   }, [week, logs, series, exercises, days]);
 
   const currentWeek = getCurrentWeek();
+  const weekIdx = week != null ? weeks.indexOf(week) : -1;
+  const weekSets = useMemo(
+    () => weekData.reduce((acc, g) => acc + g.exercises.reduce((a, e) => a + e.sets.length, 0), 0),
+    [weekData],
+  );
 
   return (
     <View style={styles.container}>
@@ -121,23 +126,34 @@ export default function HistoryScreen() {
           </Card>
         ) : (
           <>
-            {/* selector de semana */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.weekChips}>
-              {weeks.map(w => {
-                const active = w === week;
-                return (
-                  <TouchableOpacity
-                    key={w}
-                    style={[styles.weekChip, active && styles.weekChipActive]}
-                    onPress={() => setSelectedWeek(w)}
-                  >
-                    <Text style={[styles.weekChipText, active && styles.weekChipTextActive]}>
-                      SEMANA {w}{w === currentWeek ? ' · ACTUAL' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {/* navegador de semanas: ← SEMANA N → */}
+            <Card style={styles.weekPager}>
+              <TouchableOpacity
+                style={[styles.pagerBtn, weekIdx >= weeks.length - 1 && styles.pagerBtnDisabled]}
+                disabled={weekIdx >= weeks.length - 1}
+                onPress={() => setSelectedWeek(weeks[weekIdx + 1])}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="chevron-back" size={22} color={weekIdx >= weeks.length - 1 ? colors.border : colors.accent} />
+              </TouchableOpacity>
+
+              <View style={styles.pagerCenter}>
+                <Text style={styles.pagerWeek}>SEMANA {week}</Text>
+                <Text style={styles.pagerSub}>
+                  {week === currentWeek ? 'SEMANA ACTUAL · ' : ''}
+                  {weekData.length} día{weekData.length !== 1 ? 's' : ''} · {weekSets} series
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.pagerBtn, weekIdx <= 0 && styles.pagerBtnDisabled]}
+                disabled={weekIdx <= 0}
+                onPress={() => setSelectedWeek(weeks[weekIdx - 1])}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="chevron-forward" size={22} color={weekIdx <= 0 ? colors.border : colors.accent} />
+              </TouchableOpacity>
+            </Card>
 
             {weekData.map(({ day, exercises: exs }) => (
               <View key={day.id} style={styles.dayBlock}>
@@ -192,15 +208,19 @@ const styles = StyleSheet.create({
   headerLabel: { ...typography.label, letterSpacing: 3, color: colors.textMuted },
   headerName: { ...typography.display, fontSize: 30 },
 
-  weekChips: { gap: spacing.sm },
-  weekChip: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface,
+  weekPager: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
   },
-  weekChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  weekChipText: { ...typography.caption, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
-  weekChipTextActive: { color: colors.background },
+  pagerBtn: {
+    width: 40, height: 40, borderRadius: radius.full,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pagerBtnDisabled: { opacity: 0.4 },
+  pagerCenter: { alignItems: 'center', gap: 2 },
+  pagerWeek: { ...typography.displaySm, fontSize: 20 },
+  pagerSub: { ...typography.caption, fontSize: 10, letterSpacing: 1 },
 
   dayBlock: { gap: spacing.sm },
   dayHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
