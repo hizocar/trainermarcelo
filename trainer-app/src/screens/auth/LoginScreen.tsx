@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   StatusBar,
   ImageBackground,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
@@ -45,16 +46,21 @@ export default function LoginScreen() {
       />
 
       <KeyboardAvoidingView
-        style={styles.container}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.header}>
           <View style={styles.brandRow}>
             <View style={styles.brandBar} />
             <Text style={styles.brandKicker}>ENTRENAMIENTO PERSONALIZADO</Text>
           </View>
-          <Text style={styles.logo}>MARCELO</Text>
-          <Text style={styles.logoAccent}>HERRERA</Text>
+          <Text style={styles.logo} numberOfLines={1} adjustsFontSizeToFit>MARCELO</Text>
+          <Text style={styles.logoAccent} numberOfLines={1} adjustsFontSizeToFit>HERRERA</Text>
           <Text style={styles.subtitle}>COACH · THERAPIST</Text>
         </View>
 
@@ -100,6 +106,7 @@ export default function LoginScreen() {
             }
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ImageBackground>
   );
@@ -111,10 +118,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'flex-end',
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
+    paddingTop: spacing.xxl * 2,
   },
   header: {
     marginBottom: spacing.xl,
@@ -139,15 +147,16 @@ const styles = StyleSheet.create({
   },
   logo: {
     ...typography.display,
-    fontSize: 56,
-    lineHeight: 60,
+    fontSize: 48,
+    lineHeight: 62,
     color: colors.textPrimary,
   },
   logoAccent: {
     ...typography.display,
-    fontSize: 56,
-    lineHeight: 60,
+    fontSize: 48,
+    lineHeight: 62,
     color: colors.accent,
+    marginTop: -spacing.sm,
   },
   subtitle: {
     ...typography.label,

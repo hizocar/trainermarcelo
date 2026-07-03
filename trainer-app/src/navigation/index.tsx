@@ -20,6 +20,7 @@ import InviteClientScreen from '../screens/coach/InviteClientScreen';
 // Client
 import TodayScreen from '../screens/client/TodayScreen';
 import WorkoutLogScreen from '../screens/client/WorkoutLogScreen';
+import HistoryScreen from '../screens/client/HistoryScreen';
 import ProgressScreen from '../screens/client/ProgressScreen';
 import BodyProgressScreen from '../screens/client/BodyProgressScreen';
 import CoachProfileScreen from '../screens/client/CoachProfileScreen';
@@ -65,6 +66,11 @@ function ClientTabs() {
         name="Today"
         component={TodayScreen}
         options={{ tabBarLabel: 'HOY', tabBarIcon: tabIcon('barbell', 'barbell-outline') }}
+      />
+      <Tab.Screen
+        name="History"
+        component={HistoryScreen}
+        options={{ tabBarLabel: 'HISTORIAL', tabBarIcon: tabIcon('time', 'time-outline') }}
       />
       <Tab.Screen
         name="Progress"

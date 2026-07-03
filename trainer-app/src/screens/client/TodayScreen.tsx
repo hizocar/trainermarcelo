@@ -114,6 +114,7 @@ export default function TodayScreen() {
           {/* Selector de días */}
           <ScrollView
             horizontal showsHorizontalScrollIndicator={false}
+            style={styles.dayTabsScroll}
             contentContainerStyle={styles.dayTabs}
           >
             {days.map(day => {
@@ -130,8 +131,8 @@ export default function TodayScreen() {
                   <Text style={[styles.dayTabNum, active && styles.dayTabNumActive]}>
                     {day.week_day != null ? WEEK_DAYS_SHORT[day.week_day] : `D${day.day_number}`}
                   </Text>
-                  <Text style={[styles.dayTabName, active && styles.dayTabNameActive]}>
-                    {day.name.length > 8 ? day.name.slice(0, 7) + '.' : day.name.toUpperCase()}
+                  <Text style={[styles.dayTabName, active && styles.dayTabNameActive]} numberOfLines={1}>
+                    {day.name.toUpperCase()}
                   </Text>
                 </TouchableOpacity>
               );
@@ -240,11 +241,13 @@ const styles = StyleSheet.create({
   weekBadgeToday: { backgroundColor: colors.accent, borderColor: colors.accent },
   weekBadgeText: { color: colors.background, fontWeight: '900', fontSize: 16 },
 
-  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, paddingBottom: spacing.sm },
+  dayTabsScroll: { flexGrow: 0 },
+  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, paddingBottom: spacing.sm, alignItems: 'center' },
   dayTab: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 56, justifyContent: 'center',
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface, alignItems: 'center', minWidth: 72, position: 'relative',
+    backgroundColor: colors.surface, alignItems: 'center', minWidth: 76, maxWidth: 130, position: 'relative',
   },
   dayTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   todayDot: {
