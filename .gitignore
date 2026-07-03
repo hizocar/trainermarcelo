@@ -1,0 +1,5 @@
+# raíz del proyecto — junk local que no va al repo
+node_modules/
+.expo/
+.DS_Store
+*.xlsx
