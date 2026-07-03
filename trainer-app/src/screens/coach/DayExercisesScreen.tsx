@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
@@ -66,6 +66,9 @@ export default function DayExercisesScreen() {
               {exList.map(ex => (
                 <Card key={ex.id} style={styles.exerciseCard}>
                   <View style={styles.exerciseHeader}>
+                    {ex.image_url ? (
+                      <Image source={{ uri: ex.image_url }} style={styles.exThumb} />
+                    ) : null}
                     <Text style={styles.exerciseName}>{ex.name}</Text>
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{ex.unit}</Text>
@@ -76,8 +79,8 @@ export default function DayExercisesScreen() {
                     {ex.ref_weight ? (
                       <Text style={styles.metaText}>Ref: {ex.ref_weight} {ex.unit}</Text>
                     ) : null}
-                    <Text style={styles.metaText}>3 series</Text>
                   </View>
+                  {ex.notes ? <Text style={styles.notesText}>{ex.notes}</Text> : null}
                 </Card>
               ))}
             </View>
@@ -101,7 +104,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { alignSelf: 'flex-start' },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
-  title: { fontSize: 36, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1 },
+  title: { ...typography.display, fontSize: 36 },
   subtitle: { ...typography.h3, color: colors.accent },
   scroll: {
     paddingHorizontal: spacing.xl,
@@ -121,8 +124,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
   },
+  exThumb: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.surface },
   exerciseName: { ...typography.h3, flex: 1 },
+  notesText: { ...typography.caption, lineHeight: 18 },
   badge: {
     backgroundColor: colors.surface,
     borderRadius: radius.sm,

@@ -2,7 +2,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
 
@@ -20,13 +21,16 @@ import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import TodayScreen from '../screens/client/TodayScreen';
 import WorkoutLogScreen from '../screens/client/WorkoutLogScreen';
 import ProgressScreen from '../screens/client/ProgressScreen';
+import BodyProgressScreen from '../screens/client/BodyProgressScreen';
 import CoachProfileScreen from '../screens/client/CoachProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.35 }}>{emoji}</Text>;
+function tabIcon(name: keyof typeof Ionicons.glyphMap, outline: keyof typeof Ionicons.glyphMap) {
+  return ({ focused, color }: { focused: boolean; color: string }) => (
+    <Ionicons name={focused ? name : outline} size={22} color={color} />
+  );
 }
 
 // ── Coach ────────────────────────────────────────────────────────────────────
@@ -37,12 +41,12 @@ function CoachTabs() {
       <Tab.Screen
         name="Clients"
         component={ClientListScreen}
-        options={{ tabBarLabel: 'CLIENTES', tabBarIcon: ({ focused }) => <TabIcon emoji="👥" focused={focused} /> }}
+        options={{ tabBarLabel: 'CLIENTES', tabBarIcon: tabIcon('people', 'people-outline') }}
       />
       <Tab.Screen
         name="CoachProgress"
         component={CoachProgressScreen}
-        options={{ tabBarLabel: 'PROGRESO', tabBarIcon: ({ focused }) => <TabIcon emoji="📈" focused={focused} /> }}
+        options={{ tabBarLabel: 'PROGRESO', tabBarIcon: tabIcon('stats-chart', 'stats-chart-outline') }}
       />
     </Tab.Navigator>
   );
@@ -60,17 +64,22 @@ function ClientTabs() {
       <Tab.Screen
         name="Today"
         component={TodayScreen}
-        options={{ tabBarLabel: 'HOY', tabBarIcon: ({ focused }) => <TabIcon emoji="🏋️" focused={focused} /> }}
+        options={{ tabBarLabel: 'HOY', tabBarIcon: tabIcon('barbell', 'barbell-outline') }}
       />
       <Tab.Screen
         name="Progress"
         component={ProgressScreen}
-        options={{ tabBarLabel: 'PROGRESO', tabBarIcon: ({ focused }) => <TabIcon emoji="📈" focused={focused} /> }}
+        options={{ tabBarLabel: 'PROGRESO', tabBarIcon: tabIcon('stats-chart', 'stats-chart-outline') }}
+      />
+      <Tab.Screen
+        name="Body"
+        component={BodyProgressScreen}
+        options={{ tabBarLabel: 'CUERPO', tabBarIcon: tabIcon('body', 'body-outline') }}
       />
       <Tab.Screen
         name="Profile"
         component={CoachProfileScreen}
-        options={{ tabBarLabel: 'PERFIL', tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} /> }}
+        options={{ tabBarLabel: 'PERFIL', tabBarIcon: tabIcon('person', 'person-outline') }}
       />
     </Tab.Navigator>
   );
@@ -93,6 +102,7 @@ export default function AppNavigator() {
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
             <Stack.Screen name="DayExercises" component={DayExercisesScreen} />
             <Stack.Screen name="ClientProgress" component={ProgressScreen} />
+            <Stack.Screen name="ClientBody" component={BodyProgressScreen} />
             <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
           </>

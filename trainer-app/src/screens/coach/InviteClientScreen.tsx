@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Invitation } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import { showAlert } from '../../lib/alert';
 
 export default function InviteClientScreen() {
   const navigation = useNavigation<any>();
@@ -34,11 +35,11 @@ export default function InviteClientScreen() {
 
   async function inviteClient() {
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Campos incompletos', 'Completa nombre, email y contraseña temporal.');
+      showAlert('Campos incompletos', 'Completa nombre, email y contraseña temporal.');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Contraseña muy corta', 'Mínimo 6 caracteres.');
+      showAlert('Contraseña muy corta', 'Mínimo 6 caracteres.');
       return;
     }
 
@@ -65,10 +66,9 @@ export default function InviteClientScreen() {
       });
 
       if (!error) {
-        Alert.alert(
+        showAlert(
           'Invitación registrada',
-          `${name} fue agregado a la lista de invitaciones. Pídele que descargue la app y use:\n\nEmail: ${email}\nContraseña: ${password}\n\n(Debes crear su cuenta manualmente en Supabase por ahora)`,
-          [{ text: 'OK' }]
+          `${name} fue agregado a la lista de invitaciones. Pídele que descargue la app y use:\n\nEmail: ${email}\nContraseña: ${password}\n\n(Debes crear su cuenta manualmente en Supabase por ahora)`
         );
         setInvitations(prev => [{
           id: Date.now().toString(), coach_id: user!.id,
@@ -80,9 +80,9 @@ export default function InviteClientScreen() {
     } else {
       const result = await res.json();
       if (result.error) {
-        Alert.alert('Error', result.error);
+        showAlert('Error', result.error);
       } else {
-        Alert.alert('¡Listo!', `${name} fue invitado exitosamente.\n\nEmail: ${email}\nContraseña: ${password}`);
+        showAlert('¡Listo!', `${name} fue invitado exitosamente.\n\nEmail: ${email}\nContraseña: ${password}`);
         setName(''); setEmail(''); setPassword('');
         fetchInvitations();
       }
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
   header: { paddingHorizontal: spacing.xl, marginBottom: spacing.lg, gap: spacing.sm },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
-  title: { fontSize: 28, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1 },
+  title: { ...typography.display, fontSize: 28 },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.md },
 
   formCard: { gap: spacing.md },

@@ -9,6 +9,8 @@ import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import Avatar from '../../components/common/Avatar';
+import { showConfirm } from '../../lib/alert';
 
 export default function ClientListScreen() {
   const { user, signOut } = useAuth();
@@ -21,18 +23,18 @@ export default function ClientListScreen() {
   }, [user?.id]);
 
   async function fetchClients() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('users')
       .select('*')
       .eq('role', 'client')
-      .eq('coach_id', user?.id);
-    console.log('[ClientList] data:', JSON.stringify(data), 'error:', error?.message);
+      .eq('coach_id', user?.id)
+      .order('name');
     setClients(data ?? []);
     setLoading(false);
   }
 
-  function getInitials(name: string) {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  function handleSignOut() {
+    showConfirm('Cerrar sesión', '¿Seguro que quieres salir?', signOut, 'Salir');
   }
 
   return (
@@ -40,9 +42,12 @@ export default function ClientListScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>HOLA,</Text>
-          <Text style={styles.coachName}>{user?.name?.toUpperCase()}</Text>
+        <View style={styles.headerLeft}>
+          <Avatar name={user?.name ?? 'C'} imageUrl={user?.avatar_url} size={46} accent />
+          <View>
+            <Text style={styles.greeting}>HOLA,</Text>
+            <Text style={styles.coachName}>{user?.name?.toUpperCase()}</Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -51,7 +56,7 @@ export default function ClientListScreen() {
           >
             <Text style={styles.inviteBtnText}>+ CLIENTE</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={signOut} style={styles.logoutBtn}>
+          <TouchableOpacity onPress={handleSignOut} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>SALIR</Text>
           </TouchableOpacity>
         </View>
@@ -76,9 +81,7 @@ export default function ClientListScreen() {
               activeOpacity={0.7}
             >
               <Card style={styles.clientCard}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
-                </View>
+                <Avatar name={item.name} imageUrl={item.avatar_url} size={52} accent />
                 <View style={styles.clientInfo}>
                   <Text style={styles.clientName}>{item.name}</Text>
                   <Text style={styles.clientSub}>Ver plan de entrenamiento →</Text>
@@ -101,21 +104,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.xl,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   greeting: {
     ...typography.caption,
     letterSpacing: 3,
     color: colors.textMuted,
   },
-  coachName: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: colors.accent,
-    letterSpacing: -1,
-  },
+  coachName: { ...typography.display, fontSize: 30, color: colors.accent },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -157,19 +160,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.full,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.background,
-    fontWeight: '900',
-    fontSize: 18,
   },
   clientInfo: {
     flex: 1,

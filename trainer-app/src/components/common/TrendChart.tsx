@@ -1,0 +1,111 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
+import Svg, { Polyline, Polygon, Circle, Line } from 'react-native-svg';
+import { colors, typography } from '../../theme';
+
+interface Point {
+  label: string;
+  value: number;
+}
+
+interface Props {
+  data: Point[];
+  height?: number;
+  unit?: string;
+}
+
+// Gráfico de línea liviano en SVG puro: funciona igual en web y nativo
+// (react-native-gifted-charts se rompe en web por reanimated).
+export default function TrendChart({ data, height = 180, unit = '' }: Props) {
+  const [width, setWidth] = useState(0);
+  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
+
+  if (data.length === 0) return null;
+
+  const padTop = 24;
+  const padBottom = 28;
+  const padX = 16;
+  const chartH = height - padTop - padBottom;
+  const chartW = Math.max(width - padX * 2, 1);
+
+  const values = data.map(d => d.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+
+  const x = (i: number) => padX + (data.length === 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
+  const y = (v: number) => padTop + chartH - ((v - min) / range) * chartH;
+
+  const points = data.map((d, i) => `${x(i)},${y(d.value)}`).join(' ');
+  const areaPoints = `${points} ${x(data.length - 1)},${padTop + chartH} ${x(0)},${padTop + chartH}`;
+
+  const last = data[data.length - 1];
+  const showEvery = Math.max(1, Math.ceil(data.length / 6));
+
+  return (
+    <View onLayout={onLayout} style={{ height }}>
+      {width > 0 && (
+        <>
+          <Svg width={width} height={height}>
+            {[0.25, 0.5, 0.75].map(f => (
+              <Line
+                key={f}
+                x1={padX} x2={padX + chartW}
+                y1={padTop + chartH * f} y2={padTop + chartH * f}
+                stroke={colors.border} strokeWidth={1} strokeDasharray="3 5"
+              />
+            ))}
+            <Polygon points={areaPoints} fill={colors.accent} opacity={0.08} />
+            <Polyline points={points} fill="none" stroke={colors.accent} strokeWidth={2.5} strokeLinejoin="round" />
+            {data.map((d, i) => (
+              <Circle
+                key={i}
+                cx={x(i)} cy={y(d.value)}
+                r={i === data.length - 1 ? 5 : 3}
+                fill={i === data.length - 1 ? colors.accent : colors.background}
+                stroke={colors.accent} strokeWidth={2}
+              />
+            ))}
+          </Svg>
+
+          {/* etiqueta del último valor */}
+          <Text style={[styles.lastValue, { left: Math.min(x(data.length - 1) - 30, width - 72), top: y(last.value) - 24 }]}>
+            {last.value}{unit}
+          </Text>
+
+          {/* etiquetas del eje X */}
+          <View style={styles.xAxis} pointerEvents="none">
+            {data.map((d, i) => (
+              <Text
+                key={i}
+                style={[styles.xLabel, { left: x(i) - 20 }]}
+              >
+                {i % showEvery === 0 || i === data.length - 1 ? d.label : ''}
+              </Text>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  lastValue: {
+    position: 'absolute',
+    fontSize: 11,
+    fontWeight: '900',
+    color: colors.accent,
+    width: 72,
+    textAlign: 'center',
+  },
+  xAxis: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 20 },
+  xLabel: {
+    position: 'absolute',
+    width: 40,
+    textAlign: 'center',
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+});

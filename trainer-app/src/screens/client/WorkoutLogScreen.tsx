@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, ActivityIndicator, Image,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Exercise, ExerciseSeries, WorkoutLog } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
+import Card from '../../components/common/Card';
+import ExerciseVideo from '../../components/common/ExerciseVideo';
+import { showAlert } from '../../lib/alert';
 
 type RouteParams = { exercise: Exercise; week: number };
 
 interface SeriesEntry {
   series: ExerciseSeries;
   log: Partial<WorkoutLog>;
+  prev?: { weight: number; reps: number; week: number };
   saved: boolean;
 }
 
@@ -26,6 +31,7 @@ export default function WorkoutLogScreen() {
   const [entries, setEntries] = useState<SeriesEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showImage, setShowImage] = useState(true);
 
   useEffect(() => {
     fetchSeriesAndLogs();
@@ -41,68 +47,87 @@ export default function WorkoutLogScreen() {
     const seriesList: ExerciseSeries[] = seriesData ?? [];
     const seriesIds = seriesList.map(s => s.id);
 
+    if (seriesIds.length === 0) { setLoading(false); return; }
+
+    // logs de esta semana + el registro previo más reciente por serie
     const { data: logsData } = await supabase
       .from('workout_logs')
       .select('*')
       .in('series_id', seriesIds)
-      .eq('week_number', week);
+      .lte('week_number', week)
+      .order('week_number', { ascending: false });
 
-    const logMap: Record<string, WorkoutLog> = {};
-    (logsData ?? []).forEach(l => { logMap[l.series_id] = l; });
+    const currentMap: Record<string, WorkoutLog> = {};
+    const prevMap: Record<string, WorkoutLog> = {};
+    (logsData ?? []).forEach(l => {
+      if (l.week_number === week && !currentMap[l.series_id]) currentMap[l.series_id] = l;
+      else if (l.week_number < week && !prevMap[l.series_id]) prevMap[l.series_id] = l;
+    });
 
-    setEntries(seriesList.map(s => ({
-      series: s,
-      log: logMap[s.id]
-        ? { weight: logMap[s.id].weight, reps: logMap[s.id].reps }
-        : { weight: exercise.ref_weight, reps: undefined },
-      saved: !!logMap[s.id],
-    })));
+    setEntries(seriesList.map(s => {
+      const prev = prevMap[s.id];
+      return {
+        series: s,
+        log: currentMap[s.id]
+          ? { weight: currentMap[s.id].weight, reps: currentMap[s.id].reps }
+          : { weight: prev?.weight ?? exercise.ref_weight, reps: undefined },
+        prev: prev ? { weight: prev.weight, reps: prev.reps, week: prev.week_number } : undefined,
+        saved: !!currentMap[s.id],
+      };
+    }));
     setLoading(false);
   }
 
   function updateEntry(index: number, field: 'weight' | 'reps', value: string) {
+    const parsed = parseFloat(value.replace(',', '.'));
     setEntries(prev => prev.map((e, i) => i === index
-      ? { ...e, log: { ...e.log, [field]: value === '' ? undefined : parseFloat(value) }, saved: false }
+      ? { ...e, log: { ...e.log, [field]: value === '' || isNaN(parsed) ? undefined : parsed }, saved: false }
       : e
     ));
   }
 
   async function saveAll() {
+    const toSave = entries.filter(e => e.log.weight != null && e.log.reps != null);
+    if (toSave.length === 0) {
+      showAlert('Nada que guardar', 'Ingresa peso y reps en al menos una serie.');
+      return;
+    }
+
     setSaving(true);
     const now = new Date().toISOString();
+    let failed = 0;
 
-    for (const entry of entries) {
-      if (entry.log.weight == null || entry.log.reps == null) continue;
-
+    for (const entry of toSave) {
       const { data: existing } = await supabase
         .from('workout_logs')
         .select('id')
         .eq('series_id', entry.series.id)
         .eq('week_number', week)
-        .single();
+        .maybeSingle();
 
-      if (existing) {
-        await supabase.from('workout_logs').update({
-          weight: entry.log.weight,
-          reps: entry.log.reps,
-          logged_at: now,
-        }).eq('id', existing.id);
-      } else {
-        await supabase.from('workout_logs').insert({
-          series_id: entry.series.id,
-          week_number: week,
-          weight: entry.log.weight,
-          reps: entry.log.reps,
-          logged_at: now,
-          logged_by: user?.id,
-        });
-      }
+      const { error } = existing
+        ? await supabase.from('workout_logs').update({
+            weight: entry.log.weight,
+            reps: entry.log.reps,
+            logged_at: now,
+          }).eq('id', existing.id)
+        : await supabase.from('workout_logs').insert({
+            series_id: entry.series.id,
+            week_number: week,
+            weight: entry.log.weight,
+            reps: entry.log.reps,
+            logged_at: now,
+            logged_by: user?.id,
+          });
+      if (error) failed++;
     }
 
     setSaving(false);
-    Alert.alert('¡Guardado!', 'Tu entrenamiento fue registrado.', [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+    if (failed > 0) {
+      showAlert('Error al guardar', `${failed} serie(s) no se pudieron guardar. Intenta de nuevo.`);
+    } else {
+      showAlert('¡Guardado!', 'Tu entrenamiento fue registrado.', () => navigation.goBack());
+    }
   }
 
   if (loading) return (
@@ -115,40 +140,68 @@ export default function WorkoutLogScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← ATRÁS</Text>
+          <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
+          <Text style={styles.backText}>ATRÁS</Text>
         </TouchableOpacity>
         <Text style={styles.exerciseName}>{exercise.name.toUpperCase()}</Text>
-        <Text style={styles.meta}>SEMANA {week} · {exercise.reps_objective} REPS · {exercise.unit}</Text>
+        <Text style={styles.meta}>SEMANA {week} · {exercise.reps_objective} REPS · {exercise.unit.toUpperCase()}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Ejemplo del ejercicio */}
+        {(exercise.image_url || exercise.notes || exercise.video_url) && (
+          <Card style={styles.exampleCard}>
+            <TouchableOpacity style={styles.exampleHeader} onPress={() => setShowImage(v => !v)}>
+              <Text style={styles.exampleTitle}>CÓMO SE HACE</Text>
+              <Ionicons name={showImage ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+            {showImage && (
+              <>
+                {exercise.image_url && (
+                  <Image source={{ uri: exercise.image_url }} style={styles.exampleImage} resizeMode="cover" />
+                )}
+                {exercise.notes ? <Text style={styles.exampleNotes}>{exercise.notes}</Text> : null}
+                {exercise.video_url ? <ExerciseVideo url={exercise.video_url} /> : null}
+              </>
+            )}
+          </Card>
+        )}
+
         <View style={styles.tableHeader}>
-          <Text style={[styles.th, { flex: 0.5 }]}>SERIE</Text>
+          <Text style={[styles.th, { flex: 0.6 }]}>SERIE</Text>
           <Text style={[styles.th, { flex: 1 }]}>PESO ({exercise.unit})</Text>
           <Text style={[styles.th, { flex: 1 }]}>REPS</Text>
         </View>
 
         {entries.map((entry, i) => (
-          <View key={entry.series.id} style={[styles.row, entry.saved && styles.rowSaved]}>
-            <View style={[styles.seriesBadge, { flex: 0.5 }]}>
-              <Text style={styles.seriesText}>S{entry.series.series_number}</Text>
+          <View key={entry.series.id}>
+            <View style={[styles.row, entry.saved && styles.rowSaved]}>
+              <View style={[styles.seriesBadge, { flex: 0.6 }]}>
+                <Text style={styles.seriesText}>S{entry.series.series_number}</Text>
+                {entry.saved && <Ionicons name="checkmark-circle" size={14} color={colors.success} />}
+              </View>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={entry.log.weight?.toString() ?? ''}
+                onChangeText={v => updateEntry(i, 'weight', v)}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={entry.log.reps?.toString() ?? ''}
+                onChangeText={v => updateEntry(i, 'reps', v)}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+              />
             </View>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={entry.log.weight?.toString() ?? ''}
-              onChangeText={v => updateEntry(i, 'weight', v)}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-            />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={entry.log.reps?.toString() ?? ''}
-              onChangeText={v => updateEntry(i, 'reps', v)}
-              keyboardType="number-pad"
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-            />
+            {entry.prev && (
+              <Text style={styles.prevText}>
+                Última vez (S{entry.prev.week}): {entry.prev.weight}{exercise.unit} × {entry.prev.reps}
+              </Text>
+            )}
           </View>
         ))}
 
@@ -179,15 +232,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     gap: spacing.xs,
   },
-  backBtn: { alignSelf: 'flex-start' },
+  backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
-  exerciseName: { fontSize: 28, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1 },
+  exerciseName: { ...typography.display, fontSize: 28 },
   meta: { ...typography.label, color: colors.accent, letterSpacing: 2 },
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
     gap: spacing.sm,
   },
+
+  exampleCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  exampleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  exampleTitle: { ...typography.label, color: colors.accent, letterSpacing: 2 },
+  exampleImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  exampleNotes: { ...typography.body, color: colors.textPrimary, lineHeight: 21 },
+
   tableHeader: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -215,11 +280,19 @@ const styles = StyleSheet.create({
   seriesBadge: {
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
   seriesText: {
     fontWeight: '900',
     color: colors.accent,
     fontSize: 16,
+  },
+  prevText: {
+    ...typography.caption,
+    fontSize: 11,
+    paddingHorizontal: spacing.sm,
+    paddingTop: 4,
   },
   input: {
     backgroundColor: colors.surface,

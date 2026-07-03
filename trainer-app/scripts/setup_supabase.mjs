@@ -10,10 +10,18 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import * as XLSX from 'xlsx';
 
+import { readFileSync as _rf } from 'fs';
+const _env = Object.fromEntries(
+  _rf(new URL('../.env.local', import.meta.url), 'utf8')
+    .split('\n').filter(l => l.includes('='))
+    .map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()])
+);
+
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SUPABASE_URL = 'https://nosebyewczvhsdohqrse.supabase.co';
-const SERVICE_KEY = '***CLAVE-REVOCADA***';
+const SUPABASE_URL = _env.SUPABASE_URL;
+const SERVICE_KEY  = _env.SUPABASE_SERVICE_KEY;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
@@ -399,9 +407,13 @@ async function main() {
 
   // Crear usuarios
   console.log('\n👤 Creando usuarios...');
-  const coachId  = await createUser('marcelo@trainerapp.com',   '***ROTADA***', 'Marcelo Herrera', 'coach');
-  const sebId    = await createUser('sebastian@trainerapp.com', '***ROTADA***', 'Sebastián', 'client');
-  const marceloClientId = await createUser('marceloclient@trainerapp.com', '***ROTADA***', 'Marcelo', 'client');
+  // contraseñas desde .env.local (SEED_COACH_PASSWORD / SEED_CLIENT_PASSWORD) — nunca hardcodear en un repo público
+  const coachPw  = _env.SEED_COACH_PASSWORD;
+  const clientPw = _env.SEED_CLIENT_PASSWORD;
+  if (!coachPw || !clientPw) { fail('Define SEED_COACH_PASSWORD y SEED_CLIENT_PASSWORD en .env.local'); process.exit(1); }
+  const coachId  = await createUser('marcelo@trainerapp.com',   coachPw, 'Marcelo Herrera', 'coach');
+  const sebId    = await createUser('sebastian@trainerapp.com', clientPw, 'Sebastián', 'client');
+  const marceloClientId = await createUser('marceloclient@trainerapp.com', coachPw, 'Marcelo', 'client');
 
   if (!coachId || !sebId) {
     fail('No se pudo obtener los IDs de usuario, abortando seed');
@@ -424,8 +436,8 @@ async function main() {
   }
 
   console.log('\n✅ Setup completado!\n');
-  console.log('  Coach:    marcelo@trainerapp.com   / ***ROTADA***');
-  console.log('  Cliente:  sebastian@trainerapp.com / ***ROTADA***\n');
+  console.log('  Coach:    marcelo@trainerapp.com');
+  console.log('  Cliente:  sebastian@trainerapp.com');
 }
 
 main().catch(err => { console.error('\n❌ Error:', err.message); process.exit(1); });

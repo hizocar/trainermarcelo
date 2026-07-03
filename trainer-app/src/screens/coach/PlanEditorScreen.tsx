@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, Modal,
+  TextInput, ActivityIndicator, Modal, Image,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { User, WorkoutPlan, TrainingDay, Exercise } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import { showAlert, showConfirm } from '../../lib/alert';
+import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/media';
+import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 
-const WEEK_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const REPS_OPTIONS = ['4-6', '6-8', '8-10', '8-12', '10-12', '12-15', '10-15'];
 
 type RouteParams = { client: User };
@@ -44,6 +48,12 @@ export default function PlanEditorScreen() {
   const [exRefWeight, setExRefWeight] = useState('');
   const [exSuperseries, setExSuperseries] = useState('');
   const [exSeries, setExSeries] = useState('3');
+  const [exNotes, setExNotes] = useState('');
+  const [exVideoUrl, setExVideoUrl] = useState('');
+  const [exImageUrl, setExImageUrl] = useState<string | null>(null);
+  const [exNewImage, setExNewImage] = useState<ImagePickerAsset | null>(null);
+  const [exNewVideo, setExNewVideo] = useState<ImagePickerAsset | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [editingEx, setEditingEx] = useState<Exercise | null>(null);
 
   useEffect(() => { fetchPlan(); }, []);
@@ -95,22 +105,19 @@ export default function PlanEditorScreen() {
     setSaving(false);
   }
 
-  async function deleteDay(dayId: string) {
-    Alert.alert('Eliminar día', '¿Seguro? Se eliminarán todos los ejercicios.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar', style: 'destructive', onPress: async () => {
-          await supabase.from('training_days').delete().eq('id', dayId);
-          setDays(prev => prev.filter(d => d.id !== dayId));
-        }
-      }
-    ]);
+  function deleteDay(dayId: string) {
+    showConfirm('Eliminar día', '¿Seguro? Se eliminarán todos los ejercicios.', async () => {
+      await supabase.from('training_days').delete().eq('id', dayId);
+      setDays(prev => prev.filter(d => d.id !== dayId));
+    }, 'Eliminar');
   }
 
   function openAddExercise(dayId: string) {
     setTargetDayId(dayId);
     setExName(''); setExReps('8-12'); setExUnit('kg');
     setExRefWeight(''); setExSuperseries(''); setExSeries('3');
+    setExNotes(''); setExVideoUrl(''); setExImageUrl(null); setExNewImage(null);
+    setExNewVideo(null);
     setEditingEx(null);
     setShowExModal(true);
   }
@@ -123,8 +130,26 @@ export default function PlanEditorScreen() {
     setExRefWeight(ex.ref_weight?.toString() ?? '');
     setExSuperseries(ex.superseries_group ?? '');
     setExSeries('3');
+    setExNotes(ex.notes ?? '');
+    setExVideoUrl(ex.video_url ?? '');
+    setExImageUrl(ex.image_url ?? null);
+    setExNewImage(null);
+    setExNewVideo(null);
     setEditingEx(ex);
     setShowExModal(true);
+  }
+
+  async function chooseImage() {
+    const asset = await pickImage();
+    if (asset) setExNewImage(asset);
+  }
+
+  async function chooseVideo() {
+    const asset = await pickVideo();
+    if (asset) {
+      setExNewVideo(asset);
+      setExVideoUrl(''); // el archivo reemplaza al link
+    }
   }
 
   async function saveExercise() {
@@ -132,15 +157,58 @@ export default function PlanEditorScreen() {
     setSaving(true);
     const seriesCount = parseInt(exSeries) || 3;
 
+    // subir imagen de ejemplo si el coach eligió una nueva
+    let imageUrl = exImageUrl;
+    if (exNewImage) {
+      try {
+        imageUrl = await uploadMedia('exercise-media', `${user!.id}/ex-${Date.now()}.jpg`, exNewImage);
+      } catch (e: any) {
+        setSaving(false);
+        showAlert('Error al subir imagen', e.message);
+        return;
+      }
+    }
+
+    // subir archivo de video si eligió uno (tiene prioridad sobre el link)
+    let videoUrl = exVideoUrl.trim() || null;
+    if (exNewVideo) {
+      setUploadingVideo(true);
+      try {
+        videoUrl = await uploadMedia(
+          'exercise-media',
+          `${user!.id}/vid-${Date.now()}.${videoExtension(exNewVideo)}`,
+          exNewVideo,
+        );
+      } catch (e: any) {
+        setSaving(false);
+        setUploadingVideo(false);
+        showAlert('Error al subir video', e.message);
+        return;
+      }
+      setUploadingVideo(false);
+    }
+
+    const mediaFields = {
+      notes: exNotes.trim() || null,
+      video_url: videoUrl,
+      image_url: imageUrl,
+    };
+
     if (editingEx) {
-      const { data } = await supabase.from('exercises').update({
+      const { data, error } = await supabase.from('exercises').update({
         name: exName.trim(),
         reps_objective: exReps,
         unit: exUnit,
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
         superseries_group: exSuperseries.trim() || null,
+        ...mediaFields,
       }).eq('id', editingEx.id).select().single();
 
+      if (error) {
+        setSaving(false);
+        showAlert('Error al guardar', error.message);
+        return;
+      }
       if (data) {
         setDays(prev => prev.map(d => ({
           ...d,
@@ -150,7 +218,7 @@ export default function PlanEditorScreen() {
     } else {
       const day = days.find(d => d.id === targetDayId)!;
       const orderIndex = day.exercises.length;
-      const { data: exData } = await supabase.from('exercises').insert({
+      const { data: exData, error } = await supabase.from('exercises').insert({
         day_id: targetDayId,
         name: exName.trim(),
         reps_objective: exReps,
@@ -158,12 +226,20 @@ export default function PlanEditorScreen() {
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
         superseries_group: exSuperseries.trim() || null,
         order_index: orderIndex,
+        ...mediaFields,
       }).select().single();
 
+      if (error) {
+        setSaving(false);
+        showAlert('Error al guardar', error.message);
+        return;
+      }
       if (exData) {
-        for (let i = 1; i <= seriesCount; i++) {
-          await supabase.from('exercise_series').insert({ exercise_id: exData.id, series_number: i });
-        }
+        const seriesRows = Array.from({ length: seriesCount }, (_, i) => ({
+          exercise_id: exData.id,
+          series_number: i + 1,
+        }));
+        await supabase.from('exercise_series').insert(seriesRows);
         setDays(prev => prev.map(d =>
           d.id === targetDayId ? { ...d, exercises: [...d.exercises, exData] } : d
         ));
@@ -173,19 +249,14 @@ export default function PlanEditorScreen() {
     setSaving(false);
   }
 
-  async function deleteExercise(ex: Exercise) {
-    Alert.alert('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar', style: 'destructive', onPress: async () => {
-          await supabase.from('exercises').delete().eq('id', ex.id);
-          setDays(prev => prev.map(d => ({
-            ...d,
-            exercises: d.exercises.filter(e => e.id !== ex.id)
-          })));
-        }
-      }
-    ]);
+  function deleteExercise(ex: Exercise) {
+    showConfirm('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, async () => {
+      await supabase.from('exercises').delete().eq('id', ex.id);
+      setDays(prev => prev.map(d => ({
+        ...d,
+        exercises: d.exercises.filter(e => e.id !== ex.id)
+      })));
+    }, 'Eliminar');
   }
 
   if (loading) return (
@@ -241,22 +312,26 @@ export default function PlanEditorScreen() {
             {day.exercises.map(ex => (
               <Card key={ex.id} style={styles.exCard}>
                 <View style={styles.exRow}>
+                  {ex.image_url ? (
+                    <Image source={{ uri: ex.image_url }} style={styles.exThumb} />
+                  ) : null}
                   <View style={styles.exInfo}>
                     {ex.superseries_group && (
-                      <Text style={styles.superTag}>🔗 {ex.superseries_group}</Text>
+                      <Text style={styles.superTag}>⛓ {ex.superseries_group}</Text>
                     )}
                     <Text style={styles.exName}>{ex.name}</Text>
                     <Text style={styles.exMeta}>
                       {ex.reps_objective} reps · {ex.unit}
                       {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
+                      {ex.video_url ? ' · 🎬' : ''}
                     </Text>
                   </View>
                   <View style={styles.exActions}>
                     <TouchableOpacity onPress={() => openEditExercise(ex)} style={styles.editBtn}>
-                      <Text style={styles.editBtnText}>✏</Text>
+                      <Ionicons name="pencil" size={14} color={colors.textPrimary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => deleteExercise(ex)} style={styles.deleteBtn}>
-                      <Text style={styles.deleteBtnText}>✕</Text>
+                      <Ionicons name="close" size={14} color={colors.danger} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -319,7 +394,7 @@ export default function PlanEditorScreen() {
       {/* Modal: ejercicio */}
       <Modal visible={showExModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalBox}>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalBox}>
             <Text style={styles.modalTitle}>
               {editingEx ? 'EDITAR EJERCICIO' : 'NUEVO EJERCICIO'}
             </Text>
@@ -381,6 +456,69 @@ export default function PlanEditorScreen() {
               keyboardType="decimal-pad"
             />
 
+            <Text style={styles.inputLabel}>IMAGEN DE EJEMPLO (opcional)</Text>
+            <TouchableOpacity style={styles.imagePicker} onPress={chooseImage} activeOpacity={0.8}>
+              {exNewImage || exImageUrl ? (
+                <Image
+                  source={{ uri: exNewImage?.uri ?? exImageUrl! }}
+                  style={styles.imagePreview}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={28} color={colors.textMuted} />
+                  <Text style={styles.imagePlaceholderText}>Toca para elegir una foto del ejercicio</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {(exNewImage || exImageUrl) && (
+              <TouchableOpacity onPress={() => { setExNewImage(null); setExImageUrl(null); }}>
+                <Text style={styles.removeImageText}>Quitar imagen</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.inputLabel}>VIDEO DE EJEMPLO (opcional)</Text>
+            {exNewVideo ? (
+              <View style={styles.videoChip}>
+                <Ionicons name="videocam" size={18} color={colors.accent} />
+                <Text style={styles.videoChipText} numberOfLines={1}>
+                  {exNewVideo.fileName ?? 'Video seleccionado'}
+                  {exNewVideo.duration ? ` · ${Math.round(exNewVideo.duration / 1000)}s` : ''}
+                </Text>
+                <TouchableOpacity onPress={() => setExNewVideo(null)}>
+                  <Ionicons name="close-circle" size={18} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity style={styles.uploadVideoBtn} onPress={chooseVideo} activeOpacity={0.8}>
+                  <Ionicons name="cloud-upload-outline" size={18} color={colors.accent} />
+                  <Text style={styles.uploadVideoText}>SUBIR VIDEO (máx 50MB)</Text>
+                </TouchableOpacity>
+                <Text style={styles.orText}>— o pega un link de YouTube —</Text>
+                <TextInput
+                  style={styles.input}
+                  value={exVideoUrl}
+                  onChangeText={setExVideoUrl}
+                  placeholder="ej: https://youtube.com/watch?v=..."
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </>
+            )}
+
+            <Text style={styles.inputLabel}>INSTRUCCIONES / NOTAS (opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={exNotes}
+              onChangeText={setExNotes}
+              placeholder="ej: Baja controlado 3 segundos, codos a 45°..."
+              placeholderTextColor={colors.textMuted}
+              multiline
+              numberOfLines={3}
+            />
+
             {!editingEx && (
               <>
                 <Text style={styles.inputLabel}>NÚMERO DE SERIES</Text>
@@ -407,6 +545,9 @@ export default function PlanEditorScreen() {
                   : <Text style={styles.confirmBtnText}>GUARDAR</Text>}
               </TouchableOpacity>
             </View>
+            {uploadingVideo && (
+              <Text style={styles.uploadingText}>Subiendo video… esto puede tardar unos segundos</Text>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -422,7 +563,7 @@ const styles = StyleSheet.create({
   },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   headerLabel: { ...typography.caption, letterSpacing: 3, color: colors.textMuted },
-  headerName: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
+  headerName: { ...typography.displaySm },
   addDayBtn: {
     backgroundColor: colors.accent, borderRadius: radius.md,
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
@@ -460,7 +601,8 @@ const styles = StyleSheet.create({
   iconBtnDangerText: { ...typography.caption, color: colors.danger },
 
   exCard: { },
-  exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  exThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface },
   exInfo: { flex: 1 },
   superTag: { ...typography.caption, color: colors.accent, marginBottom: 2 },
   exName: { ...typography.h3 },
@@ -490,6 +632,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'flex-end',
   },
+  modalScroll: { maxHeight: '90%', flexGrow: 0 },
   modalBox: {
     backgroundColor: colors.surface, borderTopLeftRadius: radius.lg * 2,
     borderTopRightRadius: radius.lg * 2, padding: spacing.xl,
@@ -503,6 +646,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.md,
     color: colors.textPrimary, fontSize: 15,
   },
+  inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
+  imagePicker: {
+    borderRadius: radius.md, overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
+  },
+  imagePreview: { width: '100%', height: 160 },
+  imagePlaceholder: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
+  imagePlaceholderText: { ...typography.caption },
+  removeImageText: {
+    ...typography.caption, color: colors.danger,
+    textAlign: 'center', letterSpacing: 1,
+  },
+  uploadVideoBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent + '66',
+    backgroundColor: colors.card, paddingVertical: spacing.md,
+  },
+  uploadVideoText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
+  orText: { ...typography.caption, textAlign: 'center', fontSize: 10 },
+  videoChip: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.card, padding: spacing.md,
+  },
+  videoChipText: { ...typography.caption, color: colors.textPrimary, flex: 1 },
+  uploadingText: { ...typography.caption, color: colors.accent, textAlign: 'center' },
   weekDayPicker: { flexGrow: 0 },
   weekDayOption: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,

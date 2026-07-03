@@ -74,6 +74,13 @@ export default function ClientDetailScreen() {
             >
               <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>📈 VER PROGRESO</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnSecondary]}
+              onPress={() => navigation.navigate('ClientBody', { client })}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🧍 MEDIDAS Y FOTOS</Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.sectionLabel}>DÍAS DE ENTRENAMIENTO</Text>
@@ -124,12 +131,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     letterSpacing: 2,
   },
-  clientName: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: colors.textPrimary,
-    letterSpacing: -1,
-  },
+  clientName: { ...typography.display },
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,

@@ -9,7 +9,9 @@ import {
   Platform,
   ActivityIndicator,
   StatusBar,
+  ImageBackground,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, typography } from '../../theme';
 
@@ -30,91 +32,128 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <ImageBackground
+      source={require('../../../assets/hero-marcelo.jpg')}
+      style={styles.hero}
+      resizeMode="cover"
     >
       <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={['rgba(10,10,10,0.25)', 'rgba(10,10,10,0.75)', '#0A0A0A']}
+        locations={[0, 0.55, 0.88]}
+        style={StyleSheet.absoluteFill}
+      />
 
-      <View style={styles.header}>
-        <Text style={styles.logo}>TRAINER</Text>
-        <Text style={styles.logoAccent}>APP</Text>
-        <Text style={styles.subtitle}>POR MARCELO HERRERA</Text>
-      </View>
-
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>EMAIL</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="tu@email.com"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.header}>
+          <View style={styles.brandRow}>
+            <View style={styles.brandBar} />
+            <Text style={styles.brandKicker}>ENTRENAMIENTO PERSONALIZADO</Text>
+          </View>
+          <Text style={styles.logo}>MARCELO</Text>
+          <Text style={styles.logoAccent}>HERRERA</Text>
+          <Text style={styles.subtitle}>COACH · THERAPIST</Text>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>CONTRASEÑA</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-          />
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>EMAIL</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="tu@email.com"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>CONTRASEÑA</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              onSubmitEditing={handleLogin}
+            />
+          </View>
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading
+              ? <ActivityIndicator color={colors.background} />
+              : <Text style={styles.buttonText}>ENTRAR</Text>
+            }
+          </TouchableOpacity>
         </View>
-
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          {loading
-            ? <ActivityIndicator color={colors.background} />
-            : <Text style={styles.buttonText}>ENTRAR</Text>
-          }
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  hero: {
     flex: 1,
     backgroundColor: colors.background,
-    justifyContent: 'center',
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'flex-end',
     paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   header: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  brandBar: {
+    width: 28,
+    height: 3,
+    backgroundColor: colors.accent,
+    borderRadius: radius.full,
+  },
+  brandKicker: {
+    ...typography.label,
+    color: colors.textSecondary,
+    letterSpacing: 3,
+    fontSize: 10,
   },
   logo: {
+    ...typography.display,
     fontSize: 56,
-    fontWeight: '900',
+    lineHeight: 60,
     color: colors.textPrimary,
-    letterSpacing: -2,
-    lineHeight: 56,
   },
   logoAccent: {
+    ...typography.display,
     fontSize: 56,
-    fontWeight: '900',
+    lineHeight: 60,
     color: colors.accent,
-    letterSpacing: -2,
-    lineHeight: 56,
   },
   subtitle: {
     ...typography.label,
     marginTop: spacing.sm,
-    letterSpacing: 3,
+    letterSpacing: 4,
+    color: colors.textSecondary,
   },
   form: {
     gap: spacing.md,
@@ -127,9 +166,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(22, 22, 22, 0.92)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -155,6 +194,6 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontSize: 15,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 3,
   },
 });

@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator,
+  StatusBar, ActivityIndicator, Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { TrainingDay, WorkoutPlan, Exercise } from '../../types';
+import { TrainingDay, Exercise } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
-
-const WEEK_DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const WEEK_DAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+import { WEEK_DAYS, WEEK_DAYS_SHORT, getCurrentWeek } from '../../lib/weeks';
 
 export default function TodayScreen() {
   const { user } = useAuth();
@@ -19,13 +18,17 @@ export default function TodayScreen() {
   const [days, setDays] = useState<TrainingDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<TrainingDay | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
   const currentWeek = getCurrentWeek();
 
-  useEffect(() => { if (user?.id) fetchPlan(); }, [user?.id]);
-  useEffect(() => { if (selectedDay) fetchExercises(selectedDay.id); }, [selectedDay]);
+  // refresca al volver de WorkoutLog para actualizar los checks de completado
+  useFocusEffect(useCallback(() => {
+    if (user?.id && days.length === 0) fetchPlan();
+    else if (selectedDay) fetchExercises(selectedDay.id);
+  }, [user?.id, selectedDay?.id]));
 
   async function fetchPlan() {
     const { data: planData } = await supabase
@@ -52,7 +55,33 @@ export default function TodayScreen() {
     const { data } = await supabase
       .from('exercises').select('*')
       .eq('day_id', dayId).order('order_index');
-    setExercises(data ?? []);
+    const exs = data ?? [];
+    setExercises(exs);
+
+    // marcar ejercicios ya registrados esta semana
+    if (exs.length > 0) {
+      const { data: series } = await supabase
+        .from('exercise_series')
+        .select('id, exercise_id')
+        .in('exercise_id', exs.map(e => e.id));
+
+      const seriesIds = (series ?? []).map(s => s.id);
+      if (seriesIds.length > 0) {
+        const { data: logs } = await supabase
+          .from('workout_logs')
+          .select('series_id')
+          .in('series_id', seriesIds)
+          .eq('week_number', currentWeek);
+
+        const loggedSeriesIds = new Set((logs ?? []).map(l => l.series_id));
+        const done = new Set(
+          (series ?? []).filter(s => loggedSeriesIds.has(s.id)).map(s => s.exercise_id)
+        );
+        setLoggedExercises(done);
+        return;
+      }
+    }
+    setLoggedExercises(new Set());
   }
 
   const isToday = (day: TrainingDay) => day.week_day === todayWeekDay;
@@ -109,13 +138,30 @@ export default function TodayScreen() {
             })}
           </ScrollView>
 
-          {/* Indicador de si es el día de hoy */}
+          {/* Indicador de si es el día de hoy + progreso del día */}
           {selectedDay && (
             <View style={styles.dayIndicator}>
               <View style={[styles.dayIndicatorDot, isToday(selectedDay) && styles.dayIndicatorDotActive]} />
               <Text style={styles.dayIndicatorText}>
                 {isToday(selectedDay) ? 'HOY ES TU DÍA DE ENTRENAMIENTO' : `TU DÍA ES EL ${selectedDay.week_day != null ? WEEK_DAYS[selectedDay.week_day].toUpperCase() : ''}`}
               </Text>
+              {exercises.length > 0 && (
+                <Text style={styles.dayProgress}>
+                  {loggedExercises.size}/{exercises.length}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* barra de progreso del día */}
+          {exercises.length > 0 && (
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.round((loggedExercises.size / exercises.length) * 100)}%` },
+                ]}
+              />
             </View>
           )}
 
@@ -123,31 +169,45 @@ export default function TodayScreen() {
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
           >
-            {exercises.map(ex => (
-              <TouchableOpacity
-                key={ex.id}
-                onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
-                activeOpacity={0.7}
-              >
-                <Card style={styles.exerciseCard}>
-                  <View style={styles.exerciseRow}>
-                    <View style={styles.exerciseInfo}>
-                      {ex.superseries_group && (
-                        <Text style={styles.superTag}>🔗 {ex.superseries_group}</Text>
+            {exercises.map(ex => {
+              const done = loggedExercises.has(ex.id);
+              return (
+                <TouchableOpacity
+                  key={ex.id}
+                  onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
+                  activeOpacity={0.7}
+                >
+                  <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
+                    <View style={styles.exerciseRow}>
+                      {ex.image_url ? (
+                        <Image source={{ uri: ex.image_url }} style={styles.thumb} />
+                      ) : (
+                        <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                          <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
+                        </View>
                       )}
-                      <Text style={styles.exerciseName}>{ex.name}</Text>
-                      <Text style={styles.exerciseMeta}>
-                        {ex.reps_objective} reps · 3 series · {ex.unit}
-                        {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
-                      </Text>
+                      <View style={styles.exerciseInfo}>
+                        {ex.superseries_group && (
+                          <Text style={styles.superTag}>⛓ {ex.superseries_group}</Text>
+                        )}
+                        <Text style={styles.exerciseName}>{ex.name}</Text>
+                        <Text style={styles.exerciseMeta}>
+                          {ex.reps_objective} reps · {ex.unit}
+                          {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.logBtn, done && styles.logBtnDone]}>
+                        <Ionicons
+                          name={done ? 'checkmark' : 'add'}
+                          size={22}
+                          color={done ? colors.background : colors.background}
+                        />
+                      </View>
                     </View>
-                    <View style={styles.logBtn}>
-                      <Text style={styles.logBtnText}>+</Text>
-                    </View>
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            ))}
+                  </Card>
+                </TouchableOpacity>
+              );
+            })}
 
             {exercises.length === 0 && selectedDay && (
               <Card style={styles.noExCard}>
@@ -164,13 +224,6 @@ export default function TodayScreen() {
   );
 }
 
-function getCurrentWeek(): number {
-  const start = new Date('2025-01-06');
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
-  return Math.max(1, Math.min(diff + 1, 8));
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
   header: {
@@ -178,7 +231,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl, marginBottom: spacing.lg,
   },
   greeting: { ...typography.label, letterSpacing: 2, color: colors.accent },
-  userName: { fontSize: 32, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1, marginTop: 2 },
+  userName: { ...typography.display, fontSize: 34, marginTop: 2 },
   weekBadge: {
     width: 52, height: 52, borderRadius: radius.full,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
@@ -210,11 +263,31 @@ const styles = StyleSheet.create({
   },
   dayIndicatorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted },
   dayIndicatorDotActive: { backgroundColor: colors.accent },
-  dayIndicatorText: { ...typography.caption, letterSpacing: 1.5, color: colors.textMuted },
+  dayIndicatorText: { ...typography.caption, letterSpacing: 1.5, color: colors.textMuted, flex: 1 },
+  dayProgress: { ...typography.caption, color: colors.accent, fontWeight: '900', letterSpacing: 1 },
+  progressTrack: {
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
+  },
 
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.sm },
   exerciseCard: { },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  exerciseCardDone: { borderColor: colors.accent + '66' },
+  exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  thumb: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.surface },
+  thumbPlaceholder: {
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border,
+  },
   exerciseInfo: { flex: 1 },
   superTag: { ...typography.caption, color: colors.accent, marginBottom: 2 },
   exerciseName: { ...typography.h3 },
@@ -223,7 +296,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: radius.full,
     backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center',
   },
-  logBtnText: { color: colors.background, fontSize: 22, fontWeight: '900', lineHeight: 24 },
+  logBtnDone: { backgroundColor: colors.success },
 
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
   emptyTitle: { ...typography.h2, color: colors.textMuted, marginBottom: spacing.sm },

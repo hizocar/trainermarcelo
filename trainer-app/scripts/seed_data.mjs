@@ -10,10 +10,18 @@ import { createClient } from '@supabase/supabase-js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+import { readFileSync as _rf } from 'fs';
+const _env = Object.fromEntries(
+  _rf(new URL('../.env.local', import.meta.url), 'utf8')
+    .split('\n').filter(l => l.includes('='))
+    .map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()])
+);
+
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SUPABASE_URL = 'https://nosebyewczvhsdohqrse.supabase.co';
-const SERVICE_KEY  = '***CLAVE-REVOCADA***';
+const SUPABASE_URL = _env.SUPABASE_URL;
+const SERVICE_KEY  = _env.SUPABASE_SERVICE_KEY;
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
@@ -175,9 +183,9 @@ async function main() {
   await seedClient('Marcelo', USERS.marcelo.id, USERS.coach.id);
 
   console.log('\n✅ Seed completado!\n');
-  console.log('  Coach:   marcelo@trainerapp.com      / ***ROTADA***');
-  console.log('  Cliente: sebastian@trainerapp.com    / ***ROTADA***');
-  console.log('  Cliente: marceloclient@trainerapp.com / ***ROTADA***\n');
+  console.log('  Coach:   marcelo@trainerapp.com');
+  console.log('  Cliente: sebastian@trainerapp.com');
+  console.log('  Cliente: marceloclient@trainerapp.com');
 }
 
 main().catch(err => { console.error('\n❌', err.message); process.exit(1); });

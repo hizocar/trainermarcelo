@@ -6,6 +6,7 @@ export interface User {
   role: UserRole;
   coach_id?: string;
   email: string;
+  avatar_url?: string;
 }
 
 export interface WorkoutPlan {
@@ -41,6 +42,9 @@ export interface Exercise {
   unit: 'kg' | 'lb';
   ref_weight?: number;
   order_index: number;
+  image_url?: string;
+  video_url?: string;
+  notes?: string;
 }
 
 export interface ExerciseSeries {
@@ -62,4 +66,16 @@ export interface WorkoutLog {
 export interface WeeklyVolume {
   week: number;
   volume: number;
+}
+
+export interface BodyMetric {
+  id: string;
+  user_id: string;
+  measured_at: string; // fecha YYYY-MM-DD
+  weight_kg?: number;
+  height_cm?: number;
+  body_fat_pct?: number;
+  notes?: string;
+  photo_path?: string;
+  created_at: string;
 }

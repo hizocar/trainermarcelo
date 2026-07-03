@@ -43,15 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .single();
 
     if (error) {
-      console.error('[AuthContext] fetchProfile error:', error.message, error.code);
-      // Si RLS bloquea la lectura, intentar con el email del session
+      console.error('[AuthContext] fetchProfile error:', error.code);
+      // Si RLS bloquea la lectura, degradar a rol 'client'.
+      // user_metadata es editable por el propio usuario: nunca usarlo para otorgar rol coach.
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser?.user_metadata?.role) {
+      if (authUser) {
         setUser({
           id: userId,
-          name: authUser.user_metadata.name ?? authUser.email ?? '',
+          name: authUser.user_metadata?.name ?? authUser.email ?? '',
           email: authUser.email ?? '',
-          role: authUser.user_metadata.role,
+          role: 'client',
         });
       }
     } else {
