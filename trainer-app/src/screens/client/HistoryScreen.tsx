@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +45,8 @@ export default function HistoryScreen() {
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [filterDay, setFilterDay] = useState<number | null>(null);
 
   // recargar al volver de editar un registro
   useFocusEffect(useCallback(() => { if (user?.id) fetchAll(); }, [user?.id]));
@@ -114,17 +116,38 @@ export default function HistoryScreen() {
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [logs, series, exercises, days]);
 
+  // búsqueda por ejercicio, nombre de día o fecha; filtro por día del plan
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const filteredSessions = useMemo(() => {
+    let out = sessions;
+    if (filterDay != null) out = out.filter(s => s.day.day_number === filterDay);
+    const q = norm(query.trim());
+    if (q) {
+      out = out
+        .map(s => {
+          const dateText = norm(formatShortDate(s.date) + ' ' + formatMonthYear(s.date));
+          const sessionMatches = norm(s.day.name).includes(q) || dateText.includes(q);
+          const exs = sessionMatches
+            ? s.exercises
+            : s.exercises.filter(e => norm(e.exercise.name).includes(q));
+          return { ...s, exercises: exs };
+        })
+        .filter(s => s.exercises.length > 0);
+    }
+    return out;
+  }, [sessions, query, filterDay]);
+
   // agrupar por mes para los separadores
   const sections = useMemo(() => {
     const out: { month: string; sessions: Session[] }[] = [];
-    sessions.forEach(s => {
+    filteredSessions.forEach(s => {
       const month = formatMonthYear(s.date);
       const last = out[out.length - 1];
       if (last && last.month === month) last.sessions.push(s);
       else out.push({ month, sessions: [s] });
     });
     return out;
-  }, [sessions]);
+  }, [filteredSessions]);
 
   return (
     <View style={styles.container}>
@@ -134,6 +157,48 @@ export default function HistoryScreen() {
           <Text style={styles.headerName}>MIS ENTRENAMIENTOS</Text>
         </View>
 
+        {!loading && sessions.length > 0 && (
+          <>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={16} color={colors.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Buscar ejercicio, día o fecha..."
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {query.length > 0 && (
+                <TouchableOpacity onPress={() => setQuery('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.dayChips}>
+              <TouchableOpacity
+                style={[styles.dayChip, filterDay == null && styles.dayChipActive]}
+                onPress={() => setFilterDay(null)}
+              >
+                <Text style={[styles.dayChipText, filterDay == null && styles.dayChipTextActive]}>TODOS</Text>
+              </TouchableOpacity>
+              {days.map(d => (
+                <TouchableOpacity
+                  key={d.id}
+                  style={[styles.dayChip, filterDay === d.day_number && styles.dayChipActive]}
+                  onPress={() => setFilterDay(filterDay === d.day_number ? null : d.day_number)}
+                >
+                  <Text style={[styles.dayChipText, filterDay === d.day_number && styles.dayChipTextActive]}>
+                    DÍA {d.day_number} · {d.name.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         {loading ? (
           <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
         ) : sessions.length === 0 ? (
@@ -141,6 +206,11 @@ export default function HistoryScreen() {
             <Ionicons name="time-outline" size={40} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>SIN REGISTROS</Text>
             <Text style={styles.emptyText}>Cuando registres entrenamientos, aparecerán aquí ordenados por fecha.</Text>
+          </Card>
+        ) : sections.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Ionicons name="search-outline" size={32} color={colors.textMuted} />
+            <Text style={styles.emptyText}>Nada coincide con tu búsqueda.</Text>
           </Card>
         ) : (
           sections.map(section => (
@@ -200,6 +270,23 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.md },
   headerLabel: { ...typography.label, letterSpacing: 3, color: colors.textMuted },
   headerName: { ...typography.display, fontSize: 30 },
+
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+  },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: 14, padding: 0 },
+  dayChips: { gap: spacing.sm },
+  dayChip: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  dayChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dayChipText: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
+  dayChipTextActive: { color: colors.background },
 
   monthBlock: { gap: spacing.sm },
   monthLabel: { ...typography.label, letterSpacing: 3, marginTop: spacing.sm },

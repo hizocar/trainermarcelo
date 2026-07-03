@@ -11,6 +11,7 @@ import { User } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import TrendChart from '../../components/common/TrendChart';
+import { getCurrentWeek } from '../../lib/weeks';
 
 type RouteParams = { client?: User; clientId?: string; clientName?: string };
 
@@ -90,10 +91,19 @@ export default function ProgressScreen() {
     setLoading(false);
   }
 
+  // La semana en curso se excluye de todos los cálculos: parcial, distorsiona.
+  // Se suma automáticamente cuando termina (getCurrentWeek avanza).
+  const currentWeek = getCurrentWeek();
+  const closedLogs = useMemo(
+    () => logs.filter(l => l.week_number < currentWeek),
+    [logs, currentWeek],
+  );
+  const hasCurrentWeekLogs = logs.length > closedLogs.length;
+
   // ── progresión por ejercicio ──────────────────────────────────────────────
   const progress = useMemo<ExProgress[]>(() => {
     const byEx: Record<string, Record<number, LogRow[]>> = {};
-    logs.forEach(l => {
+    closedLogs.forEach(l => {
       const exId = seriesExMap[l.series_id];
       if (!exId) return;
       ((byEx[exId] ??= {})[l.week_number] ??= []).push(l);
@@ -120,7 +130,7 @@ export default function ProgressScreen() {
 
         return { exercise: e, points, delta, lastWeek: last.week, best };
       });
-  }, [logs, exercises, seriesExMap]);
+  }, [closedLogs, exercises, seriesExMap]);
 
   const improving = progress.filter(p => p.delta != null && p.delta > 1)
     .sort((a, b) => b.delta! - a.delta!);
@@ -132,13 +142,13 @@ export default function ProgressScreen() {
   // ── volumen semanal (para la línea del resumen) ───────────────────────────
   const weeklyVolume = useMemo(() => {
     const byWeek: Record<number, number> = {};
-    logs.forEach(l => {
+    closedLogs.forEach(l => {
       byWeek[l.week_number] = (byWeek[l.week_number] ?? 0) + l.weight * l.reps;
     });
     return Object.entries(byWeek)
       .map(([w, v]) => ({ week: Number(w), volume: Math.round(v) }))
       .sort((a, b) => a.week - b.week);
-  }, [logs]);
+  }, [closedLogs]);
 
   const volDelta = useMemo(() => {
     if (weeklyVolume.length < 2) return null;
@@ -147,7 +157,7 @@ export default function ProgressScreen() {
     return ((last - prev) / prev) * 100;
   }, [weeklyVolume]);
 
-  const hasData = logs.length > 0;
+  const hasData = closedLogs.length > 0;
   const comparable = improving.length + steady.length + declining.length;
 
   const fmtDelta = (d: number) => `${d > 0 ? '+' : ''}${Math.round(d)}%`;
@@ -268,6 +278,12 @@ export default function ProgressScreen() {
                   height={120}
                 />
               )}
+
+              {hasCurrentWeekLogs && (
+                <Text style={styles.currentWeekNote}>
+                  ⏳ La semana en curso se sumará al gráfico cuando termine
+                </Text>
+              )}
             </Card>
 
             {improving.length > 0 && (
@@ -342,6 +358,7 @@ const styles = StyleSheet.create({
   },
   summaryBarSeg: { height: '100%', borderRadius: radius.full },
   volLine: { ...typography.caption, textAlign: 'center' },
+  currentWeekNote: { ...typography.caption, fontSize: 10, textAlign: 'center', fontStyle: 'italic' },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
