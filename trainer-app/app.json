@@ -33,8 +33,7 @@
         {
           "photosPermission": "La app necesita acceso a tus fotos para subir imágenes de ejercicios, avatares y fotos de progreso."
         }
-      ],
-      "expo-status-bar"
+      ]
     ]
   }
 }
