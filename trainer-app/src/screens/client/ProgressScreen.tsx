@@ -26,6 +26,13 @@ interface ExerciseInfo {
   id: string;
   name: string;
   unit: string;
+  day_id: string;
+}
+
+interface PlanDay {
+  id: string;
+  day_number: number;
+  name: string;
 }
 
 // Fuerza estimada (1RM Epley): captura mejoras de peso Y de reps en un solo número
@@ -50,6 +57,8 @@ export default function ProgressScreen() {
   const isCoachView = !!(params.client || params.clientId);
 
   const [logs, setLogs] = useState<LogRow[]>([]);
+  const [planDays, setPlanDays] = useState<PlanDay[]>([]);
+  const [volDay, setVolDay] = useState<string | null>(null);
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
   const [seriesExMap, setSeriesExMap] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -67,12 +76,14 @@ export default function ProgressScreen() {
     if (!plan) { setLoading(false); return; }
 
     const { data: days } = await supabase
-      .from('training_days').select('id').eq('plan_id', plan.id);
+      .from('training_days').select('id, day_number, name')
+      .eq('plan_id', plan.id).order('day_number');
+    setPlanDays(days ?? []);
     const dayIds = (days ?? []).map(d => d.id);
     if (dayIds.length === 0) { setLoading(false); return; }
 
     const { data: exs } = await supabase
-      .from('exercises').select('id, name, unit')
+      .from('exercises').select('id, name, unit, day_id')
       .in('day_id', dayIds).order('order_index');
     setExercises(exs ?? []);
 
@@ -91,14 +102,29 @@ export default function ProgressScreen() {
     setLoading(false);
   }
 
-  // La semana en curso se excluye de todos los cálculos: parcial, distorsiona.
-  // Se suma automáticamente cuando termina (getCurrentWeek avanza).
+  // Semanas parciales fuera de los cálculos: distorsionan. Una semana está
+  // en curso si es la semana calendario actual, o si es la última con datos
+  // y aún no registra todos los días del plan.
   const currentWeek = getCurrentWeek();
-  const closedLogs = useMemo(
-    () => logs.filter(l => l.week_number < currentWeek),
-    [logs, currentWeek],
-  );
-  const hasCurrentWeekLogs = logs.length > closedLogs.length;
+  const { closedLogs, partialWeek } = useMemo(() => {
+    const valid = logs.filter(l => l.week_number < currentWeek);
+    if (valid.length === 0) return { closedLogs: valid, partialWeek: logs.length > 0 ? currentWeek : null };
+
+    const exDay: Record<string, string> = {};
+    exercises.forEach(e => { exDay[e.id] = e.day_id; });
+    const daysInWeek: Record<number, Set<string>> = {};
+    valid.forEach(l => {
+      const d = exDay[seriesExMap[l.series_id]];
+      if (d) (daysInWeek[l.week_number] ??= new Set()).add(d);
+    });
+    const lastWeek = Math.max(...valid.map(l => l.week_number));
+    const isPartial = (daysInWeek[lastWeek]?.size ?? 0) < planDays.length;
+    return {
+      closedLogs: isPartial ? valid.filter(l => l.week_number !== lastWeek) : valid,
+      partialWeek: isPartial ? lastWeek : (logs.length > valid.length ? currentWeek : null),
+    };
+  }, [logs, currentWeek, exercises, seriesExMap, planDays]);
+  const hasCurrentWeekLogs = partialWeek != null;
 
   // ── progresión por ejercicio ──────────────────────────────────────────────
   const progress = useMemo<ExProgress[]>(() => {
@@ -139,16 +165,19 @@ export default function ProgressScreen() {
     .sort((a, b) => a.delta! - b.delta!);
   const noHistory = progress.filter(p => p.delta == null);
 
-  // ── volumen semanal (para la línea del resumen) ───────────────────────────
+  // ── volumen semanal, filtrable por día del plan ───────────────────────────
   const weeklyVolume = useMemo(() => {
+    const exDay: Record<string, string> = {};
+    exercises.forEach(e => { exDay[e.id] = e.day_id; });
     const byWeek: Record<number, number> = {};
     closedLogs.forEach(l => {
+      if (volDay && exDay[seriesExMap[l.series_id]] !== volDay) return;
       byWeek[l.week_number] = (byWeek[l.week_number] ?? 0) + l.weight * l.reps;
     });
     return Object.entries(byWeek)
       .map(([w, v]) => ({ week: Number(w), volume: Math.round(v) }))
       .sort((a, b) => a.week - b.week);
-  }, [closedLogs]);
+  }, [closedLogs, volDay, exercises, seriesExMap]);
 
   const volDelta = useMemo(() => {
     if (weeklyVolume.length < 2) return null;
@@ -264,7 +293,7 @@ export default function ProgressScreen() {
 
               {volDelta != null && (
                 <Text style={styles.volLine}>
-                  Volumen S{weeklyVolume[weeklyVolume.length - 1].week}:{' '}
+                  Volumen{volDay ? ` DÍA ${planDays.find(d => d.id === volDay)?.day_number}` : ''} S{weeklyVolume[weeklyVolume.length - 1].week}:{' '}
                   <Text style={{ color: volDelta >= 0 ? colors.success : colors.danger, fontWeight: '800' }}>
                     {fmtDelta(volDelta)}
                   </Text>{' '}
@@ -272,16 +301,39 @@ export default function ProgressScreen() {
                 </Text>
               )}
 
-              {weeklyVolume.length >= 2 && (
+              {/* filtro por día del plan */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.volDayChips}>
+                <TouchableOpacity
+                  style={[styles.volDayChip, volDay == null && styles.volDayChipActive]}
+                  onPress={() => setVolDay(null)}
+                >
+                  <Text style={[styles.volDayChipText, volDay == null && styles.volDayChipTextActive]}>TODO</Text>
+                </TouchableOpacity>
+                {planDays.map(d => (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={[styles.volDayChip, volDay === d.id && styles.volDayChipActive]}
+                    onPress={() => setVolDay(volDay === d.id ? null : d.id)}
+                  >
+                    <Text style={[styles.volDayChipText, volDay === d.id && styles.volDayChipTextActive]}>
+                      DÍA {d.day_number} · {d.name.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {weeklyVolume.length >= 2 ? (
                 <TrendChart
                   data={weeklyVolume.map(w => ({ label: `S${w.week}`, value: w.volume }))}
                   height={120}
                 />
+              ) : (
+                <Text style={styles.currentWeekNote}>Este día aún no tiene dos semanas completas para comparar.</Text>
               )}
 
               {hasCurrentWeekLogs && (
                 <Text style={styles.currentWeekNote}>
-                  ⏳ La semana en curso se sumará al gráfico cuando termine
+                  ⏳ La semana {partialWeek} está en curso: se sumará al gráfico cuando estén todos sus días registrados
                 </Text>
               )}
             </Card>
@@ -359,6 +411,15 @@ const styles = StyleSheet.create({
   summaryBarSeg: { height: '100%', borderRadius: radius.full },
   volLine: { ...typography.caption, textAlign: 'center' },
   currentWeekNote: { ...typography.caption, fontSize: 10, textAlign: 'center', fontStyle: 'italic' },
+  volDayChips: { gap: spacing.xs + 2 },
+  volDayChip: {
+    paddingHorizontal: spacing.sm + 2, paddingVertical: 4,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  volDayChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  volDayChipText: { fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
+  volDayChipTextActive: { color: colors.background },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
