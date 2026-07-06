@@ -1,8 +1,14 @@
+import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from './supabase';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 // Límite del bucket exercise-media (50MB); validamos antes de subir para dar buen mensaje
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 // Abre la galería y devuelve el asset elegido (o null si cancela).
 export async function pickImage(): Promise<ImagePicker.ImagePickerAsset | null> {
@@ -28,28 +34,66 @@ export async function pickVideo(): Promise<ImagePicker.ImagePickerAsset | null> 
   return result.canceled ? null : result.assets[0];
 }
 
-// Sube imagen o video a Supabase Storage y devuelve su URL pública.
+function contentTypeOf(asset: ImagePicker.ImagePickerAsset): string {
+  return asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+}
+
+// Sube el asset al bucket. En web usa blob; en nativo sube directo desde el
+// archivo con FileSystem.uploadAsync — fetch(file://).blob() + supabase-js
+// sube cuerpos de 0 bytes en iOS/Android.
+async function uploadToBucket(
+  bucket: string,
+  path: string,
+  asset: ImagePicker.ImagePickerAsset,
+  maxBytes: number,
+): Promise<void> {
+  const contentType = contentTypeOf(asset);
+  const tooBig = `El archivo supera el máximo de ${Math.round(maxBytes / 1024 / 1024)}MB.`;
+
+  if (Platform.OS === 'web') {
+    const res = await fetch(asset.uri);
+    const blob = await res.blob();
+    if (blob.size > maxBytes) throw new Error(tooBig);
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, blob, { contentType, upsert: true });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const info = await FileSystem.getInfoAsync(asset.uri);
+  if (info.exists && (info.size ?? 0) > maxBytes) throw new Error(tooBig);
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sesión expirada: vuelve a iniciar sesión.');
+
+  const res = await FileSystem.uploadAsync(
+    `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`,
+    asset.uri,
+    {
+      httpMethod: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: ANON_KEY,
+        'Content-Type': contentType,
+        'x-upsert': 'true',
+      },
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    },
+  );
+  if (res.status !== 200 && res.status !== 201) {
+    throw new Error(`No se pudo subir (HTTP ${res.status}). ${res.body?.slice(0, 120) ?? ''}`);
+  }
+}
+
+// Sube imagen o video a un bucket público y devuelve su URL pública.
 // path debe empezar con el uid del usuario (lo exigen las políticas del bucket).
 export async function uploadMedia(
   bucket: 'exercise-media' | 'avatars',
   path: string,
   asset: ImagePicker.ImagePickerAsset,
 ): Promise<string> {
-  const res = await fetch(asset.uri);
-  const blob = await res.blob();
-
-  if (blob.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`El archivo pesa ${(blob.size / 1024 / 1024).toFixed(0)}MB y el máximo es 50MB. Usa un video más corto o pega un link de YouTube.`);
-  }
-
-  const fallback = asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
-  const contentType = asset.mimeType ?? (blob.type || fallback);
-
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(path, blob, { contentType, upsert: true });
-  if (error) throw new Error(error.message);
-
+  await uploadToBucket(bucket, path, asset, MAX_UPLOAD_BYTES);
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   // cache-bust: el path es estable pero el contenido cambia al re-subir
   return `${data.publicUrl}?v=${Date.now()}`;
@@ -63,15 +107,7 @@ export async function uploadPrivatePhoto(
   path: string,
   asset: ImagePicker.ImagePickerAsset,
 ): Promise<string> {
-  const res = await fetch(asset.uri);
-  const blob = await res.blob();
-  if (blob.size > 10 * 1024 * 1024) {
-    throw new Error('La foto pesa más de 10MB. Usa una resolución menor.');
-  }
-  const { error } = await supabase.storage
-    .from('progress-photos')
-    .upload(path, blob, { contentType: asset.mimeType ?? blob.type ?? 'image/jpeg', upsert: true });
-  if (error) throw new Error(error.message);
+  await uploadToBucket('progress-photos', path, asset, MAX_PHOTO_BYTES);
   return path;
 }
 
