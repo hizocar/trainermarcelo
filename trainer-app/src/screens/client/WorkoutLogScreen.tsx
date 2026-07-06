@@ -18,7 +18,9 @@ type RouteParams = { exercise: Exercise; week: number };
 
 interface SeriesEntry {
   series: ExerciseSeries;
-  log: Partial<WorkoutLog>;
+  // texto crudo mientras se edita: guardar números rompe la escritura de decimales ("7." → 7)
+  weight: string;
+  reps: string;
   prev?: { weight: number; reps: number; week: number };
   saved: boolean;
 }
@@ -67,28 +69,36 @@ export default function WorkoutLogScreen() {
 
     setEntries(seriesList.map(s => {
       const prev = prevMap[s.id];
+      const cur = currentMap[s.id];
       return {
         series: s,
-        log: currentMap[s.id]
-          ? { weight: currentMap[s.id].weight, reps: currentMap[s.id].reps }
-          : { weight: prev?.weight ?? exercise.ref_weight, reps: undefined },
+        weight: cur ? String(cur.weight) : (prev?.weight ?? exercise.ref_weight)?.toString() ?? '',
+        reps: cur ? String(cur.reps) : '',
         prev: prev ? { weight: prev.weight, reps: prev.reps, week: prev.week_number } : undefined,
-        saved: !!currentMap[s.id],
+        saved: !!cur,
       };
     }));
     setLoading(false);
   }
 
   function updateEntry(index: number, field: 'weight' | 'reps', value: string) {
-    const parsed = parseFloat(value.replace(',', '.'));
+    // permitir solo dígitos y un separador decimal (punto o coma)
+    const clean = value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/, '$1');
     setEntries(prev => prev.map((e, i) => i === index
-      ? { ...e, log: { ...e.log, [field]: value === '' || isNaN(parsed) ? undefined : parsed }, saved: false }
+      ? { ...e, [field]: clean, saved: false }
       : e
     ));
   }
 
+  const toNum = (s: string) => {
+    const n = parseFloat(s.replace(',', '.'));
+    return isNaN(n) ? null : n;
+  };
+
   async function saveAll() {
-    const toSave = entries.filter(e => e.log.weight != null && e.log.reps != null);
+    const toSave = entries
+      .map(e => ({ ...e, weightNum: toNum(e.weight), repsNum: toNum(e.reps) }))
+      .filter(e => e.weightNum != null && e.repsNum != null);
     if (toSave.length === 0) {
       showAlert('Nada que guardar', 'Ingresa peso y reps en al menos una serie.');
       return;
@@ -108,15 +118,15 @@ export default function WorkoutLogScreen() {
 
       const { error } = existing
         ? await supabase.from('workout_logs').update({
-            weight: entry.log.weight,
-            reps: entry.log.reps,
+            weight: entry.weightNum,
+            reps: entry.repsNum,
             logged_at: now,
           }).eq('id', existing.id)
         : await supabase.from('workout_logs').insert({
             series_id: entry.series.id,
             week_number: week,
-            weight: entry.log.weight,
-            reps: entry.log.reps,
+            weight: entry.weightNum,
+            reps: entry.repsNum,
             logged_at: now,
             logged_by: user?.id,
           });
@@ -187,7 +197,7 @@ export default function WorkoutLogScreen() {
               </View>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                value={entry.log.weight?.toString() ?? ''}
+                value={entry.weight}
                 onChangeText={v => updateEntry(i, 'weight', v)}
                 keyboardType="decimal-pad"
                 placeholder="0"
@@ -195,7 +205,7 @@ export default function WorkoutLogScreen() {
               />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                value={entry.log.reps?.toString() ?? ''}
+                value={entry.reps}
                 onChangeText={v => updateEntry(i, 'reps', v)}
                 keyboardType="number-pad"
                 placeholder="0"
