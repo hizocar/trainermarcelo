@@ -1,8 +1,9 @@
 export const WEEK_DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 export const WEEK_DAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-// Lunes de la semana 1 del programa. Los logs históricos (semanas 1-8) usan este epoch.
-const TRAINING_EPOCH = new Date('2025-01-06T00:00:00');
+// Lunes de la semana 1 del programa (inicio real del entrenamiento).
+// La semana 4 comenzó el lunes 2026-07-06.
+const TRAINING_EPOCH = new Date('2026-06-15T00:00:00');
 
 // Semana actual del programa, sin tope: el tracking continúa indefinidamente.
 export function getCurrentWeek(): number {
