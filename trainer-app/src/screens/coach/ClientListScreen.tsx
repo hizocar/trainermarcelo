@@ -4,6 +4,7 @@ import {
   StatusBar, ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
@@ -43,10 +44,12 @@ export default function ClientListScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Avatar name={user?.name ?? 'C'} imageUrl={user?.avatar_url} size={46} accent />
-          <View>
+          <Avatar name={user?.name ?? 'C'} imageUrl={user?.avatar_url} size={44} accent />
+          <View style={styles.nameBlock}>
             <Text style={styles.greeting}>HOLA,</Text>
-            <Text style={styles.coachName}>{user?.name?.toUpperCase()}</Text>
+            <Text style={styles.coachName} numberOfLines={1}>
+              {user?.name?.split(' ')[0].toUpperCase()}
+            </Text>
           </View>
         </View>
         <View style={styles.headerActions}>
@@ -54,10 +57,11 @@ export default function ClientListScreen() {
             onPress={() => navigation.navigate('InviteClient')}
             style={styles.inviteBtn}
           >
-            <Text style={styles.inviteBtnText}>+ CLIENTE</Text>
+            <Ionicons name="person-add" size={13} color={colors.background} />
+            <Text style={styles.inviteBtnText}>CLIENTE</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleSignOut} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>SALIR</Text>
+          <TouchableOpacity onPress={handleSignOut} style={styles.logoutBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="log-out-outline" size={19} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -111,24 +115,31 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm + 2,
+    flex: 1,
+    marginRight: spacing.sm,
   },
+  nameBlock: { flexShrink: 1 },
   greeting: {
     ...typography.caption,
     letterSpacing: 3,
     color: colors.textMuted,
   },
-  coachName: { ...typography.display, fontSize: 30, color: colors.accent },
+  coachName: { ...typography.display, fontSize: 26, color: colors.accent },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flexShrink: 0,
   },
   inviteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.sm,
   },
   inviteBtnText: {
     color: colors.background,
@@ -137,13 +148,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   logoutBtn: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  logoutText: {
-    ...typography.label,
-    color: colors.textMuted,
-    letterSpacing: 2,
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionLabel: {
     ...typography.label,
