@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Marcelo Herrera",
-    "slug": "trainer-app",
+    "slug": "marcelo-herrera-trainer-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,7 +20,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,6 +37,12 @@
           "photosPermission": "La app necesita acceso a tus fotos para subir imágenes de ejercicios, avatares y fotos de progreso."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4ec491f8-d9e0-434f-8ee1-828f27bb57f4"
+      }
+    },
+    "owner": "hizocars-team"
   }
 }
