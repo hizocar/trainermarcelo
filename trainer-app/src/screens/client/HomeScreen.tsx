@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { MoodLog } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import MuscleMap from '../../components/common/MuscleMap';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
@@ -180,6 +181,10 @@ export default function HomeScreen() {
             <Text style={styles.groupEmpty}>Aún no registras series esta semana. ¡A entrenar! 💪</Text>
           ) : (
             <>
+              <MuscleMap
+                height={185}
+                highlights={Object.fromEntries(groupRows.map(r => [r.group, r.sets / maxSets]))}
+              />
               {groupRows.map(r => (
                 <View key={r.group} style={styles.groupRow}>
                   <Text style={styles.groupName} numberOfLines={1}>{r.group.toUpperCase()}</Text>

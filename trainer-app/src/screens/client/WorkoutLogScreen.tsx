@@ -11,6 +11,7 @@ import { Exercise, ExerciseSeries, WorkoutLog } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
+import MuscleMap from '../../components/common/MuscleMap';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
@@ -164,7 +165,7 @@ export default function WorkoutLogScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Ejemplo del ejercicio */}
-        {(exercise.image_url || exercise.notes || exercise.video_url) && (
+        {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
             <TouchableOpacity style={styles.exampleHeader} onPress={() => setShowImage(v => !v)}>
               <Text style={styles.exampleTitle}>CÓMO SE HACE</Text>
@@ -172,6 +173,12 @@ export default function WorkoutLogScreen() {
             </TouchableOpacity>
             {showImage && (
               <>
+                {exercise.muscle_group && (
+                  <View style={styles.muscleRow}>
+                    <MuscleMap height={130} highlights={{ [exercise.muscle_group]: 1 }} showLabels={false} />
+                    <Text style={styles.muscleTag}>{exercise.muscle_group.toUpperCase()}</Text>
+                  </View>
+                )}
                 {exercise.image_url && (
                   <Image source={{ uri: exercise.image_url }} style={styles.exampleImage} resizeMode="cover" />
                 )}
@@ -267,6 +274,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   exampleNotes: { ...typography.body, color: colors.textPrimary, lineHeight: 21 },
+  muscleRow: { alignItems: 'center', gap: spacing.xs },
+  muscleTag: {
+    ...typography.label, fontSize: 9, letterSpacing: 2, color: colors.accent,
+  },
 
   tableHeader: {
     flexDirection: 'row',
