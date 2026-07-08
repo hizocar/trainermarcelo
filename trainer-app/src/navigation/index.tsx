@@ -18,6 +18,7 @@ import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
 
 // Client
+import HomeScreen from '../screens/client/HomeScreen';
 import TodayScreen from '../screens/client/TodayScreen';
 import WorkoutLogScreen from '../screens/client/WorkoutLogScreen';
 import HistoryScreen from '../screens/client/HistoryScreen';
@@ -63,6 +64,11 @@ function ClientTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false, tabBarStyle: tabStyles.bar, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.textMuted, tabBarLabelStyle: tabStyles.label }}>
       <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ tabBarLabel: 'INICIO', tabBarIcon: tabIcon('home', 'home-outline') }}
+      />
+      <Tab.Screen
         name="Today"
         component={TodayScreen}
         options={{ tabBarLabel: 'HOY', tabBarIcon: tabIcon('barbell', 'barbell-outline') }}
@@ -76,11 +82,6 @@ function ClientTabs() {
         name="Progress"
         component={ProgressScreen}
         options={{ tabBarLabel: 'PROGRESO', tabBarIcon: tabIcon('stats-chart', 'stats-chart-outline') }}
-      />
-      <Tab.Screen
-        name="Body"
-        component={BodyProgressScreen}
-        options={{ tabBarLabel: 'CUERPO', tabBarIcon: tabIcon('body', 'body-outline') }}
       />
       <Tab.Screen
         name="Profile"
@@ -116,6 +117,7 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="ClientHome" component={ClientTabs} />
             <Stack.Screen name="WorkoutLog" component={WorkoutLogScreen} />
+            <Stack.Screen name="Body" component={BodyProgressScreen} />
           </>
         )}
       </Stack.Navigator>

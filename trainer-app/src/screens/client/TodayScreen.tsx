@@ -19,6 +19,7 @@ export default function TodayScreen() {
   const [selectedDay, setSelectedDay] = useState<TrainingDay | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
+  const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
   const [loading, setLoading] = useState(true);
 
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
@@ -27,7 +28,10 @@ export default function TodayScreen() {
   // refresca al volver de WorkoutLog para actualizar los checks de completado
   useFocusEffect(useCallback(() => {
     if (user?.id && days.length === 0) fetchPlan();
-    else if (selectedDay) fetchExercises(selectedDay.id);
+    else if (selectedDay) {
+      fetchExercises(selectedDay.id);
+      fetchWeekStatus(days);
+    }
   }, [user?.id, selectedDay?.id]));
 
   async function fetchPlan() {
@@ -43,6 +47,7 @@ export default function TodayScreen() {
 
       const activeDays = (daysData ?? []).filter(d => !d.name.toLowerCase().includes('libre'));
       setDays(activeDays);
+      fetchWeekStatus(activeDays);
 
       // Auto-seleccionar el día de hoy si existe, si no el primero
       const todayDay = activeDays.find(d => d.week_day === todayWeekDay);
@@ -82,6 +87,33 @@ export default function TodayScreen() {
       }
     }
     setLoggedExercises(new Set());
+  }
+
+  // completado semanal de TODOS los días (para los checks de los tabs)
+  async function fetchWeekStatus(dayList: TrainingDay[]) {
+    if (dayList.length === 0) return;
+    const { data: exs } = await supabase
+      .from('exercises').select('id, day_id')
+      .in('day_id', dayList.map(d => d.id));
+    const { data: series } = await supabase
+      .from('exercise_series').select('id, exercise_id')
+      .in('exercise_id', (exs ?? []).map(e => e.id));
+    const { data: logs } = await supabase
+      .from('workout_logs').select('series_id')
+      .in('series_id', (series ?? []).map(s => s.id))
+      .eq('week_number', currentWeek);
+
+    const loggedSeries = new Set((logs ?? []).map(l => l.series_id));
+    const doneEx = new Set((series ?? []).filter(s => loggedSeries.has(s.id)).map(s => s.exercise_id));
+    const status: Record<string, { total: number; done: number }> = {};
+    dayList.forEach(d => { status[d.id] = { total: 0, done: 0 }; });
+    (exs ?? []).forEach(e => {
+      const st = status[e.day_id];
+      if (!st) return;
+      st.total++;
+      if (doneEx.has(e.id)) st.done++;
+    });
+    setDayStatus(status);
   }
 
   const isToday = (day: TrainingDay) => day.week_day === todayWeekDay;
@@ -124,14 +156,22 @@ export default function TodayScreen() {
             {days.map(day => {
               const active = selectedDay?.id === day.id;
               const isCurrentDay = isToday(day);
+              const st = dayStatus[day.id];
+              const complete = !!st && st.total > 0 && st.done >= st.total;
               return (
                 <TouchableOpacity
                   key={day.id}
-                  style={[styles.dayTab, active && styles.dayTabActive]}
+                  style={[styles.dayTab, active && styles.dayTabActive, complete && !active && styles.dayTabDone]}
                   onPress={() => setSelectedDay(day)}
                   activeOpacity={0.7}
                 >
-                  {isCurrentDay && <View style={styles.todayDot} />}
+                  {complete ? (
+                    <View style={styles.tabBadge}>
+                      <Ionicons name="checkmark-circle" size={15} color={active ? colors.background : colors.success} />
+                    </View>
+                  ) : isCurrentDay ? (
+                    <View style={styles.todayDot} />
+                  ) : null}
                   <Text style={[styles.dayTabNum, active && styles.dayTabNumActive]}>
                     DÍA {day.day_number}
                   </Text>
@@ -201,7 +241,7 @@ export default function TodayScreen() {
                         )}
                         <Text style={styles.exerciseName}>{ex.name}</Text>
                         <Text style={styles.exerciseMeta}>
-                          {ex.reps_objective} reps · {ex.unit}
+                          {ex.muscle_group ? `${ex.muscle_group} · ` : ''}{ex.reps_objective} reps · {ex.unit}
                           {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
                         </Text>
                       </View>
@@ -250,8 +290,8 @@ const styles = StyleSheet.create({
   weekBadgeText: { color: colors.background, fontWeight: '900', fontSize: 16 },
   weekBadgeTextIdle: { color: colors.accent },
 
-  dayTabsScroll: { flexGrow: 0 },
-  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, paddingBottom: spacing.sm, alignItems: 'center' },
+  dayTabsScroll: { flexGrow: 0, height: 68, marginBottom: spacing.xs },
+  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center' },
   dayTab: {
     paddingHorizontal: spacing.md,
     height: 56, justifyContent: 'center',
@@ -259,6 +299,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, alignItems: 'center', minWidth: 76, maxWidth: 130, position: 'relative',
   },
   dayTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dayTabDone: { borderColor: colors.success + '88' },
+  tabBadge: { position: 'absolute', top: 3, right: 4 },
   todayDot: {
     position: 'absolute', top: 4, right: 6,
     width: 6, height: 6, borderRadius: 3,

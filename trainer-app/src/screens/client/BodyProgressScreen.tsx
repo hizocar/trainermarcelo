@@ -184,7 +184,7 @@ export default function BodyProgressScreen() {
 
   return (
     <View style={styles.container}>
-      {readOnly && (
+      {navigation.canGoBack() && (
         <View style={styles.navHeader}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={16} color={colors.textMuted} />

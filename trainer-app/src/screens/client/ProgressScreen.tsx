@@ -61,7 +61,6 @@ export default function ProgressScreen() {
   const [volDay, setVolDay] = useState<string | null>(null);
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
   const [seriesExMap, setSeriesExMap] = useState<Record<string, string>>({});
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -192,15 +191,10 @@ export default function ProgressScreen() {
   const fmtDelta = (d: number) => `${d > 0 ? '+' : ''}${Math.round(d)}%`;
 
   function renderRow(p: ExProgress, tone: 'up' | 'flat' | 'down') {
-    const open = expanded === p.exercise.id;
     const toneColor = tone === 'up' ? colors.success : tone === 'down' ? colors.danger : colors.textMuted;
     return (
       <Card key={p.exercise.id} style={styles.exRow}>
-        <TouchableOpacity
-          style={styles.exRowHeader}
-          onPress={() => setExpanded(open ? null : p.exercise.id)}
-          activeOpacity={0.7}
-        >
+        <View style={styles.exRowHeader}>
           <View style={styles.exRowInfo}>
             <Text style={styles.exRowName} numberOfLines={1}>{p.exercise.name}</Text>
             <Text style={styles.exRowMeta}>
@@ -216,19 +210,7 @@ export default function ProgressScreen() {
               <Text style={[styles.deltaText, { color: toneColor }]}>{fmtDelta(p.delta)}</Text>
             </View>
           )}
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        {open && (
-          <View style={styles.exRowChart}>
-            <Text style={styles.chartCaption}>FUERZA ESTIMADA POR SEMANA ({p.exercise.unit})</Text>
-            <TrendChart
-              data={p.points.map(pt => ({ label: `S${pt.week}`, value: Math.round(pt.score * 10) / 10 }))}
-              height={150}
-              unit={p.exercise.unit}
-            />
-          </View>
-        )}
+        </View>
       </Card>
     );
   }
@@ -438,8 +420,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm, paddingVertical: 3,
   },
   deltaText: { fontSize: 12, fontWeight: '900' },
-  exRowChart: { marginTop: spacing.md, gap: spacing.xs },
-  chartCaption: { ...typography.label, fontSize: 9, letterSpacing: 1.5 },
 
   noHistoryText: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
   noHistoryHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },

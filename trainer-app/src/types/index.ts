@@ -45,6 +45,15 @@ export interface Exercise {
   image_url?: string;
   video_url?: string;
   notes?: string;
+  muscle_group?: string;
+}
+
+export interface MoodLog {
+  id: string;
+  user_id: string;
+  mood: string;
+  logged_date: string; // YYYY-MM-DD
+  created_at: string;
 }
 
 export interface ExerciseSeries {

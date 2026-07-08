@@ -16,6 +16,7 @@ import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/med
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 
 const REPS_OPTIONS = ['4-6', '6-8', '8-10', '8-12', '10-12', '12-15', '10-15'];
+const MUSCLE_GROUPS = ['Pecho', 'Espalda', 'Hombros', 'Bíceps', 'Tríceps', 'Cuádriceps', 'Isquios', 'Glúteos', 'Gemelos', 'Core'];
 
 type RouteParams = { client: User };
 
@@ -49,6 +50,7 @@ export default function PlanEditorScreen() {
   const [exSuperseries, setExSuperseries] = useState('');
   const [exSeries, setExSeries] = useState('3');
   const [exNotes, setExNotes] = useState('');
+  const [exMuscle, setExMuscle] = useState('');
   const [exVideoUrl, setExVideoUrl] = useState('');
   const [exImageUrl, setExImageUrl] = useState<string | null>(null);
   const [exNewImage, setExNewImage] = useState<ImagePickerAsset | null>(null);
@@ -117,6 +119,7 @@ export default function PlanEditorScreen() {
     setExName(''); setExReps('8-12'); setExUnit('kg');
     setExRefWeight(''); setExSuperseries(''); setExSeries('3');
     setExNotes(''); setExVideoUrl(''); setExImageUrl(null); setExNewImage(null);
+    setExMuscle('');
     setExNewVideo(null);
     setEditingEx(null);
     setShowExModal(true);
@@ -131,6 +134,7 @@ export default function PlanEditorScreen() {
     setExSuperseries(ex.superseries_group ?? '');
     setExSeries('3');
     setExNotes(ex.notes ?? '');
+    setExMuscle(ex.muscle_group ?? '');
     setExVideoUrl(ex.video_url ?? '');
     setExImageUrl(ex.image_url ?? null);
     setExNewImage(null);
@@ -192,6 +196,7 @@ export default function PlanEditorScreen() {
       notes: exNotes.trim() || null,
       video_url: videoUrl,
       image_url: imageUrl,
+      muscle_group: exMuscle || null,
     };
 
     if (editingEx) {
@@ -247,6 +252,24 @@ export default function PlanEditorScreen() {
     }
     setShowExModal(false);
     setSaving(false);
+  }
+
+  async function moveExercise(dayId: string, index: number, dir: -1 | 1) {
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    const j = index + dir;
+    if (j < 0 || j >= day.exercises.length) return;
+    const a = day.exercises[index];
+    const b = day.exercises[j];
+    setDays(prev => prev.map(d => {
+      if (d.id !== dayId) return d;
+      const list = [...d.exercises];
+      [list[index], list[j]] = [list[j], list[index]];
+      return { ...d, exercises: list };
+    }));
+    // persistir usando las posiciones del array como orden canónico
+    await supabase.from('exercises').update({ order_index: index }).eq('id', b.id);
+    await supabase.from('exercises').update({ order_index: j }).eq('id', a.id);
   }
 
   function deleteExercise(ex: Exercise) {
@@ -309,9 +332,27 @@ export default function PlanEditorScreen() {
               </View>
             </View>
 
-            {day.exercises.map(ex => (
+            {day.exercises.map((ex, idx) => (
               <Card key={ex.id} style={styles.exCard}>
                 <View style={styles.exRow}>
+                  <View style={styles.reorderCol}>
+                    <TouchableOpacity
+                      onPress={() => moveExercise(day.id, idx, -1)}
+                      disabled={idx === 0}
+                      style={styles.reorderBtn}
+                      hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="chevron-up" size={15} color={idx === 0 ? colors.border : colors.textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => moveExercise(day.id, idx, 1)}
+                      disabled={idx === day.exercises.length - 1}
+                      style={styles.reorderBtn}
+                      hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="chevron-down" size={15} color={idx === day.exercises.length - 1 ? colors.border : colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
                   {ex.image_url ? (
                     <Image source={{ uri: ex.image_url }} style={styles.exThumb} />
                   ) : null}
@@ -321,7 +362,7 @@ export default function PlanEditorScreen() {
                     )}
                     <Text style={styles.exName}>{ex.name}</Text>
                     <Text style={styles.exMeta}>
-                      {ex.reps_objective} reps · {ex.unit}
+                      {ex.muscle_group ? `${ex.muscle_group} · ` : ''}{ex.reps_objective} reps · {ex.unit}
                       {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
                       {ex.video_url ? ' · 🎬' : ''}
                     </Text>
@@ -417,6 +458,19 @@ export default function PlanEditorScreen() {
               placeholder="ej: Superserie 1"
               placeholderTextColor={colors.textMuted}
             />
+
+            <Text style={styles.inputLabel}>GRUPO MUSCULAR</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
+              {MUSCLE_GROUPS.map(g => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.repsOption, exMuscle === g && styles.repsOptionActive]}
+                  onPress={() => setExMuscle(exMuscle === g ? '' : g)}
+                >
+                  <Text style={[styles.repsOptionText, exMuscle === g && styles.repsOptionTextActive]}>{g}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
             <Text style={styles.inputLabel}>OBJETIVO DE REPS</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
@@ -603,6 +657,8 @@ const styles = StyleSheet.create({
   exCard: { },
   exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   exThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface },
+  reorderCol: { justifyContent: 'center', gap: 2 },
+  reorderBtn: { padding: 2 },
   exInfo: { flex: 1 },
   superTag: { ...typography.caption, color: colors.accent, marginBottom: 2 },
   exName: { ...typography.h3 },
