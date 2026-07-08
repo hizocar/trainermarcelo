@@ -16,7 +16,14 @@ import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/med
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 
 const REPS_OPTIONS = ['4-6', '6-8', '8-10', '8-12', '10-12', '12-15', '10-15'];
-const MUSCLE_GROUPS = ['Pecho', 'Espalda', 'Hombros', 'Bíceps', 'Tríceps', 'Cuádriceps', 'Isquios', 'Glúteos', 'Gemelos', 'Core'];
+const MUSCLE_GROUPS = [
+  'Pecho', 'Espalda alta', 'Espalda baja',
+  'Hombro anterior', 'Hombro medial', 'Hombro posterior',
+  'Bíceps', 'Tríceps', 'Antebrazos',
+  'Cuádriceps', 'Isquiotibiales', 'Aductor',
+  'Glúteo mayor', 'Glúteo medio', 'Glúteo menor',
+  'Gastrocnemios', 'Core',
+];
 
 type RouteParams = { client: User };
 
@@ -57,6 +64,8 @@ export default function PlanEditorScreen() {
   const [exNewVideo, setExNewVideo] = useState<ImagePickerAsset | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [editingEx, setEditingEx] = useState<Exercise | null>(null);
+  const [suggestions, setSuggestions] = useState<{ name: string; muscle_group: string; equipment: string | null }[]>([]);
+  const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchPlan(); }, []);
 
@@ -141,6 +150,28 @@ export default function PlanEditorScreen() {
     setExNewVideo(null);
     setEditingEx(ex);
     setShowExModal(true);
+  }
+
+  function onExNameChange(v: string) {
+    setExName(v);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const q = v.trim();
+    if (q.length < 3) { setSuggestions([]); return; }
+    searchTimer.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('exercise_library')
+        .select('name, muscle_group, equipment')
+        .or(`name.ilike.%${q}%,name_en.ilike.%${q}%`)
+        .limit(5);
+      // no sugerir si ya escribió exactamente ese nombre
+      setSuggestions((data ?? []).filter(s => s.name.toLowerCase() !== q.toLowerCase()));
+    }, 250);
+  }
+
+  function pickSuggestion(s: { name: string; muscle_group: string }) {
+    setExName(s.name);
+    setExMuscle(s.muscle_group);
+    setSuggestions([]);
   }
 
   async function chooseImage() {
@@ -250,6 +281,7 @@ export default function PlanEditorScreen() {
         ));
       }
     }
+    setSuggestions([]);
     setShowExModal(false);
     setSaving(false);
   }
@@ -444,11 +476,26 @@ export default function PlanEditorScreen() {
             <TextInput
               style={styles.input}
               value={exName}
-              onChangeText={setExName}
+              onChangeText={onExNameChange}
               placeholder="ej: Press banca, Sentadilla"
               placeholderTextColor={colors.textMuted}
               autoFocus
             />
+            {suggestions.length > 0 && (
+              <View style={styles.suggestBox}>
+                {suggestions.map(s => (
+                  <TouchableOpacity key={s.name} style={styles.suggestRow} onPress={() => pickSuggestion(s)}>
+                    <View style={styles.suggestInfo}>
+                      <Text style={styles.suggestName} numberOfLines={1}>{s.name}</Text>
+                      <Text style={styles.suggestMeta} numberOfLines={1}>
+                        {s.muscle_group}{s.equipment ? ` · ${s.equipment}` : ''}
+                      </Text>
+                    </View>
+                    <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <Text style={styles.inputLabel}>GRUPO / SUPERSERIE (opcional)</Text>
             <TextInput
@@ -657,6 +704,19 @@ const styles = StyleSheet.create({
   exCard: { },
   exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   exThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface },
+  suggestBox: {
+    backgroundColor: colors.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.accent + '44',
+    marginTop: -spacing.sm,
+  },
+  suggestRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  suggestInfo: { flex: 1 },
+  suggestName: { ...typography.body, fontSize: 14, fontWeight: '600' },
+  suggestMeta: { ...typography.caption, fontSize: 10, marginTop: 1 },
   reorderCol: { justifyContent: 'center', gap: 2 },
   reorderBtn: { padding: 2 },
   exInfo: { flex: 1 },
