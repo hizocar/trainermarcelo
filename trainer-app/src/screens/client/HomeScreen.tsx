@@ -14,16 +14,14 @@ import MuscleMap from '../../components/common/MuscleMap';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
-export const MOODS = [
-  { value: 'motivado', emoji: '💪', label: 'MOTIVADO' },
-  { value: 'bien', emoji: '🙂', label: 'BIEN' },
-  { value: 'normal', emoji: '😐', label: 'NORMAL' },
-  { value: 'cansado', emoji: '😴', label: 'CANSADO' },
-  { value: 'estresado', emoji: '😣', label: 'ESTRESADO' },
-  { value: 'adolorido', emoji: '🤕', label: 'ADOLORIDO' },
-] as const;
+// escala de energía 1-10 (1 = muy cansado, 10 = con mucha energía)
+const ENERGY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-const moodEmoji = (value: string) => MOODS.find(m => m.value === value)?.emoji ?? '·';
+function energyColor(n: number): string {
+  if (n <= 3) return colors.danger;
+  if (n <= 6) return colors.textSecondary;
+  return colors.accent;
+}
 
 // fecha local YYYY-MM-DD (no UTC: a las 21:00 de Chile ya sería "mañana" en UTC)
 function todayLocal(): string {
@@ -42,7 +40,8 @@ export default function HomeScreen() {
 
   const currentWeek = getCurrentWeek();
   const today = todayLocal();
-  const todayMood = moods.find(m => m.logged_date === today)?.mood ?? null;
+  const todayRaw = moods.find(m => m.logged_date === today)?.mood ?? null;
+  const todayEnergy = todayRaw != null ? parseInt(todayRaw, 10) || null : null;
 
   useFocusEffect(useCallback(() => { if (user?.id) fetchAll(); }, [user?.id]));
 
@@ -71,27 +70,20 @@ export default function HomeScreen() {
       .from('exercise_series').select('id, exercise_id')
       .in('exercise_id', (exs ?? []).map(e => e.id));
 
+    // total de series del SPLIT semanal por grupo (lo planificado, no lo completado)
     const exGroup: Record<string, string> = {};
     (exs ?? []).forEach(e => { exGroup[e.id] = e.muscle_group?.trim() || 'Sin grupo'; });
-    const serGroup: Record<string, string> = {};
-    (series ?? []).forEach(s => { serGroup[s.id] = exGroup[s.exercise_id]; });
-
-    const { data: logs } = await supabase
-      .from('workout_logs')
-      .select('series_id')
-      .in('series_id', (series ?? []).map(s => s.id))
-      .eq('week_number', currentWeek);
-
     const counts: Record<string, number> = {};
-    (logs ?? []).forEach(l => {
-      const g = serGroup[l.series_id] ?? 'Sin grupo';
+    (series ?? []).forEach(s => {
+      const g = exGroup[s.exercise_id] ?? 'Sin grupo';
       counts[g] = (counts[g] ?? 0) + 1;
     });
     setGroupSets(counts);
     setLoading(false);
   }
 
-  async function saveMood(mood: string) {
+  async function saveMood(level: number) {
+    const mood = String(level);
     if (!user) return;
     setSavingMood(true);
     const { error } = await supabase.from('mood_logs').upsert(
@@ -134,36 +126,45 @@ export default function HomeScreen() {
           <Text style={styles.userName}>HOLA, {user?.name?.split(' ')[0].toUpperCase()}</Text>
         </View>
 
-        {/* Encuesta diaria de ánimo */}
+        {/* Encuesta diaria de energía */}
         <Card style={styles.moodCard}>
           <Text style={styles.moodTitle}>¿CÓMO TE SIENTES HOY?</Text>
-          <View style={styles.moodGrid}>
-            {MOODS.map(m => {
-              const active = todayMood === m.value;
+          <View style={styles.energyRow}>
+            {ENERGY_LEVELS.map(n => {
+              const active = todayEnergy === n;
               return (
                 <TouchableOpacity
-                  key={m.value}
-                  style={[styles.moodChip, active && styles.moodChipActive]}
-                  onPress={() => saveMood(m.value)}
+                  key={n}
+                  style={[styles.energyBtn, active && { backgroundColor: energyColor(n), borderColor: energyColor(n) }]}
+                  onPress={() => saveMood(n)}
                   disabled={savingMood}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.moodEmoji}>{m.emoji}</Text>
-                  <Text style={[styles.moodLabel, active && styles.moodLabelActive]}>{m.label}</Text>
+                  <Text style={[styles.energyBtnText, active && styles.energyBtnTextActive]}>{n}</Text>
                 </TouchableOpacity>
               );
             })}
+          </View>
+          <View style={styles.energyLegend}>
+            <Text style={styles.energyLegendText}>1 · MUY CANSADO</Text>
+            {todayEnergy != null && (
+              <Text style={[styles.energyToday, { color: energyColor(todayEnergy) }]}>HOY: {todayEnergy}/10</Text>
+            )}
+            <Text style={styles.energyLegendText}>10 · MUCHA ENERGÍA</Text>
           </View>
           {weekHistory.length > 0 && (
             <View style={styles.moodHistory}>
               <Text style={styles.moodHistoryLabel}>DÍAS ANTERIORES</Text>
               <View style={styles.moodHistoryRow}>
-                {weekHistory.map(m => (
-                  <View key={m.logged_date} style={styles.moodHistoryItem}>
-                    <Text style={styles.moodHistoryEmoji}>{moodEmoji(m.mood)}</Text>
-                    <Text style={styles.moodHistoryDate}>{m.logged_date.slice(8, 10)}/{m.logged_date.slice(5, 7)}</Text>
-                  </View>
-                ))}
+                {weekHistory.map(m => {
+                  const n = parseInt(m.mood, 10) || 0;
+                  return (
+                    <View key={m.logged_date} style={styles.moodHistoryItem}>
+                      <Text style={[styles.moodHistoryEnergy, { color: energyColor(n) }]}>{n}</Text>
+                      <Text style={styles.moodHistoryDate}>{m.logged_date.slice(8, 10)}/{m.logged_date.slice(5, 7)}</Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -173,12 +174,12 @@ export default function HomeScreen() {
         <Card style={styles.groupCard}>
           <View style={styles.groupHeader}>
             <Text style={styles.groupTitle}>SERIES POR GRUPO MUSCULAR</Text>
-            <Text style={styles.groupWeek}>SEMANA {currentWeek}</Text>
+            <Text style={styles.groupWeek}>SPLIT SEMANAL</Text>
           </View>
           {loading ? (
             <ActivityIndicator color={colors.accent} />
           ) : totalSets === 0 ? (
-            <Text style={styles.groupEmpty}>Aún no registras series esta semana. ¡A entrenar! 💪</Text>
+            <Text style={styles.groupEmpty}>Tu coach aún no configura ejercicios en el plan.</Text>
           ) : (
             <>
               <MuscleMap
@@ -194,7 +195,7 @@ export default function HomeScreen() {
                   <Text style={styles.groupCount}>{r.sets}</Text>
                 </View>
               ))}
-              <Text style={styles.groupTotal}>{totalSets} series esta semana</Text>
+              <Text style={styles.groupTotal}>{totalSets} series planificadas por semana</Text>
             </>
           )}
         </Card>
@@ -232,22 +233,22 @@ const styles = StyleSheet.create({
 
   moodCard: { gap: spacing.md },
   moodTitle: { ...typography.h3, fontSize: 15 },
-  moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  moodChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface,
+  energyRow: { flexDirection: 'row', gap: 5 },
+  energyBtn: {
+    flex: 1, aspectRatio: 0.8, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
+    alignItems: 'center', justifyContent: 'center',
   },
-  moodChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  moodEmoji: { fontSize: 16 },
-  moodLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
-  moodLabelActive: { color: colors.background },
+  energyBtnText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+  energyBtnTextActive: { color: colors.background },
+  energyLegend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  energyLegendText: { ...typography.caption, fontSize: 9, letterSpacing: 1 },
+  energyToday: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   moodHistory: { gap: spacing.xs },
   moodHistoryLabel: { ...typography.label, fontSize: 9, letterSpacing: 2 },
   moodHistoryRow: { flexDirection: 'row', gap: spacing.md },
   moodHistoryItem: { alignItems: 'center', gap: 2 },
-  moodHistoryEmoji: { fontSize: 18 },
+  moodHistoryEnergy: { fontSize: 16, fontWeight: '900' },
   moodHistoryDate: { ...typography.caption, fontSize: 9 },
 
   groupCard: { gap: spacing.sm },
