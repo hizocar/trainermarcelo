@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Image,
+  StatusBar, ActivityIndicator, Image, TextInput,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,13 @@ import { TrainingDay, Exercise } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate } from '../../lib/weeks';
+import { showAlert } from '../../lib/alert';
+
+const PHASE_INFO: Record<string, { label: string; color: string }> = {
+  acumulacion: { label: 'ACUMULACIÓN', color: colors.accent },
+  intensificacion: { label: 'INTENSIFICACIÓN', color: '#FF9F1C' },
+  descarga: { label: 'DESCARGA', color: '#4CC9F0' },
+};
 
 export default function TodayScreen() {
   const { user } = useAuth();
@@ -20,6 +27,9 @@ export default function TodayScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
+  const [phase, setPhase] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [noteDirty, setNoteDirty] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
@@ -40,6 +50,11 @@ export default function TodayScreen() {
       .eq('client_id', user?.id).single();
 
     if (planData) {
+      const { data: ph } = await supabase
+        .from('week_phases').select('phase')
+        .eq('plan_id', planData.id).eq('week_number', currentWeek).maybeSingle();
+      setPhase(ph?.phase ?? null);
+
       const { data: daysData } = await supabase
         .from('training_days').select('*')
         .eq('plan_id', planData.id)
@@ -57,6 +72,12 @@ export default function TodayScreen() {
   }
 
   async function fetchExercises(dayId: string) {
+    // nota de sesión existente para este día+semana
+    supabase.from('session_notes').select('note')
+      .eq('user_id', user!.id).eq('day_id', dayId).eq('week_number', currentWeek)
+      .maybeSingle()
+      .then(({ data: n }) => { setNote(n?.note ?? ''); setNoteDirty(false); });
+
     const { data } = await supabase
       .from('exercises').select('*')
       .eq('day_id', dayId).order('order_index');
@@ -116,6 +137,16 @@ export default function TodayScreen() {
     setDayStatus(status);
   }
 
+  async function saveNote() {
+    if (!selectedDay || !note.trim()) return;
+    const { error } = await supabase.from('session_notes').upsert(
+      { user_id: user!.id, day_id: selectedDay.id, week_number: currentWeek, note: note.trim() },
+      { onConflict: 'user_id,day_id,week_number' },
+    );
+    if (error) showAlert('No se pudo guardar', error.message);
+    else setNoteDirty(false);
+  }
+
   const isToday = (day: TrainingDay) => day.week_day === todayWeekDay;
 
   return (
@@ -128,6 +159,13 @@ export default function TodayScreen() {
             {formatShortDate(new Date().toISOString()).toUpperCase()}
           </Text>
           <Text style={styles.userName}>{user?.name?.split(' ')[0].toUpperCase()}</Text>
+          {phase && PHASE_INFO[phase] && (
+            <View style={[styles.phaseBadge, { borderColor: PHASE_INFO[phase].color }]}>
+              <Text style={[styles.phaseText, { color: PHASE_INFO[phase].color }]}>
+                FASE · {PHASE_INFO[phase].label}
+              </Text>
+            </View>
+          )}
         </View>
         {selectedDay && (
           <View style={[styles.weekBadge, isToday(selectedDay) && styles.weekBadgeToday]}>
@@ -182,25 +220,6 @@ export default function TodayScreen() {
               );
             })}
           </ScrollView>
-
-          {/* Indicador de si es el día de hoy + progreso del día */}
-          {selectedDay && (
-            <View style={styles.dayIndicator}>
-              <View style={[styles.dayIndicatorDot, isToday(selectedDay) && styles.dayIndicatorDotActive]} />
-              <Text style={styles.dayIndicatorText}>
-                {isToday(selectedDay)
-                  ? 'SUGERIDO PARA HOY'
-                  : selectedDay.week_day != null
-                    ? `SUGERIDO PARA EL ${WEEK_DAYS[selectedDay.week_day].toUpperCase()} · ENTRENA CUANDO PUEDAS`
-                    : 'ENTRENA CUANDO PUEDAS'}
-              </Text>
-              {exercises.length > 0 && (
-                <Text style={styles.dayProgress}>
-                  {loggedExercises.size}/{exercises.length}
-                </Text>
-              )}
-            </View>
-          )}
 
           {/* barra de progreso del día */}
           {exercises.length > 0 && (
@@ -258,6 +277,28 @@ export default function TodayScreen() {
               );
             })}
 
+            {exercises.length > 0 && selectedDay && (
+              <Card style={styles.noteCard}>
+                <Text style={styles.noteTitle}>NOTA PARA TU COACH</Text>
+                <TextInput
+                  style={styles.noteInput}
+                  value={note}
+                  onChangeText={v => { setNote(v); setNoteDirty(true); }}
+                  placeholder="ej: sentí molestia en el hombro en la S3..."
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                />
+                {noteDirty && note.trim().length > 0 && (
+                  <TouchableOpacity style={styles.noteSave} onPress={saveNote}>
+                    <Text style={styles.noteSaveText}>GUARDAR NOTA</Text>
+                  </TouchableOpacity>
+                )}
+                {!noteDirty && note.trim().length > 0 && (
+                  <Text style={styles.noteSaved}>✓ Guardada — tu coach la verá</Text>
+                )}
+              </Card>
+            )}
+
             {exercises.length === 0 && selectedDay && (
               <Card style={styles.noExCard}>
                 <Text style={styles.noExTitle}>SIN EJERCICIOS</Text>
@@ -289,6 +330,23 @@ const styles = StyleSheet.create({
   weekBadgeToday: { backgroundColor: colors.accent, borderColor: colors.accent },
   weekBadgeText: { color: colors.background, fontWeight: '900', fontSize: 16 },
   weekBadgeTextIdle: { color: colors.accent },
+  phaseBadge: {
+    alignSelf: 'flex-start', marginTop: spacing.xs,
+    borderWidth: 1, borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  phaseText: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  noteCard: { gap: spacing.sm, marginTop: spacing.sm },
+  noteTitle: { ...typography.label, letterSpacing: 2 },
+  noteInput: {
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    color: colors.textPrimary, fontSize: 14, minHeight: 60, textAlignVertical: 'top',
+  },
+  noteSave: { alignSelf: 'flex-end' },
+  noteSaveText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
+  noteSaved: { ...typography.caption, fontSize: 10, color: colors.success, textAlign: 'right' },
 
   dayTabsScroll: { flexGrow: 0, height: 68, marginBottom: spacing.xs },
   dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center' },
@@ -315,10 +373,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     paddingHorizontal: spacing.xl, paddingVertical: spacing.sm,
   },
-  dayIndicatorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted },
-  dayIndicatorDotActive: { backgroundColor: colors.accent },
-  dayIndicatorText: { ...typography.caption, letterSpacing: 1.5, color: colors.textMuted, flex: 1 },
-  dayProgress: { ...typography.caption, color: colors.accent, fontWeight: '900', letterSpacing: 1 },
   progressTrack: {
     height: 4,
     borderRadius: radius.full,

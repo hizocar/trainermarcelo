@@ -4,6 +4,8 @@ import {
   TextInput, ActivityIndicator, Image,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +14,6 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
-import ExerciseMotion, { patternFor } from '../../components/common/ExerciseMotion';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
@@ -23,6 +24,7 @@ interface SeriesEntry {
   // texto crudo mientras se edita: guardar números rompe la escritura de decimales ("7." → 7)
   weight: string;
   reps: string;
+  rir: string;
   prev?: { weight: number; reps: number; week: number };
   saved: boolean;
 }
@@ -37,7 +39,32 @@ export default function WorkoutLogScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showImage, setShowImage] = useState(true);
-  const motionPattern = patternFor(exercise.name, exercise.name_en, exercise.muscle_group);
+  const [timerLeft, setTimerLeft] = useState<number | null>(null);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const restSeconds = exercise.rest_seconds ?? 90;
+
+  function startRestTimer() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setTimerLeft(restSeconds);
+    timerRef.current = setInterval(() => {
+      setTimerLeft(prev => {
+        if (prev == null || prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          return null;
+        }
+        if (prev === 4 && Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function stopRestTimer() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setTimerLeft(null);
+  }
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   useEffect(() => {
     fetchSeriesAndLogs();
@@ -77,6 +104,7 @@ export default function WorkoutLogScreen() {
         series: s,
         weight: cur ? String(cur.weight) : (prev?.weight ?? exercise.ref_weight)?.toString() ?? '',
         reps: cur ? String(cur.reps) : '',
+        rir: cur?.rir != null ? String(cur.rir) : '',
         prev: prev ? { weight: prev.weight, reps: prev.reps, week: prev.week_number } : undefined,
         saved: !!cur,
       };
@@ -84,7 +112,7 @@ export default function WorkoutLogScreen() {
     setLoading(false);
   }
 
-  function updateEntry(index: number, field: 'weight' | 'reps', value: string) {
+  function updateEntry(index: number, field: 'weight' | 'reps' | 'rir', value: string) {
     // permitir solo dígitos y un separador decimal (punto o coma)
     const clean = value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/, '$1');
     setEntries(prev => prev.map((e, i) => i === index
@@ -98,9 +126,28 @@ export default function WorkoutLogScreen() {
     return isNaN(n) ? null : n;
   };
 
+  // autoprogresión: si completó el tope del rango en todas las series previas → sugerir +2.5%
+  const repTop = (() => {
+    const m = exercise.reps_objective?.match(/(\d+)\s*-\s*(\d+)/);
+    if (m) return parseInt(m[2], 10);
+    const single = parseInt(exercise.reps_objective ?? '', 10);
+    return isNaN(single) ? null : single;
+  })();
+  const suggestion = React.useMemo(() => {
+    if (!repTop || entries.length === 0) return null;
+    if (entries.some(e => e.saved)) return null;               // ya registró hoy
+    if (!entries.every(e => e.prev && e.prev.reps >= repTop)) return null;
+    return entries.map(e => Math.round(e.prev!.weight * 1.025 * 2) / 2);
+  }, [entries, repTop]);
+
+  function applySuggestion() {
+    if (!suggestion) return;
+    setEntries(prev => prev.map((e, i) => ({ ...e, weight: String(suggestion[i]), saved: false })));
+  }
+
   async function saveAll() {
     const toSave = entries
-      .map(e => ({ ...e, weightNum: toNum(e.weight), repsNum: toNum(e.reps) }))
+      .map(e => ({ ...e, weightNum: toNum(e.weight), repsNum: toNum(e.reps), rirNum: e.rir === '' ? null : Math.min(9, Math.round(toNum(e.rir) ?? 0)) }))
       .filter(e => e.weightNum != null && e.repsNum != null);
     if (toSave.length === 0) {
       showAlert('Nada que guardar', 'Ingresa peso y reps en al menos una serie.');
@@ -123,6 +170,7 @@ export default function WorkoutLogScreen() {
         ? await supabase.from('workout_logs').update({
             weight: entry.weightNum,
             reps: entry.repsNum,
+            rir: entry.rirNum,
             logged_at: now,
           }).eq('id', existing.id)
         : await supabase.from('workout_logs').insert({
@@ -130,6 +178,7 @@ export default function WorkoutLogScreen() {
             week_number: week,
             weight: entry.weightNum,
             reps: entry.repsNum,
+            rir: entry.rirNum,
             logged_at: now,
             logged_by: user?.id,
           });
@@ -168,7 +217,7 @@ export default function WorkoutLogScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Ejemplo del ejercicio */}
-        {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group || motionPattern) && (
+        {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
             <TouchableOpacity style={styles.exampleHeader} onPress={() => setShowImage(v => !v)}>
               <Text style={styles.exampleTitle}>CÓMO SE HACE</Text>
@@ -176,7 +225,6 @@ export default function WorkoutLogScreen() {
             </TouchableOpacity>
             {showImage && (
               <>
-                {motionPattern && <ExerciseMotion pattern={motionPattern} height={165} />}
                 {exercise.muscle_group && (
                   <View style={styles.muscleRow}>
                     <MuscleMap height={130} highlights={{ [exercise.muscle_group]: 1 }} showLabels={false} />
@@ -193,16 +241,26 @@ export default function WorkoutLogScreen() {
           </Card>
         )}
 
+        {suggestion && (
+          <TouchableOpacity style={styles.suggestionBanner} onPress={applySuggestion} activeOpacity={0.8}>
+            <Ionicons name="trending-up" size={16} color={colors.background} />
+            <Text style={styles.suggestionText}>
+              Completaste el rango la semana pasada — toca para subir +2.5%
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.tableHeader}>
-          <Text style={[styles.th, { flex: 0.6 }]}>SERIE</Text>
+          <Text style={[styles.th, { flex: 0.5 }]}>SERIE</Text>
           <Text style={[styles.th, { flex: 1 }]}>PESO ({exercise.unit})</Text>
           <Text style={[styles.th, { flex: 1 }]}>REPS</Text>
+          <Text style={[styles.th, { flex: 0.6 }]}>RIR</Text>
         </View>
 
         {entries.map((entry, i) => (
           <View key={entry.series.id}>
             <View style={[styles.row, entry.saved && styles.rowSaved]}>
-              <View style={[styles.seriesBadge, { flex: 0.6 }]}>
+              <View style={[styles.seriesBadge, { flex: 0.5 }]}>
                 <Text style={styles.seriesText}>S{entry.series.series_number}</Text>
                 {entry.saved && <Ionicons name="checkmark-circle" size={14} color={colors.success} />}
               </View>
@@ -222,6 +280,15 @@ export default function WorkoutLogScreen() {
                 placeholder="0"
                 placeholderTextColor={colors.textMuted}
               />
+              <TextInput
+                style={[styles.input, { flex: 0.6 }]}
+                value={entry.rir}
+                onChangeText={v => updateEntry(i, 'rir', v)}
+                keyboardType="number-pad"
+                placeholder="–"
+                placeholderTextColor={colors.textMuted}
+                maxLength={1}
+              />
             </View>
             {entry.prev && (
               <Text style={styles.prevText}>
@@ -230,6 +297,22 @@ export default function WorkoutLogScreen() {
             )}
           </View>
         ))}
+
+        {timerLeft != null ? (
+          <TouchableOpacity style={styles.timerActive} onPress={stopRestTimer} activeOpacity={0.8}>
+            <Text style={styles.timerCount}>
+              {Math.floor(timerLeft / 60)}:{String(timerLeft % 60).padStart(2, '0')}
+            </Text>
+            <Text style={styles.timerHint}>DESCANSANDO · TOCA PARA CANCELAR</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.timerBtn} onPress={startRestTimer} activeOpacity={0.8}>
+            <Ionicons name="timer-outline" size={18} color={colors.accent} />
+            <Text style={styles.timerBtnText}>
+              INICIAR DESCANSO ({Math.floor(restSeconds / 60)}:{String(restSeconds % 60).padStart(2, '0')})
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -263,6 +346,34 @@ const styles = StyleSheet.create({
   exerciseName: { ...typography.display, fontSize: 28 },
   meta: { ...typography.label, color: colors.accent, letterSpacing: 2 },
   nameEn: { ...typography.caption, fontStyle: 'italic', marginTop: -2 },
+  paramRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
+  paramChip: {
+    fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.textSecondary,
+    backgroundColor: colors.surface, borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 3,
+    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+  },
+  suggestionBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.accent, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    marginBottom: spacing.xs,
+  },
+  suggestionText: { color: colors.background, fontSize: 12, fontWeight: '800', flex: 1 },
+  timerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent + '55',
+    paddingVertical: spacing.md, marginTop: spacing.xs,
+  },
+  timerBtnText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
+  timerActive: {
+    alignItems: 'center', gap: 2,
+    borderRadius: radius.md, backgroundColor: colors.accentSoft,
+    borderWidth: 1, borderColor: colors.accent,
+    paddingVertical: spacing.sm, marginTop: spacing.xs,
+  },
+  timerCount: { fontSize: 34, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] },
+  timerHint: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, color: colors.textMuted },
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,

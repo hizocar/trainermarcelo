@@ -48,6 +48,9 @@ export interface Exercise {
   muscle_group?: string;
   name_en?: string;
   library_id?: string;
+  tempo?: string;
+  rest_seconds?: number;
+  target_rir?: string;
 }
 
 export interface MoodLog {
@@ -70,8 +73,35 @@ export interface WorkoutLog {
   week_number: number;
   weight: number;
   reps: number;
+  rir?: number;
   logged_at: string;
   logged_by: string;
+}
+
+export interface SessionNote {
+  id: string;
+  user_id: string;
+  day_id: string;
+  week_number: number;
+  note: string;
+  created_at: string;
+}
+
+export interface DayTemplate {
+  id: string;
+  coach_id: string;
+  name: string;
+  exercises: any[];
+  created_at: string;
+}
+
+export type MesoPhase = 'acumulacion' | 'intensificacion' | 'descarga';
+
+export interface WeekPhase {
+  id: string;
+  plan_id: string;
+  week_number: number;
+  phase: MesoPhase;
 }
 
 export interface WeeklyVolume {

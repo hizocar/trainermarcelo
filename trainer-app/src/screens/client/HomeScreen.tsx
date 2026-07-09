@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const [moods, setMoods] = useState<MoodLog[]>([]);
   const [savingMood, setSavingMood] = useState(false);
   const [groupSets, setGroupSets] = useState<Record<string, number>>({});
+  const [weekDays, setWeekDays] = useState<{ id: string; day_number: number; name: string; total: number; done: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const currentWeek = getCurrentWeek();
@@ -62,13 +63,33 @@ export default function HomeScreen() {
     if (!plan) { setLoading(false); return; }
 
     const { data: days } = await supabase
-      .from('training_days').select('id').eq('plan_id', plan.id);
+      .from('training_days').select('id, day_number, name')
+      .eq('plan_id', plan.id).order('day_number');
     const { data: exs } = await supabase
-      .from('exercises').select('id, muscle_group')
+      .from('exercises').select('id, muscle_group, day_id')
       .in('day_id', (days ?? []).map(d => d.id));
     const { data: series } = await supabase
       .from('exercise_series').select('id, exercise_id')
       .in('exercise_id', (exs ?? []).map(e => e.id));
+
+    // días entrenados vs pendientes esta semana
+    const { data: weekLogs } = await supabase
+      .from('workout_logs').select('series_id')
+      .in('series_id', (series ?? []).map(s => s.id))
+      .eq('week_number', currentWeek);
+    const loggedSeries = new Set((weekLogs ?? []).map(l => l.series_id));
+    const doneEx = new Set((series ?? []).filter(s => loggedSeries.has(s.id)).map(s => s.exercise_id));
+    setWeekDays((days ?? [])
+      .filter(d => !d.name.toLowerCase().includes('libre'))
+      .map(d => {
+        const dayExs = (exs ?? []).filter(e => e.day_id === d.id);
+        return {
+          ...d,
+          total: dayExs.length,
+          done: dayExs.filter(e => doneEx.has(e.id)).length,
+        };
+      })
+      .filter(d => d.total > 0));
 
     // total de series del SPLIT semanal por grupo (lo planificado, no lo completado)
     const exGroup: Record<string, string> = {};
@@ -170,6 +191,40 @@ export default function HomeScreen() {
           )}
         </Card>
 
+        {/* Días entrenados vs pendientes */}
+        {weekDays.length > 0 && (
+          <Card style={styles.weekCard}>
+            <Text style={styles.groupTitle}>MI SEMANA</Text>
+            <View style={styles.weekRow}>
+              {weekDays.map(d => {
+                const complete = d.done >= d.total;
+                const started = d.done > 0 && !complete;
+                return (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={[styles.weekDayChip, complete && styles.weekDayChipDone, started && styles.weekDayChipStarted]}
+                    onPress={() => navigation.navigate('Today')}
+                    activeOpacity={0.7}
+                  >
+                    {complete ? (
+                      <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                    ) : started ? (
+                      <Text style={styles.weekDayCount}>{d.done}/{d.total}</Text>
+                    ) : (
+                      <Ionicons name="ellipse-outline" size={16} color={colors.textMuted} />
+                    )}
+                    <Text style={[styles.weekDayNum, complete && { color: colors.success }]}>DÍA {d.day_number}</Text>
+                    <Text style={styles.weekDayName} numberOfLines={1}>{d.name.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.weekSummary}>
+              {weekDays.filter(d => d.done >= d.total).length} de {weekDays.length} días completados esta semana
+            </Text>
+          </Card>
+        )}
+
         {/* Series por grupo muscular (semana en curso) */}
         <Card style={styles.groupCard}>
           <View>
@@ -251,6 +306,20 @@ const styles = StyleSheet.create({
   moodHistoryEnergy: { fontSize: 16, fontWeight: '900' },
   moodHistoryDate: { ...typography.caption, fontSize: 9 },
 
+  weekCard: { gap: spacing.sm },
+  weekRow: { flexDirection: 'row', gap: spacing.sm },
+  weekDayChip: {
+    flex: 1, alignItems: 'center', gap: 3,
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingVertical: spacing.sm + 2, paddingHorizontal: 2,
+  },
+  weekDayChipDone: { borderColor: colors.success + '88', backgroundColor: colors.success + '11' },
+  weekDayChipStarted: { borderColor: colors.accent + '66' },
+  weekDayCount: { fontSize: 13, fontWeight: '900', color: colors.accent },
+  weekDayNum: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5, color: colors.textPrimary },
+  weekDayName: { fontSize: 8, fontWeight: '700', letterSpacing: 0.3, color: colors.textMuted },
+  weekSummary: { ...typography.caption, fontSize: 10, textAlign: 'center' },
   groupCard: { gap: spacing.sm },
   groupTitle: { ...typography.h3, fontSize: 15 },
   groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.accent, marginTop: 2 },

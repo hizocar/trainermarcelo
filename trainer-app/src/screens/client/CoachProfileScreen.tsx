@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const COACH_INSTAGRAM = 'https://www.instagram.com/marcetherapistt/';
 import { supabase } from '../../lib/supabase';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
@@ -18,6 +19,7 @@ import { showAlert, showConfirm } from '../../lib/alert';
 
 export default function CoachProfileScreen() {
   const { user, signOut } = useAuth();
+  const navigation = useNavigation<any>();
   const [coach, setCoach] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
@@ -140,6 +142,16 @@ export default function CoachProfileScreen() {
           </Card>
         )}
 
+        <TouchableOpacity
+          style={styles.calcBtn}
+          onPress={() => navigation.navigate('Calculators')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="calculator-outline" size={18} color={colors.accent} />
+          <Text style={styles.calcBtnText}>CALCULADORAS · 1RM Y DISCOS</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
+
         <View style={styles.logoutSection}>
           <TouchableOpacity onPress={handleSignOut}>
             <Text style={styles.logoutBtn}>CERRAR SESIÓN</Text>
@@ -207,6 +219,13 @@ const styles = StyleSheet.create({
   noCoachCard: { alignItems: 'center', paddingVertical: spacing.xl },
   noCoachText: { ...typography.body, color: colors.textMuted },
 
+  calcBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+  },
+  calcBtnText: { ...typography.label, color: colors.textPrimary, letterSpacing: 1, flex: 1 },
   logoutSection: { marginTop: spacing.lg, alignItems: 'center' },
   logoutBtn: { ...typography.label, color: colors.danger, letterSpacing: 3, padding: spacing.md },
 });

@@ -4,8 +4,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { User, TrainingDay, WorkoutPlan } from '../../types';
+import { User, TrainingDay, WorkoutPlan, SessionNote } from '../../types';
+import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
+
+const PHASES = [
+  { value: 'acumulacion', label: 'ACUMULACIÓN', color: colors.accent },
+  { value: 'intensificacion', label: 'INTENSIFICACIÓN', color: '#FF9F1C' },
+  { value: 'descarga', label: 'DESCARGA', color: '#4CC9F0' },
+];
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 
@@ -18,7 +26,10 @@ export default function ClientDetailScreen() {
 
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [days, setDays] = useState<TrainingDay[]>([]);
+  const [phase, setPhase] = useState<string | null>(null);
+  const [notes, setNotes] = useState<(SessionNote & { dayName?: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentWeek = getCurrentWeek();
 
   useEffect(() => {
     fetchPlan();
@@ -38,9 +49,39 @@ export default function ClientDetailScreen() {
         .select('*')
         .eq('plan_id', planData.id)
         .order('day_number');
-      setDays(daysData ?? []);
+      const dayList = daysData ?? [];
+      setDays(dayList);
+
+      // fase de la semana actual
+      const { data: ph } = await supabase
+        .from('week_phases').select('phase')
+        .eq('plan_id', planData.id).eq('week_number', currentWeek).maybeSingle();
+      setPhase(ph?.phase ?? null);
+
+      // últimas notas del cliente
+      const { data: notesData } = await supabase
+        .from('session_notes').select('*')
+        .eq('user_id', client.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      const dayName = Object.fromEntries(dayList.map(d => [d.id, `Día ${d.day_number} · ${d.name}`]));
+      setNotes((notesData ?? []).map(n => ({ ...n, dayName: dayName[n.day_id] })));
     }
     setLoading(false);
+  }
+
+  async function setWeekPhase(value: string) {
+    if (!plan) return;
+    if (phase === value) {
+      await supabase.from('week_phases').delete().eq('plan_id', plan.id).eq('week_number', currentWeek);
+      setPhase(null);
+    } else {
+      const { error } = await supabase.from('week_phases').upsert(
+        { plan_id: plan.id, week_number: currentWeek, phase: value },
+        { onConflict: 'plan_id,week_number' },
+      );
+      if (!error) setPhase(value);
+    }
   }
 
   return (
@@ -82,6 +123,38 @@ export default function ClientDetailScreen() {
               <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🧍 MEDIDAS Y FOTOS</Text>
             </TouchableOpacity>
           </View>
+
+          <Text style={styles.sectionLabel}>FASE DE LA SEMANA (SEMANA {currentWeek})</Text>
+          <View style={styles.phaseRow}>
+            {PHASES.map(p => (
+              <TouchableOpacity
+                key={p.value}
+                style={[styles.phaseChip, phase === p.value && { backgroundColor: p.color, borderColor: p.color }]}
+                onPress={() => setWeekPhase(p.value)}
+              >
+                <Text style={[styles.phaseChipText, phase === p.value && { color: colors.background }]}>
+                  {p.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {notes.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>NOTAS DEL CLIENTE</Text>
+              {notes.map(n => (
+                <Card key={n.id} style={styles.noteCard}>
+                  <View style={styles.noteHeader}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.accent} />
+                    <Text style={styles.noteMeta}>
+                      {n.dayName ?? 'Día'} · S{n.week_number} · {formatShortDate(n.created_at)}
+                    </Text>
+                  </View>
+                  <Text style={styles.noteText}>{n.note}</Text>
+                </Card>
+              ))}
+            </>
+          )}
 
           <Text style={styles.sectionLabel}>DÍAS DE ENTRENAMIENTO</Text>
 
@@ -167,6 +240,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
+  phaseRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  phaseChip: {
+    flex: 1, alignItems: 'center',
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface, paddingVertical: spacing.sm,
+  },
+  phaseChipText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5, color: colors.textMuted },
+  noteCard: { gap: spacing.xs },
+  noteHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  noteMeta: { ...typography.caption, fontSize: 10, letterSpacing: 0.5 },
+  noteText: { ...typography.body, fontSize: 14 },
   dayCard: {
     flexDirection: 'row',
     alignItems: 'center',

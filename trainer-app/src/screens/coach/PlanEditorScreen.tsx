@@ -16,6 +16,8 @@ import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/med
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 
 const REPS_OPTIONS = ['4-6', '6-8', '8-10', '8-12', '10-12', '12-15', '10-15'];
+const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
+const RIR_OPTIONS = ['0', '0-1', '1-2', '2-3', '3+'];
 const MUSCLE_GROUPS = [
   'Pecho', 'Espalda alta', 'Espalda baja',
   'Hombro anterior', 'Hombro medial', 'Hombro posterior',
@@ -58,6 +60,10 @@ export default function PlanEditorScreen() {
   const [exSeries, setExSeries] = useState('3');
   const [exNotes, setExNotes] = useState('');
   const [exMuscle, setExMuscle] = useState('');
+  const [exTempo, setExTempo] = useState('');
+  const [exRest, setExRest] = useState<number | null>(null);
+  const [exTargetRir, setExTargetRir] = useState('');
+  const [templates, setTemplates] = useState<{ id: string; name: string; exercises: any[] }[]>([]);
   const [exVideoUrl, setExVideoUrl] = useState('');
   const [exImageUrl, setExImageUrl] = useState<string | null>(null);
   const [exNewImage, setExNewImage] = useState<ImagePickerAsset | null>(null);
@@ -68,7 +74,61 @@ export default function PlanEditorScreen() {
   const [exLibrary, setExLibrary] = useState<{ name_en: string | null; library_id: string | null }>({ name_en: null, library_id: null });
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { fetchPlan(); }, []);
+  useEffect(() => { fetchPlan(); fetchTemplates(); }, []);
+
+  async function fetchTemplates() {
+    const { data } = await supabase
+      .from('day_templates')
+      .select('id, name, exercises')
+      .order('created_at', { ascending: false });
+    setTemplates(data ?? []);
+  }
+
+  async function saveDayAsTemplate(day: DayWithExercises) {
+    if (day.exercises.length === 0) {
+      showAlert('Día vacío', 'Agrega ejercicios antes de guardarlo como plantilla.');
+      return;
+    }
+    const snapshot = day.exercises.map(e => ({
+      name: e.name, name_en: e.name_en ?? null, library_id: e.library_id ?? null,
+      muscle_group: e.muscle_group ?? null, reps_objective: e.reps_objective,
+      unit: e.unit, ref_weight: e.ref_weight ?? null,
+      superseries_group: e.superseries_group ?? null,
+      tempo: e.tempo ?? null, rest_seconds: e.rest_seconds ?? null, target_rir: e.target_rir ?? null,
+      notes: e.notes ?? null, image_url: e.image_url ?? null, video_url: e.video_url ?? null,
+    }));
+    const { error } = await supabase.from('day_templates').insert({
+      coach_id: user!.id, name: day.name, exercises: snapshot,
+    });
+    if (error) showAlert('Error', error.message);
+    else { showAlert('Plantilla guardada', `"${day.name}" (${snapshot.length} ejercicios) quedó disponible para cualquier cliente.`); fetchTemplates(); }
+  }
+
+  async function addDayFromTemplate(tpl: { id: string; name: string; exercises: any[] }) {
+    if (!plan) return;
+    setSaving(true);
+    const { data: newDay, error } = await supabase
+      .from('training_days')
+      .insert({ plan_id: plan.id, day_number: days.length + 1, name: newDayName.trim() || tpl.name, week_day: newDayWeekDay })
+      .select().single();
+    if (error || !newDay) { setSaving(false); showAlert('Error', error?.message ?? ''); return; }
+
+    const created: Exercise[] = [];
+    for (let i = 0; i < tpl.exercises.length; i++) {
+      const t = tpl.exercises[i];
+      const { data: ex } = await supabase.from('exercises')
+        .insert({ ...t, day_id: newDay.id, order_index: i })
+        .select().single();
+      if (ex) {
+        await supabase.from('exercise_series').insert(
+          Array.from({ length: 3 }, (_, s) => ({ exercise_id: ex.id, series_number: s + 1 }))
+        );
+        created.push(ex);
+      }
+    }
+    setDays(prev => [...prev, { ...newDay, exercises: created }]);
+    setNewDayName(''); setNewDayWeekDay(1); setShowDayModal(false); setSaving(false);
+  }
 
   async function fetchPlan() {
     const { data: planData } = await supabase
@@ -130,6 +190,7 @@ export default function PlanEditorScreen() {
     setExRefWeight(''); setExSuperseries(''); setExSeries('3');
     setExNotes(''); setExVideoUrl(''); setExImageUrl(null); setExNewImage(null);
     setExMuscle('');
+    setExTempo(''); setExRest(null); setExTargetRir('');
     setExLibrary({ name_en: null, library_id: null });
     setExNewVideo(null);
     setEditingEx(null);
@@ -146,6 +207,7 @@ export default function PlanEditorScreen() {
     setExSeries('3');
     setExNotes(ex.notes ?? '');
     setExMuscle(ex.muscle_group ?? '');
+    setExTempo(ex.tempo ?? ''); setExRest(ex.rest_seconds ?? null); setExTargetRir(ex.target_rir ?? '');
     setExLibrary({ name_en: ex.name_en ?? null, library_id: ex.library_id ?? null });
     setExVideoUrl(ex.video_url ?? '');
     setExImageUrl(ex.image_url ?? null);
@@ -235,6 +297,9 @@ export default function PlanEditorScreen() {
       muscle_group: exMuscle || null,
       name_en: exLibrary.name_en,
       library_id: exLibrary.library_id,
+      tempo: exTempo.trim() || null,
+      rest_seconds: exRest,
+      target_rir: exTargetRir || null,
     };
 
     if (editingEx) {
@@ -362,6 +427,9 @@ export default function PlanEditorScreen() {
                 <Text style={styles.dayName}>{day.name.toUpperCase()}</Text>
               </View>
               <View style={styles.dayHeaderActions}>
+                <TouchableOpacity onPress={() => saveDayAsTemplate(day)} style={styles.iconBtn}>
+                  <Ionicons name="bookmark-outline" size={13} color={colors.accent} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => openAddExercise(day.id)} style={styles.iconBtn}>
                   <Text style={styles.iconBtnText}>+ EJ.</Text>
                 </TouchableOpacity>
@@ -457,6 +525,21 @@ export default function PlanEditorScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            {templates.length > 0 && (
+              <>
+                <Text style={styles.inputLabel}>O CREAR DESDE PLANTILLA</Text>
+                <View style={styles.templateList}>
+                  {templates.map(tpl => (
+                    <TouchableOpacity key={tpl.id} style={styles.templateRow} onPress={() => addDayFromTemplate(tpl)} disabled={saving}>
+                      <Ionicons name="bookmark" size={14} color={colors.accent} />
+                      <Text style={styles.templateName} numberOfLines={1}>{tpl.name}</Text>
+                      <Text style={styles.templateCount}>{tpl.exercises.length} ej.</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowDayModal(false)}>
@@ -563,6 +646,44 @@ export default function PlanEditorScreen() {
               placeholderTextColor={colors.textMuted}
               keyboardType="decimal-pad"
             />
+
+            <Text style={styles.inputLabel}>TEMPO (opcional, ej: 3-0-1)</Text>
+            <TextInput
+              style={styles.input}
+              value={exTempo}
+              onChangeText={setExTempo}
+              placeholder="excéntrica-pausa-concéntrica"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.inputLabel}>DESCANSO ENTRE SERIES (opcional)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
+              {REST_OPTIONS.map(s => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.repsOption, exRest === s && styles.repsOptionActive]}
+                  onPress={() => setExRest(exRest === s ? null : s)}
+                >
+                  <Text style={[styles.repsOptionText, exRest === s && styles.repsOptionTextActive]}>
+                    {s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.inputLabel}>RIR OBJETIVO (opcional)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
+              {RIR_OPTIONS.map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.repsOption, exTargetRir === r && styles.repsOptionActive]}
+                  onPress={() => setExTargetRir(exTargetRir === r ? '' : r)}
+                >
+                  <Text style={[styles.repsOptionText, exTargetRir === r && styles.repsOptionTextActive]}>RIR {r}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
             <Text style={styles.inputLabel}>IMAGEN DE EJEMPLO (opcional)</Text>
             <TouchableOpacity style={styles.imagePicker} onPress={chooseImage} activeOpacity={0.8}>
@@ -711,6 +832,15 @@ const styles = StyleSheet.create({
   exCard: { },
   exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   exThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface },
+  templateList: { gap: spacing.xs },
+  templateRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+  },
+  templateName: { ...typography.body, fontSize: 14, fontWeight: '600', flex: 1 },
+  templateCount: { ...typography.caption, fontSize: 10 },
   suggestBox: {
     backgroundColor: colors.card, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.accent + '44',
