@@ -46,6 +46,8 @@ export interface Exercise {
   video_url?: string;
   notes?: string;
   muscle_group?: string;
+  name_en?: string;
+  library_id?: string;
 }
 
 export interface MoodLog {

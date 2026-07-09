@@ -64,7 +64,8 @@ export default function PlanEditorScreen() {
   const [exNewVideo, setExNewVideo] = useState<ImagePickerAsset | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [editingEx, setEditingEx] = useState<Exercise | null>(null);
-  const [suggestions, setSuggestions] = useState<{ name: string; muscle_group: string; equipment: string | null }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string; name_en: string | null; muscle_group: string; equipment: string | null }[]>([]);
+  const [exLibrary, setExLibrary] = useState<{ name_en: string | null; library_id: string | null }>({ name_en: null, library_id: null });
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchPlan(); }, []);
@@ -129,6 +130,7 @@ export default function PlanEditorScreen() {
     setExRefWeight(''); setExSuperseries(''); setExSeries('3');
     setExNotes(''); setExVideoUrl(''); setExImageUrl(null); setExNewImage(null);
     setExMuscle('');
+    setExLibrary({ name_en: null, library_id: null });
     setExNewVideo(null);
     setEditingEx(null);
     setShowExModal(true);
@@ -144,6 +146,7 @@ export default function PlanEditorScreen() {
     setExSeries('3');
     setExNotes(ex.notes ?? '');
     setExMuscle(ex.muscle_group ?? '');
+    setExLibrary({ name_en: ex.name_en ?? null, library_id: ex.library_id ?? null });
     setExVideoUrl(ex.video_url ?? '');
     setExImageUrl(ex.image_url ?? null);
     setExNewImage(null);
@@ -154,13 +157,14 @@ export default function PlanEditorScreen() {
 
   function onExNameChange(v: string) {
     setExName(v);
+    setExLibrary({ name_en: null, library_id: null });
     if (searchTimer.current) clearTimeout(searchTimer.current);
     const q = v.trim();
     if (q.length < 3) { setSuggestions([]); return; }
     searchTimer.current = setTimeout(async () => {
       const { data } = await supabase
         .from('exercise_library')
-        .select('name, muscle_group, equipment')
+        .select('id, name, name_en, muscle_group, equipment')
         .or(`name.ilike.%${q}%,name_en.ilike.%${q}%`)
         .limit(5);
       // no sugerir si ya escribió exactamente ese nombre
@@ -168,9 +172,10 @@ export default function PlanEditorScreen() {
     }, 250);
   }
 
-  function pickSuggestion(s: { name: string; muscle_group: string }) {
+  function pickSuggestion(s: { id: string; name: string; name_en: string | null; muscle_group: string }) {
     setExName(s.name);
     setExMuscle(s.muscle_group);
+    setExLibrary({ name_en: s.name_en, library_id: s.id });
     setSuggestions([]);
   }
 
@@ -228,6 +233,8 @@ export default function PlanEditorScreen() {
       video_url: videoUrl,
       image_url: imageUrl,
       muscle_group: exMuscle || null,
+      name_en: exLibrary.name_en,
+      library_id: exLibrary.library_id,
     };
 
     if (editingEx) {

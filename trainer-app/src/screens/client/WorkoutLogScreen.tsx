@@ -12,6 +12,7 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
+import ExerciseMotion, { patternFor } from '../../components/common/ExerciseMotion';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
@@ -36,6 +37,7 @@ export default function WorkoutLogScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showImage, setShowImage] = useState(true);
+  const motionPattern = patternFor(exercise.name, exercise.name_en, exercise.muscle_group);
 
   useEffect(() => {
     fetchSeriesAndLogs();
@@ -156,6 +158,7 @@ export default function WorkoutLogScreen() {
           <Text style={styles.backText}>ATRÁS</Text>
         </TouchableOpacity>
         <Text style={styles.exerciseName}>{exercise.name.toUpperCase()}</Text>
+        {exercise.name_en ? <Text style={styles.nameEn}>{exercise.name_en}</Text> : null}
         <Text style={styles.meta}>
           {week === getCurrentWeek()
             ? formatShortDate(new Date().toISOString()).toUpperCase()
@@ -165,7 +168,7 @@ export default function WorkoutLogScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Ejemplo del ejercicio */}
-        {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
+        {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group || motionPattern) && (
           <Card style={styles.exampleCard}>
             <TouchableOpacity style={styles.exampleHeader} onPress={() => setShowImage(v => !v)}>
               <Text style={styles.exampleTitle}>CÓMO SE HACE</Text>
@@ -173,6 +176,7 @@ export default function WorkoutLogScreen() {
             </TouchableOpacity>
             {showImage && (
               <>
+                {motionPattern && <ExerciseMotion pattern={motionPattern} height={165} />}
                 {exercise.muscle_group && (
                   <View style={styles.muscleRow}>
                     <MuscleMap height={130} highlights={{ [exercise.muscle_group]: 1 }} showLabels={false} />
@@ -258,6 +262,7 @@ const styles = StyleSheet.create({
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   exerciseName: { ...typography.display, fontSize: 28 },
   meta: { ...typography.label, color: colors.accent, letterSpacing: 2 },
+  nameEn: { ...typography.caption, fontStyle: 'italic', marginTop: -2 },
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,

@@ -172,7 +172,7 @@ export default function HomeScreen() {
 
         {/* Series por grupo muscular (semana en curso) */}
         <Card style={styles.groupCard}>
-          <View style={styles.groupHeader}>
+          <View>
             <Text style={styles.groupTitle}>SERIES POR GRUPO MUSCULAR</Text>
             <Text style={styles.groupWeek}>SPLIT SEMANAL</Text>
           </View>
@@ -252,12 +252,11 @@ const styles = StyleSheet.create({
   moodHistoryDate: { ...typography.caption, fontSize: 9 },
 
   groupCard: { gap: spacing.sm },
-  groupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   groupTitle: { ...typography.h3, fontSize: 15 },
-  groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.accent },
+  groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.accent, marginTop: 2 },
   groupEmpty: { ...typography.caption, textAlign: 'center', paddingVertical: spacing.md },
   groupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  groupName: { ...typography.caption, fontWeight: '800', letterSpacing: 0.5, width: 96 },
+  groupName: { fontSize: 10.5, color: colors.textMuted, fontWeight: '800', letterSpacing: 0.3, width: 112 },
   groupBarTrack: {
     flex: 1, height: 8, borderRadius: radius.full,
     backgroundColor: colors.surface, overflow: 'hidden',

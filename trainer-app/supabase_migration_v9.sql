@@ -1,11 +1,11 @@
 -- ============================================================
--- Migración v9 — Biblioteca de ejercicios (824, fuente smartworkout)
+-- Migración v9 — Biblioteca de ejercicios (824)
 -- Ejecutar en el SQL Editor de Supabase DESPUÉS de la v8
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.exercise_library (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_id     text UNIQUE,          -- id de la fuente, para re-sincronizar
+  source_id     text UNIQUE,          -- id externo, para re-sincronizar
   name          text NOT NULL,        -- nombre en español
   name_en       text,
   body_part     text,                 -- categoría gruesa de la fuente
