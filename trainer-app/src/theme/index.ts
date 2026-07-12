@@ -1,21 +1,25 @@
 import { Platform } from 'react-native';
 
 export const colors = {
-  background: '#0A0A0A',
-  surface: '#161616',
-  card: '#1A1A1A',
-  cardElevated: '#202020',
+  background: '#08090A',
+  backgroundElevated: '#0E1012',
+  surface: '#15181B',
+  card: '#16191C',
+  cardElevated: '#1D2126',
   accent: '#C8FF00',
   accentDark: '#9ACC00',
   accentSoft: 'rgba(200, 255, 0, 0.10)',
+  accentGlow: 'rgba(200, 255, 0, 0.22)',
   textPrimary: '#FFFFFF',
-  textSecondary: '#B8B8B8',
-  textMuted: '#7A7A7A',
-  border: '#262626',
-  borderLight: '#333333',
-  danger: '#FF4D4D',
+  textSecondary: '#B4BAC1',
+  textMuted: '#6E757D',
+  border: '#23272C',
+  borderLight: '#31363C',
+  danger: '#FF5252',
+  warning: '#FF9F1C',
   success: '#3DDC84',
-  overlay: 'rgba(0, 0, 0, 0.55)',
+  info: '#4CC9F0',
+  overlay: 'rgba(0, 0, 0, 0.72)',
 } as const;
 
 // Anton: display condensada estilo cartel deportivo (una sola weight, usar en mayúsculas)
@@ -24,7 +28,6 @@ export const fonts = {
 };
 
 export const typography = {
-  // titulares grandes — Anton, siempre en mayúsculas
   display: {
     fontFamily: fonts.display,
     fontSize: 34,
@@ -41,10 +44,10 @@ export const typography = {
   },
   h1: { fontSize: 32, fontWeight: '900' as const, letterSpacing: -1, color: colors.textPrimary },
   h2: { fontSize: 24, fontWeight: '800' as const, letterSpacing: -0.5, color: colors.textPrimary },
-  h3: { fontSize: 17, fontWeight: '700' as const, color: colors.textPrimary },
+  h3: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.2, color: colors.textPrimary },
   body: { fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary, lineHeight: 21 },
   caption: { fontSize: 12, fontWeight: '500' as const, color: colors.textMuted },
-  label: { fontSize: 11, fontWeight: '700' as const, letterSpacing: 1, color: colors.textMuted },
+  label: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 1.2, color: colors.textMuted },
 };
 
 export const spacing = {
@@ -59,18 +62,31 @@ export const spacing = {
 export const radius = {
   sm: 10,
   md: 14,
-  lg: 18,
+  lg: 20,
+  xl: 26,
   full: 999,
 };
 
 // sombra sutil para tarjetas (web usa boxShadow; nativo shadow*/elevation)
 export const cardShadow = Platform.select({
-  web: { boxShadow: '0 2px 16px rgba(0, 0, 0, 0.35)' } as object,
+  web: { boxShadow: '0 6px 24px rgba(0, 0, 0, 0.45)' } as object,
   default: {
     shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.38,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+});
+
+// resplandor lima para elementos destacados (CTA, valores clave)
+export const accentGlow = Platform.select({
+  web: { boxShadow: '0 4px 22px rgba(200, 255, 0, 0.28)' } as object,
+  default: {
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 8,
   },
 });

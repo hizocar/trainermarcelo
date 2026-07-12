@@ -39,6 +39,9 @@ export default function WorkoutLogScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showImage, setShowImage] = useState(true);
+  const [note, setNote] = useState('');
+  const [noteDirty, setNoteDirty] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
   const [timerLeft, setTimerLeft] = useState<number | null>(null);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const restSeconds = exercise.rest_seconds ?? 90;
@@ -68,7 +71,30 @@ export default function WorkoutLogScreen() {
 
   useEffect(() => {
     fetchSeriesAndLogs();
+    fetchNote();
   }, []);
+
+  async function fetchNote() {
+    if (!user || !exercise.day_id) return;
+    const { data } = await supabase
+      .from('session_notes').select('note')
+      .eq('user_id', user.id).eq('day_id', exercise.day_id).eq('week_number', week)
+      .maybeSingle();
+    setNote(data?.note ?? '');
+    setNoteDirty(false);
+  }
+
+  async function saveNote() {
+    if (!user || !note.trim()) return;
+    setNoteSaving(true);
+    const { error } = await supabase.from('session_notes').upsert(
+      { user_id: user.id, day_id: exercise.day_id, week_number: week, note: note.trim() },
+      { onConflict: 'user_id,day_id,week_number' },
+    );
+    setNoteSaving(false);
+    if (error) showAlert('No se pudo guardar la nota', error.message);
+    else setNoteDirty(false);
+  }
 
   async function fetchSeriesAndLogs() {
     const { data: seriesData } = await supabase
@@ -220,16 +246,15 @@ export default function WorkoutLogScreen() {
         {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
             <TouchableOpacity style={styles.exampleHeader} onPress={() => setShowImage(v => !v)}>
-              <Text style={styles.exampleTitle}>CÓMO SE HACE</Text>
+              <Text style={styles.exampleTitle}>
+                {(exercise.image_url || exercise.video_url || exercise.notes) ? 'MÚSCULO Y TÉCNICA' : 'MÚSCULO TRABAJADO'}
+              </Text>
               <Ionicons name={showImage ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
             </TouchableOpacity>
             {showImage && (
               <>
                 {exercise.muscle_group && (
-                  <View style={styles.muscleRow}>
-                    <MuscleMap height={130} highlights={{ [exercise.muscle_group]: 1 }} showLabels={false} />
-                    <Text style={styles.muscleTag}>{exercise.muscle_group.toUpperCase()}</Text>
-                  </View>
+                  <MuscleMap height={172} highlights={{ [exercise.muscle_group]: 1 }} />
                 )}
                 {exercise.image_url && (
                   <Image source={{ uri: exercise.image_url }} style={styles.exampleImage} resizeMode="cover" />
@@ -245,7 +270,7 @@ export default function WorkoutLogScreen() {
           <TouchableOpacity style={styles.suggestionBanner} onPress={applySuggestion} activeOpacity={0.8}>
             <Ionicons name="trending-up" size={16} color={colors.background} />
             <Text style={styles.suggestionText}>
-              Completaste el rango la semana pasada — toca para subir +2.5%
+              Completaste el rango la semana pasada — quizá podrías subir un poco más
             </Text>
           </TouchableOpacity>
         )}
@@ -314,6 +339,28 @@ export default function WorkoutLogScreen() {
           </TouchableOpacity>
         )}
 
+        <Card style={styles.noteCard}>
+          <View style={styles.noteHeader}>
+            <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.accent} />
+            <Text style={styles.noteTitle}>NOTA PARA TU COACH</Text>
+          </View>
+          <TextInput
+            style={styles.noteInput}
+            value={note}
+            onChangeText={v => { setNote(v); setNoteDirty(true); }}
+            placeholder="ej: sentí molestia en el hombro en la S3..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+          />
+          {noteDirty && note.trim().length > 0 ? (
+            <TouchableOpacity style={styles.noteSave} onPress={saveNote} disabled={noteSaving}>
+              <Text style={styles.noteSaveText}>{noteSaving ? 'GUARDANDO...' : 'GUARDAR NOTA'}</Text>
+            </TouchableOpacity>
+          ) : note.trim().length > 0 ? (
+            <Text style={styles.noteSaved}>✓ Guardada — tu coach la verá</Text>
+          ) : null}
+        </Card>
+
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
           onPress={saveAll}
@@ -374,6 +421,18 @@ const styles = StyleSheet.create({
   },
   timerCount: { fontSize: 34, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] },
   timerHint: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, color: colors.textMuted },
+  noteCard: { gap: spacing.sm, marginTop: spacing.sm },
+  noteHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  noteTitle: { ...typography.label, letterSpacing: 2 },
+  noteInput: {
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    color: colors.textPrimary, fontSize: 14, minHeight: 56, textAlignVertical: 'top',
+  },
+  noteSave: { alignSelf: 'flex-end' },
+  noteSaveText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
+  noteSaved: { ...typography.caption, fontSize: 10, color: colors.success, textAlign: 'right' },
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,

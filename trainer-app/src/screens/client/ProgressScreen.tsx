@@ -12,6 +12,7 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import TrendChart from '../../components/common/TrendChart';
 import { getCurrentWeek } from '../../lib/weeks';
+import HistoryScreen from './HistoryScreen';
 
 type RouteParams = { client?: User; clientId?: string; clientName?: string };
 
@@ -62,6 +63,7 @@ export default function ProgressScreen() {
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
   const [seriesExMap, setSeriesExMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'evolucion' | 'historial'>('evolucion');
 
   useEffect(() => {
     if (targetId) fetchData();
@@ -226,12 +228,29 @@ export default function ProgressScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text style={styles.headerLabel}>PROGRESO</Text>
-          <Text style={styles.headerName}>{targetName.toUpperCase()}</Text>
-        </View>
+      <View style={styles.headerBlock}>
+        <Text style={styles.headerLabel}>PROGRESO</Text>
+        <Text style={styles.headerName}>{targetName.toUpperCase()}</Text>
+        {!isCoachView && (
+          <View style={styles.segment}>
+            {([['evolucion', 'EVOLUCIÓN'], ['historial', 'HISTORIAL']] as const).map(([key, label]) => (
+              <TouchableOpacity
+                key={key}
+                style={[styles.segmentBtn, tab === key && styles.segmentBtnActive]}
+                onPress={() => setTab(key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.segmentText, tab === key && styles.segmentTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
 
+      {tab === 'historial' && !isCoachView ? (
+        <HistoryScreen embedded />
+      ) : (
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
         ) : !hasData ? (
@@ -367,6 +386,7 @@ export default function ProgressScreen() {
           </>
         )}
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -377,6 +397,16 @@ const styles = StyleSheet.create({
   backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
+  headerBlock: { paddingHorizontal: spacing.xl, gap: spacing.sm, marginBottom: spacing.sm },
+  segment: {
+    flexDirection: 'row', gap: 4,
+    backgroundColor: colors.surface, borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.border, padding: 3,
+  },
+  segmentBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.full },
+  segmentBtnActive: { backgroundColor: colors.accent },
+  segmentText: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted },
+  segmentTextActive: { color: colors.background },
   headerLabel: { ...typography.label, letterSpacing: 3, color: colors.textMuted },
   headerName: { ...typography.display, fontSize: 30 },
 

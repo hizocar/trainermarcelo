@@ -36,7 +36,7 @@ interface Session {
   exercises: { exercise: Exercise; sets: { seriesNum: number; weight: number; reps: number }[] }[];
 }
 
-export default function HistoryScreen() {
+export default function HistoryScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
 
@@ -150,12 +150,14 @@ export default function HistoryScreen() {
   }, [filteredSessions]);
 
   return (
-    <View style={styles.container}>
+    <View style={embedded ? styles.containerEmbedded : styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text style={styles.headerLabel}>HISTORIAL</Text>
-          <Text style={styles.headerName}>MIS ENTRENAMIENTOS</Text>
-        </View>
+        {!embedded && (
+          <View>
+            <Text style={styles.headerLabel}>HISTORIAL</Text>
+            <Text style={styles.headerName}>MIS ENTRENAMIENTOS</Text>
+          </View>
+        )}
 
         {!loading && sessions.length > 0 && (
           <>
@@ -267,6 +269,7 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
+  containerEmbedded: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.md },
   headerLabel: { ...typography.label, letterSpacing: 3, color: colors.textMuted },
   headerName: { ...typography.display, fontSize: 30 },

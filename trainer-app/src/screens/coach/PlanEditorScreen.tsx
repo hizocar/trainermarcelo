@@ -197,14 +197,18 @@ export default function PlanEditorScreen() {
     setShowExModal(true);
   }
 
-  function openEditExercise(ex: Exercise) {
+  async function openEditExercise(ex: Exercise) {
     setTargetDayId(ex.day_id);
+    const { count } = await supabase
+      .from('exercise_series')
+      .select('*', { count: 'exact', head: true })
+      .eq('exercise_id', ex.id);
+    setExSeries(String(count ?? 3));
     setExName(ex.name);
     setExReps(ex.reps_objective);
     setExUnit(ex.unit);
     setExRefWeight(ex.ref_weight?.toString() ?? '');
     setExSuperseries(ex.superseries_group ?? '');
-    setExSeries('3');
     setExNotes(ex.notes ?? '');
     setExMuscle(ex.muscle_group ?? '');
     setExTempo(ex.tempo ?? ''); setExRest(ex.rest_seconds ?? null); setExTargetRir(ex.target_rir ?? '');
@@ -317,6 +321,34 @@ export default function PlanEditorScreen() {
         showAlert('Error al guardar', error.message);
         return;
       }
+      // sincronizar el número de series (nunca borra series con registros)
+      const { data: existingSeries } = await supabase
+        .from('exercise_series').select('id, series_number')
+        .eq('exercise_id', editingEx.id).order('series_number');
+      const current = existingSeries ?? [];
+      if (seriesCount > current.length) {
+        await supabase.from('exercise_series').insert(
+          Array.from({ length: seriesCount - current.length }, (_, i) => ({
+            exercise_id: editingEx.id, series_number: current.length + i + 1,
+          }))
+        );
+      } else if (seriesCount < current.length) {
+        const toRemove = current.slice(seriesCount);
+        const { data: used } = await supabase
+          .from('workout_logs').select('series_id').in('series_id', toRemove.map(s => s.id));
+        const usedIds = new Set((used ?? []).map(l => l.series_id));
+        const deletable = toRemove.filter(s => !usedIds.has(s.id));
+        if (deletable.length > 0) {
+          await supabase.from('exercise_series').delete().in('id', deletable.map(s => s.id));
+        }
+        if (deletable.length < toRemove.length) {
+          showAlert(
+            'Algunas series se conservaron',
+            `${toRemove.length - deletable.length} serie(s) tienen entrenamientos registrados y no se eliminaron.`
+          );
+        }
+      }
+
       if (data) {
         setDays(prev => prev.map(d => ({
           ...d,
@@ -748,22 +780,18 @@ export default function PlanEditorScreen() {
               numberOfLines={3}
             />
 
-            {!editingEx && (
-              <>
-                <Text style={styles.inputLabel}>NÚMERO DE SERIES</Text>
-                <View style={styles.unitPicker}>
-                  {['2', '3', '4'].map(n => (
-                    <TouchableOpacity
-                      key={n}
-                      style={[styles.unitOption, exSeries === n && styles.unitOptionActive]}
-                      onPress={() => setExSeries(n)}
-                    >
-                      <Text style={[styles.unitOptionText, exSeries === n && styles.unitOptionTextActive]}>{n}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
+            <Text style={styles.inputLabel}>NÚMERO DE SERIES</Text>
+            <View style={styles.unitPicker}>
+              {['1', '2', '3', '4', '5'].map(n => (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.unitOption, exSeries === n && styles.unitOptionActive]}
+                  onPress={() => setExSeries(n)}
+                >
+                  <Text style={[styles.unitOptionText, exSeries === n && styles.unitOptionTextActive]}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowExModal(false)}>

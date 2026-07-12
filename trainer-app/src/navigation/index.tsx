@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
@@ -21,7 +21,6 @@ import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import HomeScreen from '../screens/client/HomeScreen';
 import TodayScreen from '../screens/client/TodayScreen';
 import WorkoutLogScreen from '../screens/client/WorkoutLogScreen';
-import HistoryScreen from '../screens/client/HistoryScreen';
 import ProgressScreen from '../screens/client/ProgressScreen';
 import BodyProgressScreen from '../screens/client/BodyProgressScreen';
 import CoachProfileScreen from '../screens/client/CoachProfileScreen';
@@ -32,7 +31,9 @@ const Tab = createBottomTabNavigator();
 
 function tabIcon(name: keyof typeof Ionicons.glyphMap, outline: keyof typeof Ionicons.glyphMap) {
   return ({ focused, color }: { focused: boolean; color: string }) => (
-    <Ionicons name={focused ? name : outline} size={22} color={color} />
+    <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
+      <Ionicons name={focused ? name : outline} size={20} color={color} />
+    </View>
   );
 }
 
@@ -73,11 +74,6 @@ function ClientTabs() {
         name="Today"
         component={TodayScreen}
         options={{ tabBarLabel: 'HOY', tabBarIcon: tabIcon('barbell', 'barbell-outline') }}
-      />
-      <Tab.Screen
-        name="History"
-        component={HistoryScreen}
-        options={{ tabBarLabel: 'HISTORIAL', tabBarIcon: tabIcon('time', 'time-outline') }}
       />
       <Tab.Screen
         name="Progress"
@@ -130,12 +126,17 @@ export default function AppNavigator() {
 
 const tabStyles = StyleSheet.create({
   bar: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.backgroundElevated,
     borderTopColor: colors.border,
     borderTopWidth: 1,
-    height: 80,
-    paddingBottom: 16,
-    paddingTop: 8,
+    height: 84,
+    paddingBottom: 18,
+    paddingTop: 10,
   },
-  label: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  label: { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
+  iconWrap: {
+    width: 42, height: 30, borderRadius: 999,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iconWrapActive: { backgroundColor: colors.accentSoft },
 });

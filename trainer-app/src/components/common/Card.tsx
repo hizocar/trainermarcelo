@@ -1,23 +1,39 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { StyleSheet, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, spacing, cardShadow } from '../../theme';
 
 interface Props {
   children: React.ReactNode;
   style?: ViewStyle;
+  /** tarjeta destacada: borde lima y fondo con tinte del acento */
+  highlight?: boolean;
 }
 
-export default function Card({ children, style }: Props) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export default function Card({ children, style, highlight }: Props) {
+  return (
+    <LinearGradient
+      colors={
+        highlight
+          ? ['rgba(200,255,0,0.08)', 'rgba(200,255,0,0.02)']
+          : [colors.cardElevated, colors.card]
+      }
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0.7, y: 1 }}
+      style={[styles.card, highlight && styles.cardHighlight, style]}
+    >
+      {children}
+    </LinearGradient>
+  );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
     ...(cardShadow as object),
   },
+  cardHighlight: { borderColor: colors.accent + '55' },
 });

@@ -1,132 +1,172 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Ellipse, G, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { colors, typography, spacing } from '../../theme';
 
-// Mapa muscular propio (asset original de la app, sin fuentes externas).
-// highlights: intensidad 0..1 por grupo — 1 = lima pleno, 0 = no destacado.
+// Mapa muscular anatómico (asset original). Cada grupo es una región con forma
+// realista; el grupo activo se resalta en lima con halo, el resto queda apagado.
 interface Props {
-  highlights: Record<string, number>;
+  highlights: Record<string, number>;   // intensidad 0..1 por grupo
   height?: number;
   showLabels?: boolean;
 }
 
-const BODY = colors.surface;
-const LINE = colors.border;
+const SKIN = '#2A2E33';        // relleno base del cuerpo
+const SKIN_LINE = '#3A3F45';   // contorno
+const MUSCLE_OFF = '#33383E';  // músculo no resaltado
+const MUSCLE_LINE = '#42474E';
 
-function fillFor(intensity?: number) {
-  if (!intensity || intensity <= 0) return { fill: 'transparent' };
-  return { fill: colors.accent, fillOpacity: 0.2 + 0.7 * Math.min(intensity, 1) };
+function muscleProps(intensity?: number) {
+  if (!intensity || intensity <= 0) {
+    return { fill: MUSCLE_OFF, stroke: MUSCLE_LINE, strokeWidth: 0.6 };
+  }
+  const op = 0.45 + 0.55 * Math.min(intensity, 1);
+  return { fill: colors.accent, fillOpacity: op, stroke: colors.accent, strokeWidth: 0.8 };
 }
 
-// silueta base compartida (viewBox 0 0 200 460)
-function Silhouette() {
+// ── Vista frontal ────────────────────────────────────────────────────────────
+function Front({ h }: { h: Record<string, number> }) {
   return (
-    <>
-      <Circle cx={100} cy={32} r={22} fill={BODY} stroke={LINE} />
-      <Rect x={90} y={52} width={20} height={14} fill={BODY} stroke={LINE} />
-      {/* torso */}
-      <Path
-        d="M56 68 L144 68 Q150 70 149 84 L143 170 Q141 186 132 196 L132 214 L68 214 L68 196 Q59 186 57 170 L51 84 Q50 70 56 68 Z"
-        fill={BODY} stroke={LINE}
-      />
-      {/* brazos */}
-      <Path d="M56 70 Q40 78 40 100 L36 150 L30 200 L44 202 L52 152 L58 110 Z" fill={BODY} stroke={LINE} />
-      <Path d="M144 70 Q160 78 160 100 L164 150 L170 200 L156 202 L148 152 L142 110 Z" fill={BODY} stroke={LINE} />
-      {/* piernas */}
-      <Path d="M68 214 L66 300 L70 380 L72 430 L88 430 L90 380 L94 300 L98 214 Z" fill={BODY} stroke={LINE} />
-      <Path d="M132 214 L134 300 L130 380 L128 430 L112 430 L110 380 L106 300 L102 214 Z" fill={BODY} stroke={LINE} />
-    </>
-  );
-}
+    <Svg viewBox="0 0 200 400" width="100%" height="100%">
+      {/* silueta base */}
+      <G fill={SKIN} stroke={SKIN_LINE} strokeWidth={1}>
+        {/* cabeza y cuello */}
+        <Circle cx={100} cy={26} r={17} />
+        <Path d="M91 40 h18 v10 q-9 5 -18 0 Z" />
+        {/* torso */}
+        <Path d="M62 52 q38 -9 76 0 q7 3 6 16 l-5 74 q-2 20 -12 30 l1 22 h-56 l1 -22 q-10 -10 -12 -30 l-5 -74 q-1 -13 6 -16 Z" />
+        {/* brazos */}
+        <Path d="M62 54 q-16 6 -19 26 l-8 60 q-2 12 2 22 l10 -2 l6 -22 l10 -54 l2 -40 Z" />
+        <Path d="M138 54 q16 6 19 26 l8 60 q2 12 -2 22 l-10 -2 l-6 -22 l-10 -54 l-2 -40 Z" />
+        {/* antebrazos + manos */}
+        <Path d="M35 158 l-7 46 q-1 10 3 20 l9 -1 l4 -22 l4 -42 Z" />
+        <Path d="M165 158 l7 46 q1 10 -3 20 l-9 -1 l-4 -22 l-4 -42 Z" />
+        {/* piernas */}
+        <Path d="M70 214 q-4 4 -4 14 l-3 74 l-4 62 l1 20 h16 l3 -22 l6 -70 l3 -66 Z" />
+        <Path d="M130 214 q4 4 4 14 l3 74 l4 62 l-1 20 h-16 l-3 -22 l-6 -70 l-3 -66 Z" />
+      </G>
 
-function FrontView({ h }: { h: Record<string, number> }) {
-  return (
-    <Svg viewBox="0 0 200 460" width="100%" height="100%">
-      <Silhouette />
-      {/* Pecho */}
-      <Ellipse cx={79} cy={96} rx={23} ry={17} {...fillFor(h['Pecho'])} />
-      <Ellipse cx={121} cy={96} rx={23} ry={17} {...fillFor(h['Pecho'])} />
-      {/* Hombro anterior */}
-      <Circle cx={58} cy={80} r={11} {...fillFor(h['Hombro anterior'])} />
-      <Circle cx={142} cy={80} r={11} {...fillFor(h['Hombro anterior'])} />
-      {/* Hombro medial (cara externa) */}
-      <Ellipse cx={45} cy={82} rx={8} ry={13} {...fillFor(h['Hombro medial'])} />
-      <Ellipse cx={155} cy={82} rx={8} ry={13} {...fillFor(h['Hombro medial'])} />
-      {/* Bíceps */}
-      <Ellipse cx={48} cy={122} rx={10} ry={22} {...fillFor(h['Bíceps'])} />
-      <Ellipse cx={152} cy={122} rx={10} ry={22} {...fillFor(h['Bíceps'])} />
-      {/* Antebrazos */}
-      <Ellipse cx={39} cy={175} rx={8} ry={24} {...fillFor(h['Antebrazos'])} />
-      <Ellipse cx={161} cy={175} rx={8} ry={24} {...fillFor(h['Antebrazos'])} />
-      {/* Core */}
-      <Rect x={82} y={122} width={36} height={68} rx={12} {...fillFor(h['Core'])} />
-      {/* Aductor (cara interna del muslo) */}
-      <Ellipse cx={91} cy={250} rx={9} ry={28} {...fillFor(h['Aductor'])} />
-      <Ellipse cx={109} cy={250} rx={9} ry={28} {...fillFor(h['Aductor'])} />
-      {/* Cuádriceps */}
-      <Ellipse cx={78} cy={268} rx={13} ry={42} {...fillFor(h['Cuádriceps'])} />
-      <Ellipse cx={122} cy={268} rx={13} ry={42} {...fillFor(h['Cuádriceps'])} />
+      {/* músculos frontales */}
+      {/* hombro anterior */}
+      <Path d="M60 58 q-15 3 -18 22 q10 6 22 3 q3 -15 -4 -25 Z" {...muscleProps(h['Hombro anterior'])} />
+      <Path d="M140 58 q15 3 18 22 q-10 6 -22 3 q-3 -15 4 -25 Z" {...muscleProps(h['Hombro anterior'])} />
+      {/* hombro medial (cara externa, se ve un poco de frente) */}
+      <Path d="M42 78 q-6 2 -7 18 q7 3 12 -2 q1 -10 -5 -16 Z" {...muscleProps(h['Hombro medial'])} />
+      <Path d="M158 78 q6 2 7 18 q-7 3 -12 -2 q-1 -10 5 -16 Z" {...muscleProps(h['Hombro medial'])} />
+      {/* pecho */}
+      <Path d="M66 62 q16 -5 31 0 q3 20 -2 30 q-16 7 -29 -2 q-4 -16 0 -28 Z" {...muscleProps(h['Pecho'])} />
+      <Path d="M134 62 q-16 -5 -31 0 q-3 20 2 30 q16 7 29 -2 q4 -16 0 -28 Z" {...muscleProps(h['Pecho'])} />
+      {/* bíceps */}
+      <Path d="M46 92 q-6 4 -6 26 q8 5 14 0 q3 -18 -8 -26 Z" {...muscleProps(h['Bíceps'])} />
+      <Path d="M154 92 q6 4 6 26 q-8 5 -14 0 q-3 -18 8 -26 Z" {...muscleProps(h['Bíceps'])} />
+      {/* antebrazos */}
+      <Path d="M37 130 q-6 6 -8 42 q6 3 11 -1 q4 -24 -3 -41 Z" {...muscleProps(h['Antebrazos'])} />
+      <Path d="M163 130 q6 6 8 42 q-6 3 -11 -1 q-4 -24 3 -41 Z" {...muscleProps(h['Antebrazos'])} />
+      {/* core (recto abdominal + oblicuos) */}
+      <Path d="M84 96 h32 q3 30 -1 60 q-15 8 -30 0 q-4 -30 -1 -60 Z" {...muscleProps(h['Core'])} />
+      {/* aductor (cara interna del muslo) */}
+      <Path d="M86 220 q-9 3 -11 40 q8 4 14 -2 q4 -22 -3 -38 Z" {...muscleProps(h['Aductor'])} />
+      <Path d="M114 220 q9 3 11 40 q-8 4 -14 -2 q-4 -22 3 -38 Z" {...muscleProps(h['Aductor'])} />
+      {/* cuádriceps */}
+      <Path d="M70 222 q-6 4 -6 20 l-2 44 q10 6 20 1 l3 -46 q1 -16 -15 -19 Z" {...muscleProps(h['Cuádriceps'])} />
+      <Path d="M130 222 q6 4 6 20 l2 44 q-10 6 -20 1 l-3 -46 q-1 -16 15 -19 Z" {...muscleProps(h['Cuádriceps'])} />
+      {/* gastrocnemios (parte frontal-lateral visible: tibial) */}
+      <Path d="M64 300 q-4 4 -5 40 q7 4 12 -1 l1 -38 Z" {...muscleProps(h['Gastrocnemios'])} />
+      <Path d="M136 300 q4 4 5 40 q-7 4 -12 -1 l-1 -38 Z" {...muscleProps(h['Gastrocnemios'])} />
     </Svg>
   );
 }
 
-function BackView({ h }: { h: Record<string, number> }) {
+// ── Vista posterior ──────────────────────────────────────────────────────────
+function Back({ h }: { h: Record<string, number> }) {
   return (
-    <Svg viewBox="0 0 200 460" width="100%" height="100%">
-      <Silhouette />
-      {/* Espalda alta (trapecio + dorsales) */}
-      <Path
-        d="M100 62 L138 74 L134 118 Q120 142 100 148 Q80 142 66 118 L62 74 Z"
-        {...fillFor(h['Espalda alta'])}
-      />
-      {/* Espalda baja */}
-      <Rect x={84} y={152} width={32} height={38} rx={10} {...fillFor(h['Espalda baja'])} />
-      {/* Hombro posterior */}
-      <Circle cx={58} cy={80} r={11} {...fillFor(h['Hombro posterior'])} />
-      <Circle cx={142} cy={80} r={11} {...fillFor(h['Hombro posterior'])} />
-      {/* Tríceps */}
-      <Ellipse cx={48} cy={122} rx={10} ry={22} {...fillFor(h['Tríceps'])} />
-      <Ellipse cx={152} cy={122} rx={10} ry={22} {...fillFor(h['Tríceps'])} />
-      {/* Antebrazos */}
-      <Ellipse cx={39} cy={175} rx={8} ry={24} {...fillFor(h['Antebrazos'])} />
-      <Ellipse cx={161} cy={175} rx={8} ry={24} {...fillFor(h['Antebrazos'])} />
-      {/* Glúteo medio (superior-lateral) */}
-      <Ellipse cx={76} cy={200} rx={10} ry={9} {...fillFor(h['Glúteo medio'])} />
-      <Ellipse cx={124} cy={200} rx={10} ry={9} {...fillFor(h['Glúteo medio'])} />
-      {/* Glúteo menor (pequeño, bajo el medio) */}
-      <Ellipse cx={71} cy={212} rx={6} ry={6} {...fillFor(h['Glúteo menor'])} />
-      <Ellipse cx={129} cy={212} rx={6} ry={6} {...fillFor(h['Glúteo menor'])} />
-      {/* Glúteo mayor */}
-      <Ellipse cx={84} cy={218} rx={15} ry={17} {...fillFor(h['Glúteo mayor'])} />
-      <Ellipse cx={116} cy={218} rx={15} ry={17} {...fillFor(h['Glúteo mayor'])} />
-      {/* Isquiotibiales */}
-      <Ellipse cx={79} cy={275} rx={13} ry={38} {...fillFor(h['Isquiotibiales'])} />
-      <Ellipse cx={121} cy={275} rx={13} ry={38} {...fillFor(h['Isquiotibiales'])} />
-      {/* Gastrocnemios */}
-      <Ellipse cx={80} cy={355} rx={10} ry={28} {...fillFor(h['Gastrocnemios'])} />
-      <Ellipse cx={120} cy={355} rx={10} ry={28} {...fillFor(h['Gastrocnemios'])} />
+    <Svg viewBox="0 0 200 400" width="100%" height="100%">
+      <G fill={SKIN} stroke={SKIN_LINE} strokeWidth={1}>
+        <Circle cx={100} cy={26} r={17} />
+        <Path d="M91 40 h18 v10 q-9 5 -18 0 Z" />
+        <Path d="M62 52 q38 -9 76 0 q7 3 6 16 l-5 74 q-2 20 -12 30 l1 22 h-56 l1 -22 q-10 -10 -12 -30 l-5 -74 q-1 -13 6 -16 Z" />
+        <Path d="M62 54 q-16 6 -19 26 l-8 60 q-2 12 2 22 l10 -2 l6 -22 l10 -54 l2 -40 Z" />
+        <Path d="M138 54 q16 6 19 26 l8 60 q2 12 -2 22 l-10 -2 l-6 -22 l-10 -54 l-2 -40 Z" />
+        <Path d="M35 158 l-7 46 q-1 10 3 20 l9 -1 l4 -22 l4 -42 Z" />
+        <Path d="M165 158 l7 46 q1 10 -3 20 l-9 -1 l-4 -22 l-4 -42 Z" />
+        <Path d="M70 214 q-4 4 -4 14 l-3 74 l-4 62 l1 20 h16 l3 -22 l6 -70 l3 -66 Z" />
+        <Path d="M130 214 q4 4 4 14 l3 74 l4 62 l-1 20 h-16 l-3 -22 l-6 -70 l-3 -66 Z" />
+      </G>
+
+      {/* trapecio (parte de espalda alta) */}
+      <Path d="M100 50 l30 8 q-2 14 -8 20 q-22 8 -44 0 q-6 -6 -8 -20 Z" {...muscleProps(h['Espalda alta'])} />
+      {/* dorsales (lats, parte de espalda alta) */}
+      <Path d="M70 78 q-6 30 4 54 q14 8 24 4 l0 -58 q-16 -6 -28 0 Z" {...muscleProps(h['Espalda alta'])} />
+      <Path d="M130 78 q6 30 -4 54 q-14 8 -24 4 l0 -58 q16 -6 28 0 Z" {...muscleProps(h['Espalda alta'])} />
+      {/* espalda baja (erectores) */}
+      <Path d="M86 134 h28 q2 18 -2 30 q-12 6 -24 0 q-4 -12 -2 -30 Z" {...muscleProps(h['Espalda baja'])} />
+      {/* hombro posterior */}
+      <Path d="M60 58 q-15 3 -18 22 q10 6 22 3 q3 -15 -4 -25 Z" {...muscleProps(h['Hombro posterior'])} />
+      <Path d="M140 58 q15 3 18 22 q-10 6 -22 3 q-3 -15 4 -25 Z" {...muscleProps(h['Hombro posterior'])} />
+      {/* tríceps */}
+      <Path d="M46 92 q-6 4 -6 28 q8 5 14 0 q3 -20 -8 -28 Z" {...muscleProps(h['Tríceps'])} />
+      <Path d="M154 92 q6 4 6 28 q-8 5 -14 0 q-3 -20 8 -28 Z" {...muscleProps(h['Tríceps'])} />
+      {/* antebrazos */}
+      <Path d="M37 130 q-6 6 -8 42 q6 3 11 -1 q4 -24 -3 -41 Z" {...muscleProps(h['Antebrazos'])} />
+      <Path d="M163 130 q6 6 8 42 q-6 3 -11 -1 q-4 -24 3 -41 Z" {...muscleProps(h['Antebrazos'])} />
+      {/* glúteo medio (superior-lateral) */}
+      <Path d="M73 168 q-6 3 -6 15 q7 4 13 0 q1 -10 -7 -15 Z" {...muscleProps(h['Glúteo medio'])} />
+      <Path d="M127 168 q6 3 6 15 q-7 4 -13 0 q-1 -10 7 -15 Z" {...muscleProps(h['Glúteo medio'])} />
+      {/* glúteo menor (pequeño, bajo el medio) */}
+      <Ellipse cx={78} cy={188} rx={7} ry={7} {...muscleProps(h['Glúteo menor'])} />
+      <Ellipse cx={122} cy={188} rx={7} ry={7} {...muscleProps(h['Glúteo menor'])} />
+      {/* glúteo mayor */}
+      <Path d="M72 182 q-8 4 -8 20 q4 12 18 12 q4 -16 2 -30 q-6 -4 -12 -2 Z" {...muscleProps(h['Glúteo mayor'])} />
+      <Path d="M128 182 q8 4 8 20 q-4 12 -18 12 q-4 -16 -2 -30 q6 -4 12 -2 Z" {...muscleProps(h['Glúteo mayor'])} />
+      {/* isquiotibiales */}
+      <Path d="M70 220 q-6 4 -6 20 l-2 42 q10 6 20 1 l3 -44 q1 -16 -15 -19 Z" {...muscleProps(h['Isquiotibiales'])} />
+      <Path d="M130 220 q6 4 6 20 l2 42 q-10 6 -20 1 l-3 -44 q-1 -16 15 -19 Z" {...muscleProps(h['Isquiotibiales'])} />
+      {/* gastrocnemios (pantorrilla, muy visible por detrás) */}
+      <Path d="M66 300 q-6 5 -6 30 q8 5 14 0 q3 -22 -8 -30 Z" {...muscleProps(h['Gastrocnemios'])} />
+      <Path d="M134 300 q6 5 6 30 q-8 5 -14 0 q-3 -22 8 -30 Z" {...muscleProps(h['Gastrocnemios'])} />
     </Svg>
   );
 }
 
-export default function MuscleMap({ highlights, height = 190, showLabels = true }: Props) {
+export default function MuscleMap({ highlights, height = 220, showLabels = true }: Props) {
+  // etiqueta del grupo activo principal
+  const active = Object.entries(highlights)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+
   return (
-    <View style={styles.row}>
-      <View style={[styles.figure, { height }]}>
-        <FrontView h={highlights} />
-        {showLabels && <Text style={styles.label}>FRONTAL</Text>}
+    <View style={styles.wrap}>
+      <View style={styles.row}>
+        <View style={[styles.figure, { height }]}>
+          <Front h={highlights} />
+          {showLabels && <Text style={styles.viewLabel}>FRONTAL</Text>}
+        </View>
+        <View style={[styles.figure, { height }]}>
+          <Back h={highlights} />
+          {showLabels && <Text style={styles.viewLabel}>POSTERIOR</Text>}
+        </View>
       </View>
-      <View style={[styles.figure, { height }]}>
-        <BackView h={highlights} />
-        {showLabels && <Text style={styles.label}>POSTERIOR</Text>}
-      </View>
+      {showLabels && active && (
+        <View style={styles.activePill}>
+          <View style={styles.activeDot} />
+          <Text style={styles.activeText}>{active.toUpperCase()}</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg },
-  figure: { aspectRatio: 200 / 460, alignItems: 'center' },
-  label: { ...typography.label, fontSize: 8, letterSpacing: 2, marginTop: 2 },
+  wrap: { alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
+  figure: { aspectRatio: 200 / 400, alignItems: 'center' },
+  viewLabel: { ...typography.label, fontSize: 8, letterSpacing: 2, marginTop: 2, color: colors.textMuted },
+  activePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.accentSoft, borderRadius: 999,
+    borderWidth: 1, borderColor: colors.accent + '55',
+    paddingHorizontal: 12, paddingVertical: 4,
+  },
+  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
+  activeText: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.accent },
 });
