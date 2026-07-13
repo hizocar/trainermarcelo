@@ -25,3 +25,21 @@ export function formatMonthYear(iso: string): string {
   const d = new Date(iso);
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
+
+/** Lunes en que empieza una semana del programa. */
+export function weekStartDate(week: number): Date {
+  return new Date(TRAINING_EPOCH.getTime() + (week - 1) * 7 * 86400000);
+}
+
+/** "lun 13 jul" — cuándo arranca la semana indicada. */
+export function weekStartLabel(week: number): string {
+  return formatShortDate(weekStartDate(week).toISOString());
+}
+
+/** Días que faltan para que empiece la semana indicada (0 = ya empezó). */
+export function daysUntilWeek(week: number): number {
+  const start = weekStartDate(week);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.ceil((start.getTime() - today.getTime()) / 86400000));
+}

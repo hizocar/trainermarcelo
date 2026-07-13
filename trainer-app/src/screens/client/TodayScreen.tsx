@@ -8,11 +8,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { TrainingDay, Exercise } from '../../types';
-import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, PlanDay, PlanExercise } from '../../lib/plan';
+import { fetchFullPlan, fetchLogs, activeDays, PlanDay, PlanExercise } from '../../lib/plan';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
-import { WEEK_DAYS, getCurrentWeek, formatShortDate } from '../../lib/weeks';
+import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek } from '../../lib/weeks';
 import { showAlert } from '../../lib/alert';
 
 const PHASE_INFO: Record<string, { label: string; color: string }> = {
@@ -106,6 +106,14 @@ export default function TodayScreen() {
   }
 
   const isToday = (day: TrainingDay) => day.week_day === todayWeekDay;
+
+  // ¿todos los días del plan completados esta semana?
+  const weekComplete = days.length > 0 && days.every(d => {
+    const st = dayStatus[d.id];
+    return st && st.total > 0 && st.done >= st.total;
+  });
+  const nextWeek = currentWeek + 1;
+  const daysToNext = daysUntilWeek(nextWeek);
 
   return (
     <View style={styles.container}>
@@ -201,51 +209,67 @@ export default function TodayScreen() {
             showsVerticalScrollIndicator={false}
           >
             <SyncBanner />
-            {groupBySuperseries(exercises).map(group => (
-              <View key={group.key} style={group.superseries ? styles.ssGroup : undefined}>
-                {group.superseries && (
-                  <View style={styles.ssHeader}>
-                    <Ionicons name="link" size={12} color={colors.accent} />
-                    <Text style={styles.ssTitle}>{group.superseries.toUpperCase()}</Text>
-                    <Text style={styles.ssHint}>sin descanso entre estos</Text>
+
+            {weekComplete && (
+              <Card highlight style={styles.doneCard}>
+                <View style={styles.doneHeader}>
+                  <Ionicons name="trophy" size={22} color={colors.accent} />
+                  <View style={styles.doneInfo}>
+                    <Text style={styles.doneTitle}>¡SEMANA {currentWeek} COMPLETA!</Text>
+                    <Text style={styles.doneSub}>
+                      Terminaste los {days.length} días de entrenamiento 💪
+                    </Text>
                   </View>
-                )}
-                {group.exercises.map(ex => {
-                  const done = loggedExercises.has(ex.id);
-                  return (
-                    <TouchableOpacity
-                      key={ex.id}
-                      onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
-                      activeOpacity={0.7}
-                      style={group.superseries ? styles.ssItem : undefined}
-                    >
-                      <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
-                        <View style={styles.exerciseRow}>
-                          {ex.image_url ? (
-                            <Image source={{ uri: ex.image_url }} style={styles.thumb} />
-                          ) : (
-                            <View style={[styles.thumb, styles.thumbPlaceholder]}>
-                              <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
-                            </View>
-                          )}
-                          <View style={styles.exerciseInfo}>
-                            <Text style={styles.exerciseName}>{ex.name}</Text>
-                            <Text style={styles.exerciseMeta}>
-                              {ex.muscle_group ? `${ex.muscle_group} · ` : ''}
-                              {ex.exercise_series.length} series · {ex.reps_objective} reps
-                              {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
-                            </Text>
-                          </View>
-                          <View style={[styles.logBtn, done && styles.logBtnDone]}>
-                            <Ionicons name={done ? 'checkmark' : 'add'} size={22} color={colors.background} />
-                          </View>
+                </View>
+
+                <View style={styles.doneDivider} />
+
+                <Text style={styles.nextLabel}>LO QUE VIENE</Text>
+                <Text style={styles.nextText}>
+                  {daysToNext === 0
+                    ? `La semana ${nextWeek} ya empezó — registra tu Día 1 cuando entrenes.`
+                    : daysToNext === 1
+                      ? `La semana ${nextWeek} empieza mañana (${weekStartLabel(nextWeek)}).`
+                      : `La semana ${nextWeek} empieza el ${weekStartLabel(nextWeek)} (en ${daysToNext} días).`}
+                </Text>
+                <Text style={styles.nextHint}>
+                  Mientras tanto puedes revisar o corregir lo que registraste tocando cualquier ejercicio.
+                </Text>
+              </Card>
+            )}
+            {exercises.map(ex => {
+              const done = loggedExercises.has(ex.id);
+              return (
+                <TouchableOpacity
+                  key={ex.id}
+                  onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
+                  activeOpacity={0.7}
+                >
+                  <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
+                    <View style={styles.exerciseRow}>
+                      {ex.image_url ? (
+                        <Image source={{ uri: ex.image_url }} style={styles.thumb} />
+                      ) : (
+                        <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                          <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
                         </View>
-                      </Card>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
+                      )}
+                      <View style={styles.exerciseInfo}>
+                        <Text style={styles.exerciseName}>{ex.name}</Text>
+                        <Text style={styles.exerciseMeta}>
+                          {ex.muscle_group ? `${ex.muscle_group} · ` : ''}
+                          {ex.exercise_series.length} series · {ex.reps_objective} reps
+                          {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.logBtn, done && styles.logBtnDone]}>
+                        <Ionicons name={done ? 'checkmark' : 'add'} size={22} color={colors.background} />
+                      </View>
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              );
+            })}
 
             {exercises.length > 0 && selectedDay && (
               <Card style={styles.noteCard}>
@@ -318,17 +342,18 @@ const styles = StyleSheet.create({
   noteSaveText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
   noteSaved: { ...typography.caption, fontSize: 10, color: colors.success, textAlign: 'right' },
 
-  dayTabsScroll: { flexGrow: 0, height: 68, marginBottom: spacing.xs },
-  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center' },
+  dayTabsScroll: { flexGrow: 0, marginBottom: spacing.xs },
+  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.xs },
   dayTab: {
     paddingHorizontal: spacing.md,
-    height: 56, justifyContent: 'center',
+    paddingTop: spacing.md, paddingBottom: spacing.sm,
+    justifyContent: 'center',
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface, alignItems: 'center', minWidth: 76, maxWidth: 130, position: 'relative',
+    backgroundColor: colors.surface, alignItems: 'center', minWidth: 82, maxWidth: 140, position: 'relative',
   },
   dayTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   dayTabDone: { borderColor: colors.success + '88' },
-  tabBadge: { position: 'absolute', top: 3, right: 4 },
+  tabBadge: { position: 'absolute', top: 5, right: 6 },
   todayDot: {
     position: 'absolute', top: 4, right: 6,
     width: 6, height: 6, borderRadius: 3,
@@ -362,14 +387,15 @@ const styles = StyleSheet.create({
   },
 
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.sm },
-  ssGroup: {
-    borderLeftWidth: 2, borderLeftColor: colors.accent + '66',
-    paddingLeft: spacing.sm, gap: spacing.xs,
-  },
-  ssHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
-  ssTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.accent },
-  ssHint: { fontSize: 9, fontStyle: 'italic', color: colors.textMuted },
-  ssItem: { marginBottom: spacing.xs },
+  doneCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  doneHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  doneInfo: { flex: 1 },
+  doneTitle: { ...typography.displaySm, fontSize: 18, color: colors.accent },
+  doneSub: { ...typography.caption, marginTop: 1 },
+  doneDivider: { height: 1, backgroundColor: colors.border },
+  nextLabel: { ...typography.label, letterSpacing: 2, fontSize: 9 },
+  nextText: { ...typography.body, fontSize: 14 },
+  nextHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },
   exerciseCard: { },
   exerciseCardDone: { borderColor: colors.accent + '66' },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
