@@ -39,6 +39,14 @@
         {
           "photosPermission": "La app necesita acceso a tus fotos para subir imágenes de ejercicios, avatares y fotos de progreso."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#08090A",
+          "imageWidth": 200
+        }
       ]
     ],
     "extra": {

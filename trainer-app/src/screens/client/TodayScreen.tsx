@@ -14,6 +14,7 @@ import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek } from '../../lib/weeks';
 import { showAlert } from '../../lib/alert';
+import { refreshReminders } from '../../lib/notifications';
 
 const PHASE_INFO: Record<string, { label: string; color: string }> = {
   acumulacion: { label: 'ACUMULACIÓN', color: colors.accent },
@@ -71,6 +72,15 @@ export default function TodayScreen() {
       };
     });
     setDayStatus(status);
+
+    // los recordatorios solo avisan de días pendientes: reprogramar al cambiar el estado
+    refreshReminders(list.map(d => ({
+      id: d.id,
+      day_number: d.day_number,
+      name: d.name,
+      week_day: d.week_day,
+      done: (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total,
+    })));
 
     const todayDay = list.find(d => d.week_day === todayWeekDay);
     const selected = todayDay ?? list[0] ?? null;

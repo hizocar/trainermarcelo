@@ -3,14 +3,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 
-// Recordatorios locales: no requieren servidor y funcionan siempre.
-//  - día de entrenamiento: a la hora elegida, solo los días del plan
-//  - encuesta de energía: en la mañana, todos los días
+// Recordatorios locales (no requieren servidor).
+//
+// Se reprograman cada vez que se abre la app o se guarda un entrenamiento:
+// así nunca avisan de un día que ya está completado. Por eso usamos avisos
+// puntuales para los próximos 7 días en vez de repeticiones semanales fijas.
 
 const ENABLED_KEY = 'notif_enabled_v1';
-const HOUR_KEY = 'notif_hour_v1';
+const TRAIN_HOUR_KEY = 'notif_train_hour_v1';
+const MOOD_HOUR_KEY = 'notif_mood_hour_v1';
 
-export const DEFAULT_HOUR = 18; // 18:00
+export const DEFAULT_TRAIN_HOUR = 18; // 18:00
+export const DEFAULT_MOOD_HOUR = 9;   // 09:00
+
+export interface ReminderDay {
+  id: string;
+  day_number: number;
+  name: string;
+  week_day?: number | null;
+  /** ya completado en la semana en curso: no se avisa */
+  done?: boolean;
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -25,10 +38,22 @@ export async function notificationsEnabled(): Promise<boolean> {
   return (await AsyncStorage.getItem(ENABLED_KEY)) === '1';
 }
 
-export async function reminderHour(): Promise<number> {
-  const raw = await AsyncStorage.getItem(HOUR_KEY);
-  const h = raw ? parseInt(raw, 10) : NaN;
-  return isNaN(h) ? DEFAULT_HOUR : h;
+export async function getHours(): Promise<{ trainHour: number; moodHour: number }> {
+  const [t, m] = await Promise.all([
+    AsyncStorage.getItem(TRAIN_HOUR_KEY),
+    AsyncStorage.getItem(MOOD_HOUR_KEY),
+  ]);
+  const th = t ? parseInt(t, 10) : NaN;
+  const mh = m ? parseInt(m, 10) : NaN;
+  return {
+    trainHour: isNaN(th) ? DEFAULT_TRAIN_HOUR : th,
+    moodHour: isNaN(mh) ? DEFAULT_MOOD_HOUR : mh,
+  };
+}
+
+export async function setHours(trainHour: number, moodHour: number): Promise<void> {
+  await AsyncStorage.setItem(TRAIN_HOUR_KEY, String(trainHour));
+  await AsyncStorage.setItem(MOOD_HOUR_KEY, String(moodHour));
 }
 
 async function requestPermission(): Promise<boolean> {
@@ -39,38 +64,55 @@ async function requestPermission(): Promise<boolean> {
   return asked === 'granted';
 }
 
+/** Próxima fecha (a partir de mañana o de hoy si aún no pasa la hora) para un día de la semana. */
+function nextDateFor(weekDay: number, hour: number): Date | null {
+  const now = new Date();
+  for (let offset = 0; offset < 7; offset++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + offset);
+    d.setHours(hour, 0, 0, 0);
+    if (d.getDay() === weekDay && d.getTime() > now.getTime() + 60000) return d;
+  }
+  return null;
+}
+
 /**
- * Programa los recordatorios: uno por cada día de entrenamiento del plan
- * (semanal, a la hora elegida) + la encuesta de energía cada mañana.
+ * Reprograma todos los recordatorios.
+ *  - entrenamiento: solo los días del plan que NO estén completados
+ *  - encuesta de energía: cada día a la hora elegida
+ * Llamar al abrir la app y al guardar un entrenamiento.
  */
 export async function scheduleReminders(
-  days: { day_number: number; name: string; week_day?: number | null }[],
-  hour: number = DEFAULT_HOUR,
+  days: ReminderDay[],
+  hours?: { trainHour?: number; moodHour?: number },
 ): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  const ok = await requestPermission();
-  if (!ok) return false;
+  if (!(await requestPermission())) return false;
+
+  const saved = await getHours();
+  const trainHour = hours?.trainHour ?? saved.trainHour;
+  const moodHour = hours?.moodHour ?? saved.moodHour;
 
   await Notifications.cancelAllScheduledNotificationsAsync();
 
-  // recordatorio de entrenamiento por cada día programado
+  // recordatorios de entrenamiento: solo días pendientes, próxima ocurrencia
   for (const d of days) {
-    if (d.week_day == null) continue;
+    if (d.done || d.week_day == null) continue;
+    const when = nextDateFor(d.week_day, trainHour);
+    if (!when) continue;
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `Hoy toca Día ${d.day_number} · ${d.name}`,
-        body: 'Abre la app para registrar tu entrenamiento 💪',
+        title: `Día ${d.day_number} · ${d.name}`,
+        body: 'Te toca entrenar hoy. Abre la app para registrarlo 💪',
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-        weekday: d.week_day + 1,   // expo: 1=domingo … 7=sábado
-        hour,
-        minute: 0,
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: when,
       },
     });
   }
 
-  // encuesta de energía, todas las mañanas
+  // encuesta de energía: diaria
   await Notifications.scheduleNotificationAsync({
     content: {
       title: '¿Cómo te sientes hoy?',
@@ -78,14 +120,20 @@ export async function scheduleReminders(
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 9,
+      hour: moodHour,
       minute: 0,
     },
   });
 
   await AsyncStorage.setItem(ENABLED_KEY, '1');
-  await AsyncStorage.setItem(HOUR_KEY, String(hour));
+  await setHours(trainHour, moodHour);
   return true;
+}
+
+/** Reprograma solo si el usuario ya activó los recordatorios (silencioso). */
+export async function refreshReminders(days: ReminderDay[]): Promise<void> {
+  if (!(await notificationsEnabled())) return;
+  await scheduleReminders(days);
 }
 
 export async function cancelReminders(): Promise<void> {

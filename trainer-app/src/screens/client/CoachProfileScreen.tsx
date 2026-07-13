@@ -16,7 +16,9 @@ import Card from '../../components/common/Card';
 import Avatar from '../../components/common/Avatar';
 import { pickImage, uploadImage } from '../../lib/media';
 import { showAlert, showConfirm } from '../../lib/alert';
-import { scheduleReminders, cancelReminders, notificationsEnabled } from '../../lib/notifications';
+import { scheduleReminders, cancelReminders, notificationsEnabled, getHours, DEFAULT_TRAIN_HOUR, DEFAULT_MOOD_HOUR } from '../../lib/notifications';
+import { fetchFullPlan, fetchLogs, activeDays } from '../../lib/plan';
+import { getCurrentWeek } from '../../lib/weeks';
 import { Switch, Platform } from 'react-native';
 
 export default function CoachProfileScreen() {
@@ -27,8 +29,14 @@ export default function CoachProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [notifOn, setNotifOn] = useState(false);
+  const [trainHour, setTrainHour] = useState(DEFAULT_TRAIN_HOUR);
+  const [moodHour, setMoodHour] = useState(DEFAULT_MOOD_HOUR);
 
-  useEffect(() => { fetchCoach(); notificationsEnabled().then(setNotifOn); }, []);
+  useEffect(() => {
+    fetchCoach();
+    notificationsEnabled().then(setNotifOn);
+    getHours().then(h => { setTrainHour(h.trainHour); setMoodHour(h.moodHour); });
+  }, []);
   useEffect(() => { setAvatarUrl(user?.avatar_url ?? null); }, [user?.avatar_url]);
 
   async function fetchCoach() {
@@ -55,24 +63,49 @@ export default function CoachProfileScreen() {
     setUploadingAvatar(false);
   }
 
+  /** Días del plan con su estado de completado en la semana en curso. */
+  async function reminderDays() {
+    const plan = await fetchFullPlan(user!.id);
+    if (!plan) return [];
+    const week = getCurrentWeek();
+    const logs = await fetchLogs(plan.seriesIds, week);
+    const loggedSeries = new Set(logs.map(l => l.series_id));
+    const doneEx = new Set(
+      Object.entries(plan.seriesToExercise)
+        .filter(([sid]) => loggedSeries.has(sid))
+        .map(([, exId]) => exId),
+    );
+    return activeDays(plan.days).map(d => ({
+      id: d.id,
+      day_number: d.day_number,
+      name: d.name,
+      week_day: d.week_day,
+      done: d.exercises.length > 0 && d.exercises.every(e => doneEx.has(e.id)),
+    }));
+  }
+
   async function toggleNotifications(value: boolean) {
     if (!value) {
       await cancelReminders();
       setNotifOn(false);
       return;
     }
-    const { data: plan } = await supabase
-      .from('workout_plans').select('id').eq('client_id', user!.id).maybeSingle();
-    const { data: days } = plan
-      ? await supabase.from('training_days').select('day_number, name, week_day').eq('plan_id', plan.id)
-      : { data: [] };
-    const ok = await scheduleReminders(days ?? []);
+    const ok = await scheduleReminders(await reminderDays(), { trainHour, moodHour });
     if (ok) {
       setNotifOn(true);
-      showAlert('Recordatorios activados', 'Te avisaremos tus días de entrenamiento y la encuesta diaria de energía.');
+      showAlert('Recordatorios activados', 'Solo te avisamos de los días que aún no has completado.');
     } else {
       showAlert('Permiso denegado', 'Activa las notificaciones para la app en los Ajustes de tu iPhone.');
     }
+  }
+
+  async function changeHour(kind: 'train' | 'mood', hour: number) {
+    if (kind === 'train') setTrainHour(hour); else setMoodHour(hour);
+    if (!notifOn) return;
+    await scheduleReminders(await reminderDays(), {
+      trainHour: kind === 'train' ? hour : trainHour,
+      moodHour: kind === 'mood' ? hour : moodHour,
+    });
   }
 
   function handleSignOut() {
@@ -171,7 +204,7 @@ export default function CoachProfileScreen() {
               <Ionicons name="notifications-outline" size={18} color={colors.accent} />
               <View style={styles.notifInfo}>
                 <Text style={styles.notifTitle}>RECORDATORIOS</Text>
-                <Text style={styles.notifSub}>Tus días de entrenamiento y la encuesta diaria</Text>
+                <Text style={styles.notifSub}>Solo de los días que aún no completas</Text>
               </View>
               <Switch
                 value={notifOn}
@@ -180,6 +213,42 @@ export default function CoachProfileScreen() {
                 thumbColor={colors.textPrimary}
               />
             </View>
+
+            {notifOn && (
+              <>
+                <View style={styles.notifDivider} />
+
+                <Text style={styles.hourLabel}>¿A QUÉ HORA TE RECORDAMOS EL ENTRENAMIENTO?</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.hourRow}>
+                  {[6, 7, 8, 9, 12, 15, 17, 18, 19, 20, 21].map(h => (
+                    <TouchableOpacity
+                      key={h}
+                      style={[styles.hourChip, trainHour === h && styles.hourChipActive]}
+                      onPress={() => changeHour('train', h)}
+                    >
+                      <Text style={[styles.hourChipText, trainHour === h && styles.hourChipTextActive]}>
+                        {String(h).padStart(2, '0')}:00
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={styles.hourLabel}>¿A QUÉ HORA TE PREGUNTAMOS POR TU ENERGÍA?</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.hourRow}>
+                  {[6, 7, 8, 9, 10, 11, 12, 20, 21, 22].map(h => (
+                    <TouchableOpacity
+                      key={h}
+                      style={[styles.hourChip, moodHour === h && styles.hourChipActive]}
+                      onPress={() => changeHour('mood', h)}
+                    >
+                      <Text style={[styles.hourChipText, moodHour === h && styles.hourChipTextActive]}>
+                        {String(h).padStart(2, '0')}:00
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
           </Card>
         )}
 
@@ -260,7 +329,18 @@ const styles = StyleSheet.create({
   noCoachCard: { alignItems: 'center', paddingVertical: spacing.xl },
   noCoachText: { ...typography.body, color: colors.textMuted },
 
-  notifCard: {},
+  notifCard: { gap: spacing.sm },
+  notifDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.xs },
+  hourLabel: { ...typography.label, fontSize: 9, letterSpacing: 1.2 },
+  hourRow: { gap: spacing.xs },
+  hourChip: {
+    paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  hourChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  hourChipText: { fontSize: 11, fontWeight: '800', color: colors.textMuted },
+  hourChipTextActive: { color: colors.background },
   notifRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   notifInfo: { flex: 1 },
   notifTitle: { ...typography.label, color: colors.textPrimary, letterSpacing: 1.5 },
