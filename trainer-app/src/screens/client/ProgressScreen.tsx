@@ -12,6 +12,7 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import TrendChart from '../../components/common/TrendChart';
 import { getCurrentWeek } from '../../lib/weeks';
+import { energyPerformance } from '../../lib/progress';
 import HistoryScreen from './HistoryScreen';
 
 type RouteParams = { client?: User; clientId?: string; clientName?: string };
@@ -64,6 +65,7 @@ export default function ProgressScreen() {
   const [seriesExMap, setSeriesExMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'evolucion' | 'historial'>('evolucion');
+  const [energyStats, setEnergyStats] = useState<ReturnType<typeof energyPerformance>>(null);
 
   useEffect(() => {
     if (targetId) fetchData();
@@ -97,9 +99,25 @@ export default function ProgressScreen() {
 
     const { data: logsData } = await supabase
       .from('workout_logs')
-      .select('series_id, week_number, weight, reps')
+      .select('series_id, week_number, weight, reps, logged_at')
       .in('series_id', Object.keys(sMap));
     setLogs(logsData ?? []);
+
+    // cruce energía × rendimiento: volumen por fecha vs energía reportada
+    const { data: moodData } = await supabase
+      .from('mood_logs').select('logged_date, mood').eq('user_id', targetId);
+    const volByDate: Record<string, number> = {};
+    (logsData ?? []).forEach((l: any) => {
+      if (!l.logged_at) return;
+      const d = l.logged_at.slice(0, 10);
+      volByDate[d] = (volByDate[d] ?? 0) + l.weight * l.reps;
+    });
+    const sessions = Object.entries(volByDate).map(([date, volume]) => ({ date, volume }));
+    const moods = (moodData ?? [])
+      .map((m: any) => ({ logged_date: m.logged_date, energy: parseInt(m.mood, 10) }))
+      .filter((m: any) => !isNaN(m.energy));
+    setEnergyStats(energyPerformance(sessions, moods));
+
     setLoading(false);
   }
 
@@ -339,6 +357,40 @@ export default function ProgressScreen() {
               )}
             </Card>
 
+            {energyStats && (
+              <Card highlight style={styles.energyCard}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="flash" size={14} color={colors.accent} />
+                  <Text style={[styles.sectionLabel, { color: colors.accent }]}>ENERGÍA Y RENDIMIENTO</Text>
+                </View>
+                <Text style={styles.energyHeadline}>
+                  {energyStats.deltaPct > 0
+                    ? `Rindes ${energyStats.deltaPct}% más los días que llegas con energía`
+                    : energyStats.deltaPct < 0
+                      ? `Curiosamente rindes ${Math.abs(energyStats.deltaPct)}% más los días de baja energía`
+                      : 'Tu rendimiento es parejo con cualquier nivel de energía'}
+                </Text>
+                <View style={styles.energyCompare}>
+                  <View style={styles.energyCol}>
+                    <Text style={[styles.energyVal, { color: colors.danger }]}>
+                      {energyStats.low.toLocaleString()}
+                    </Text>
+                    <Text style={styles.energyColLabel}>ENERGÍA BAJA (1-4)</Text>
+                    <Text style={styles.energyDays}>{energyStats.lowDays} día{energyStats.lowDays > 1 ? 's' : ''}</Text>
+                  </View>
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.energyCol}>
+                    <Text style={[styles.energyVal, { color: colors.accent }]}>
+                      {energyStats.high.toLocaleString()}
+                    </Text>
+                    <Text style={styles.energyColLabel}>ENERGÍA ALTA (7-10)</Text>
+                    <Text style={styles.energyDays}>{energyStats.highDays} día{energyStats.highDays > 1 ? 's' : ''}</Text>
+                  </View>
+                </View>
+                <Text style={styles.energyFoot}>Volumen medio por sesión (kg levantados)</Text>
+              </Card>
+            )}
+
             {improving.length > 0 && (
               <>
                 <View style={styles.sectionHeader}>
@@ -438,6 +490,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   sectionLabel: { ...typography.label, letterSpacing: 2 },
+  energyCard: { gap: spacing.sm, marginTop: spacing.sm },
+  energyHeadline: { ...typography.h3, fontSize: 15, lineHeight: 21 },
+  energyCompare: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs },
+  energyCol: { flex: 1, alignItems: 'center', gap: 2 },
+  energyVal: { fontSize: 22, fontWeight: '900' },
+  energyColLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
+  energyDays: { fontSize: 9, color: colors.textMuted },
+  energyFoot: { ...typography.caption, fontSize: 10, textAlign: 'center', fontStyle: 'italic' },
 
   exRow: { gap: 0 },
   exRowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

@@ -16,6 +16,8 @@ import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
+import { saveLog } from '../../lib/offline';
+import { suggestProgression } from '../../lib/progress';
 
 type RouteParams = { exercise: Exercise; week: number };
 
@@ -152,19 +154,13 @@ export default function WorkoutLogScreen() {
     return isNaN(n) ? null : n;
   };
 
-  // autoprogresión: si completó el tope del rango en todas las series previas → sugerir +2.5%
-  const repTop = (() => {
-    const m = exercise.reps_objective?.match(/(\d+)\s*-\s*(\d+)/);
-    if (m) return parseInt(m[2], 10);
-    const single = parseInt(exercise.reps_objective ?? '', 10);
-    return isNaN(single) ? null : single;
-  })();
+  // autoprogresión (lógica pura, con tests en lib/progress)
   const suggestion = React.useMemo(() => {
-    if (!repTop || entries.length === 0) return null;
-    if (entries.some(e => e.saved)) return null;               // ya registró hoy
-    if (!entries.every(e => e.prev && e.prev.reps >= repTop)) return null;
-    return entries.map(e => Math.round(e.prev!.weight * 1.025 * 2) / 2);
-  }, [entries, repTop]);
+    if (entries.length === 0 || entries.some(e => e.saved)) return null;
+    const prevSets = entries.map(e => e.prev).filter(Boolean) as { weight: number; reps: number }[];
+    if (prevSets.length !== entries.length) return null;
+    return suggestProgression(prevSets, exercise.reps_objective);
+  }, [entries, exercise.reps_objective]);
 
   function applySuggestion() {
     if (!suggestion) return;
@@ -182,38 +178,28 @@ export default function WorkoutLogScreen() {
 
     setSaving(true);
     const now = new Date().toISOString();
-    let failed = 0;
+    let queued = 0;
 
     for (const entry of toSave) {
-      const { data: existing } = await supabase
-        .from('workout_logs')
-        .select('id')
-        .eq('series_id', entry.series.id)
-        .eq('week_number', week)
-        .maybeSingle();
-
-      const { error } = existing
-        ? await supabase.from('workout_logs').update({
-            weight: entry.weightNum,
-            reps: entry.repsNum,
-            rir: entry.rirNum,
-            logged_at: now,
-          }).eq('id', existing.id)
-        : await supabase.from('workout_logs').insert({
-            series_id: entry.series.id,
-            week_number: week,
-            weight: entry.weightNum,
-            reps: entry.repsNum,
-            rir: entry.rirNum,
-            logged_at: now,
-            logged_by: user?.id,
-          });
-      if (error) failed++;
+      const result = await saveLog({
+        series_id: entry.series.id,
+        week_number: week,
+        weight: entry.weightNum!,
+        reps: entry.repsNum!,
+        rir: entry.rirNum,
+        logged_at: now,
+        logged_by: user!.id,
+      });
+      if (result === 'queued') queued++;
     }
 
     setSaving(false);
-    if (failed > 0) {
-      showAlert('Error al guardar', `${failed} serie(s) no se pudieron guardar. Intenta de nuevo.`);
+    if (queued > 0) {
+      showAlert(
+        'Guardado sin conexión',
+        `Tu entrenamiento quedó guardado en el teléfono y se subirá solo cuando vuelva la señal.`,
+        () => navigation.goBack(),
+      );
     } else {
       showAlert('¡Guardado!', 'Tu entrenamiento fue registrado.', () => navigation.goBack());
     }

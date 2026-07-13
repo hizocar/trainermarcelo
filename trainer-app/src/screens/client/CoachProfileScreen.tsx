@@ -16,6 +16,8 @@ import Card from '../../components/common/Card';
 import Avatar from '../../components/common/Avatar';
 import { pickImage, uploadImage } from '../../lib/media';
 import { showAlert, showConfirm } from '../../lib/alert';
+import { scheduleReminders, cancelReminders, notificationsEnabled } from '../../lib/notifications';
+import { Switch, Platform } from 'react-native';
 
 export default function CoachProfileScreen() {
   const { user, signOut } = useAuth();
@@ -24,8 +26,9 @@ export default function CoachProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [notifOn, setNotifOn] = useState(false);
 
-  useEffect(() => { fetchCoach(); }, []);
+  useEffect(() => { fetchCoach(); notificationsEnabled().then(setNotifOn); }, []);
   useEffect(() => { setAvatarUrl(user?.avatar_url ?? null); }, [user?.avatar_url]);
 
   async function fetchCoach() {
@@ -50,6 +53,26 @@ export default function CoachProfileScreen() {
       showAlert('Error al subir foto', e.message ?? 'Revisa que la migración v6 esté aplicada en Supabase.');
     }
     setUploadingAvatar(false);
+  }
+
+  async function toggleNotifications(value: boolean) {
+    if (!value) {
+      await cancelReminders();
+      setNotifOn(false);
+      return;
+    }
+    const { data: plan } = await supabase
+      .from('workout_plans').select('id').eq('client_id', user!.id).maybeSingle();
+    const { data: days } = plan
+      ? await supabase.from('training_days').select('day_number, name, week_day').eq('plan_id', plan.id)
+      : { data: [] };
+    const ok = await scheduleReminders(days ?? []);
+    if (ok) {
+      setNotifOn(true);
+      showAlert('Recordatorios activados', 'Te avisaremos tus días de entrenamiento y la encuesta diaria de energía.');
+    } else {
+      showAlert('Permiso denegado', 'Activa las notificaciones para la app en los Ajustes de tu iPhone.');
+    }
   }
 
   function handleSignOut() {
@@ -142,6 +165,24 @@ export default function CoachProfileScreen() {
           </Card>
         )}
 
+        {Platform.OS !== 'web' && (
+          <Card style={styles.notifCard}>
+            <View style={styles.notifRow}>
+              <Ionicons name="notifications-outline" size={18} color={colors.accent} />
+              <View style={styles.notifInfo}>
+                <Text style={styles.notifTitle}>RECORDATORIOS</Text>
+                <Text style={styles.notifSub}>Tus días de entrenamiento y la encuesta diaria</Text>
+              </View>
+              <Switch
+                value={notifOn}
+                onValueChange={toggleNotifications}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.textPrimary}
+              />
+            </View>
+          </Card>
+        )}
+
         <TouchableOpacity
           style={styles.calcBtn}
           onPress={() => navigation.navigate('Calculators')}
@@ -219,6 +260,11 @@ const styles = StyleSheet.create({
   noCoachCard: { alignItems: 'center', paddingVertical: spacing.xl },
   noCoachText: { ...typography.body, color: colors.textMuted },
 
+  notifCard: {},
+  notifRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  notifInfo: { flex: 1 },
+  notifTitle: { ...typography.label, color: colors.textPrimary, letterSpacing: 1.5 },
+  notifSub: { ...typography.caption, fontSize: 10, marginTop: 1 },
   calcBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.card, borderRadius: radius.md,

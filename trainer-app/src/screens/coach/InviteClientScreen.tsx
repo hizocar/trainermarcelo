@@ -38,54 +38,44 @@ export default function InviteClientScreen() {
       showAlert('Campos incompletos', 'Completa nombre, email y contraseña temporal.');
       return;
     }
-    if (password.length < 6) {
-      showAlert('Contraseña muy corta', 'Mínimo 6 caracteres.');
+    if (password.length < 8) {
+      showAlert('Contraseña muy corta', 'Mínimo 8 caracteres.');
       return;
     }
 
     setLoading(true);
 
-    // Crear usuario en Supabase Auth con service role via Edge Function
-    // Por ahora usamos la API de auth admin directamente
-    const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/invite-client`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase(), password, coach_id: user!.id }),
-    });
+    // La Edge Function valida que quien llama sea un coach y crea la cuenta.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); showAlert('Sesión expirada', 'Vuelve a iniciar sesión.'); return; }
 
-    if (!res.ok) {
-      // Fallback: registrar en invitaciones para procesamiento manual
-      const { error } = await supabase.from('invitations').insert({
-        coach_id: user!.id,
-        email: email.trim().toLowerCase(),
-        name: name.trim(),
-        status: 'pending',
-      });
-
-      if (!error) {
-        showAlert(
-          'Invitación registrada',
-          `${name} fue agregado a la lista de invitaciones. Pídele que descargue la app y use:\n\nEmail: ${email}\nContraseña: ${password}\n\n(Debes crear su cuenta manualmente en Supabase por ahora)`
-        );
-        setInvitations(prev => [{
-          id: Date.now().toString(), coach_id: user!.id,
-          email: email.trim().toLowerCase(), name: name.trim(),
-          status: 'pending', created_at: new Date().toISOString(),
-        }, ...prev]);
-        setName(''); setEmail(''); setPassword('');
-      }
-    } else {
+    try {
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/invite-client`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          },
+          body: JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase(), password }),
+        },
+      );
       const result = await res.json();
-      if (result.error) {
-        showAlert('Error', result.error);
+
+      if (!res.ok || result.error) {
+        showAlert('No se pudo invitar', result.error ?? `Error ${res.status}`);
       } else {
-        showAlert('¡Listo!', `${name} fue invitado exitosamente.\n\nEmail: ${email}\nContraseña: ${password}`);
+        showAlert(
+          '¡Cliente creado!',
+          `${name} ya puede entrar con:\n\nEmail: ${email}\nContraseña: ${password}\n\nPídele que la cambie al entrar.`,
+        );
         setName(''); setEmail(''); setPassword('');
         fetchInvitations();
       }
+    } catch (e: any) {
+      showAlert('Error de conexión', e.message ?? 'Revisa tu señal e intenta de nuevo.');
     }
 
     setLoading(false);
@@ -144,7 +134,7 @@ export default function InviteClientScreen() {
               style={styles.input}
               value={password}
               onChangeText={setPassword}
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mínimo 8 caracteres"
               placeholderTextColor={colors.textMuted}
               secureTextEntry
             />

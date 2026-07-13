@@ -129,10 +129,10 @@ function Back({ h }: { h: Record<string, number> }) {
 }
 
 export default function MuscleMap({ highlights, height = 220, showLabels = true }: Props) {
-  // etiqueta del grupo activo principal
-  const active = Object.entries(highlights)
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  // La etiqueta solo tiene sentido cuando se destaca UN grupo (pantalla de
+  // ejercicio). Con varios activos es un mapa de calor: nombrar uno confunde.
+  const activeGroups = Object.entries(highlights).filter(([, v]) => v > 0);
+  const active = activeGroups.length === 1 ? activeGroups[0][0] : null;
 
   return (
     <View style={styles.wrap}>

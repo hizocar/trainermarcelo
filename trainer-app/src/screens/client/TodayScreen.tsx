@@ -8,8 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { TrainingDay, Exercise } from '../../types';
+import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, PlanDay, PlanExercise } from '../../lib/plan';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import SyncBanner from '../../components/common/SyncBanner';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { showAlert } from '../../lib/alert';
 
@@ -22,9 +24,9 @@ const PHASE_INFO: Record<string, { label: string; color: string }> = {
 export default function TodayScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
-  const [days, setDays] = useState<TrainingDay[]>([]);
-  const [selectedDay, setSelectedDay] = useState<TrainingDay | null>(null);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [days, setDays] = useState<PlanDay[]>([]);
+  const [selectedDay, setSelectedDay] = useState<PlanDay | null>(null);
+  const [exercises, setExercises] = useState<PlanExercise[]>([]);
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
   const [phase, setPhase] = useState<string | null>(null);
@@ -36,105 +38,61 @@ export default function TodayScreen() {
   const currentWeek = getCurrentWeek();
 
   // refresca al volver de WorkoutLog para actualizar los checks de completado
-  useFocusEffect(useCallback(() => {
-    if (user?.id && days.length === 0) fetchPlan();
-    else if (selectedDay) {
-      fetchExercises(selectedDay.id);
-      fetchWeekStatus(days);
-    }
-  }, [user?.id, selectedDay?.id]));
+  useFocusEffect(useCallback(() => { if (user?.id) fetchPlan(); }, [user?.id]));
 
   async function fetchPlan() {
-    const { data: planData } = await supabase
-      .from('workout_plans').select('*')
-      .eq('client_id', user?.id).single();
+    if (!user?.id) return;
+    const plan = await fetchFullPlan(user.id);
+    if (!plan) { setLoading(false); return; }
 
-    if (planData) {
-      const { data: ph } = await supabase
-        .from('week_phases').select('phase')
-        .eq('plan_id', planData.id).eq('week_number', currentWeek).maybeSingle();
-      setPhase(ph?.phase ?? null);
+    const { data: ph } = await supabase
+      .from('week_phases').select('phase')
+      .eq('plan_id', plan.id).eq('week_number', currentWeek).maybeSingle();
+    setPhase(ph?.phase ?? null);
 
-      const { data: daysData } = await supabase
-        .from('training_days').select('*')
-        .eq('plan_id', planData.id)
-        .order('week_day', { nullsFirst: false });
+    const list = activeDays(plan.days);
+    setDays(list);
 
-      const activeDays = (daysData ?? []).filter(d => !d.name.toLowerCase().includes('libre'));
-      setDays(activeDays);
-      fetchWeekStatus(activeDays);
+    // logs de la semana: una consulta para todo el plan
+    const logs = await fetchLogs(plan.seriesIds, currentWeek);
+    const loggedSeries = new Set(logs.map(l => l.series_id));
+    const doneEx = new Set(
+      Object.entries(plan.seriesToExercise)
+        .filter(([sid]) => loggedSeries.has(sid))
+        .map(([, exId]) => exId),
+    );
+    setLoggedExercises(doneEx);
 
-      // Auto-seleccionar el día de hoy si existe, si no el primero
-      const todayDay = activeDays.find(d => d.week_day === todayWeekDay);
-      setSelectedDay(todayDay ?? activeDays[0] ?? null);
-    }
+    const status: Record<string, { total: number; done: number }> = {};
+    list.forEach(d => {
+      status[d.id] = {
+        total: d.exercises.length,
+        done: d.exercises.filter(e => doneEx.has(e.id)).length,
+      };
+    });
+    setDayStatus(status);
+
+    const todayDay = list.find(d => d.week_day === todayWeekDay);
+    const selected = todayDay ?? list[0] ?? null;
+    setSelectedDay(selected);
+    setExercises(selected?.exercises ?? []);
+    if (selected) loadNote(selected.id);
     setLoading(false);
   }
 
-  async function fetchExercises(dayId: string) {
-    // nota de sesión existente para este día+semana
-    supabase.from('session_notes').select('note')
-      .eq('user_id', user!.id).eq('day_id', dayId).eq('week_number', currentWeek)
-      .maybeSingle()
-      .then(({ data: n }) => { setNote(n?.note ?? ''); setNoteDirty(false); });
-
+  async function loadNote(dayId: string) {
     const { data } = await supabase
-      .from('exercises').select('*')
-      .eq('day_id', dayId).order('order_index');
-    const exs = data ?? [];
-    setExercises(exs);
-
-    // marcar ejercicios ya registrados esta semana
-    if (exs.length > 0) {
-      const { data: series } = await supabase
-        .from('exercise_series')
-        .select('id, exercise_id')
-        .in('exercise_id', exs.map(e => e.id));
-
-      const seriesIds = (series ?? []).map(s => s.id);
-      if (seriesIds.length > 0) {
-        const { data: logs } = await supabase
-          .from('workout_logs')
-          .select('series_id')
-          .in('series_id', seriesIds)
-          .eq('week_number', currentWeek);
-
-        const loggedSeriesIds = new Set((logs ?? []).map(l => l.series_id));
-        const done = new Set(
-          (series ?? []).filter(s => loggedSeriesIds.has(s.id)).map(s => s.exercise_id)
-        );
-        setLoggedExercises(done);
-        return;
-      }
-    }
-    setLoggedExercises(new Set());
+      .from('session_notes').select('note')
+      .eq('user_id', user!.id).eq('day_id', dayId).eq('week_number', currentWeek)
+      .maybeSingle();
+    setNote(data?.note ?? '');
+    setNoteDirty(false);
   }
 
-  // completado semanal de TODOS los días (para los checks de los tabs)
-  async function fetchWeekStatus(dayList: TrainingDay[]) {
-    if (dayList.length === 0) return;
-    const { data: exs } = await supabase
-      .from('exercises').select('id, day_id')
-      .in('day_id', dayList.map(d => d.id));
-    const { data: series } = await supabase
-      .from('exercise_series').select('id, exercise_id')
-      .in('exercise_id', (exs ?? []).map(e => e.id));
-    const { data: logs } = await supabase
-      .from('workout_logs').select('series_id')
-      .in('series_id', (series ?? []).map(s => s.id))
-      .eq('week_number', currentWeek);
-
-    const loggedSeries = new Set((logs ?? []).map(l => l.series_id));
-    const doneEx = new Set((series ?? []).filter(s => loggedSeries.has(s.id)).map(s => s.exercise_id));
-    const status: Record<string, { total: number; done: number }> = {};
-    dayList.forEach(d => { status[d.id] = { total: 0, done: 0 }; });
-    (exs ?? []).forEach(e => {
-      const st = status[e.day_id];
-      if (!st) return;
-      st.total++;
-      if (doneEx.has(e.id)) st.done++;
-    });
-    setDayStatus(status);
+  function selectDay(day: PlanDay) {
+    setSelectedDay(day);
+    setExercises(day.exercises);
+    loadNote(day.id);
   }
 
   async function saveNote() {
@@ -200,7 +158,7 @@ export default function TodayScreen() {
                 <TouchableOpacity
                   key={day.id}
                   style={[styles.dayTab, active && styles.dayTabActive, complete && !active && styles.dayTabDone]}
-                  onPress={() => setSelectedDay(day)}
+                  onPress={() => selectDay(day)}
                   activeOpacity={0.7}
                 >
                   {complete ? (
@@ -222,14 +180,19 @@ export default function TodayScreen() {
           </ScrollView>
 
           {/* barra de progreso del día */}
-          {exercises.length > 0 && (
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.round((loggedExercises.size / exercises.length) * 100)}%` },
-                ]}
-              />
+          {exercises.length > 0 && selectedDay && (
+            <View style={styles.progressRow}>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.round(((dayStatus[selectedDay.id]?.done ?? 0) / exercises.length) * 100)}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressCount}>
+                {dayStatus[selectedDay.id]?.done ?? 0}/{exercises.length}
+              </Text>
             </View>
           )}
 
@@ -237,45 +200,52 @@ export default function TodayScreen() {
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
           >
-            {exercises.map(ex => {
-              const done = loggedExercises.has(ex.id);
-              return (
-                <TouchableOpacity
-                  key={ex.id}
-                  onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
-                  activeOpacity={0.7}
-                >
-                  <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
-                    <View style={styles.exerciseRow}>
-                      {ex.image_url ? (
-                        <Image source={{ uri: ex.image_url }} style={styles.thumb} />
-                      ) : (
-                        <View style={[styles.thumb, styles.thumbPlaceholder]}>
-                          <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
+            <SyncBanner />
+            {groupBySuperseries(exercises).map(group => (
+              <View key={group.key} style={group.superseries ? styles.ssGroup : undefined}>
+                {group.superseries && (
+                  <View style={styles.ssHeader}>
+                    <Ionicons name="link" size={12} color={colors.accent} />
+                    <Text style={styles.ssTitle}>{group.superseries.toUpperCase()}</Text>
+                    <Text style={styles.ssHint}>sin descanso entre estos</Text>
+                  </View>
+                )}
+                {group.exercises.map(ex => {
+                  const done = loggedExercises.has(ex.id);
+                  return (
+                    <TouchableOpacity
+                      key={ex.id}
+                      onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
+                      activeOpacity={0.7}
+                      style={group.superseries ? styles.ssItem : undefined}
+                    >
+                      <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
+                        <View style={styles.exerciseRow}>
+                          {ex.image_url ? (
+                            <Image source={{ uri: ex.image_url }} style={styles.thumb} />
+                          ) : (
+                            <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                              <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
+                            </View>
+                          )}
+                          <View style={styles.exerciseInfo}>
+                            <Text style={styles.exerciseName}>{ex.name}</Text>
+                            <Text style={styles.exerciseMeta}>
+                              {ex.muscle_group ? `${ex.muscle_group} · ` : ''}
+                              {ex.exercise_series.length} series · {ex.reps_objective} reps
+                              {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
+                            </Text>
+                          </View>
+                          <View style={[styles.logBtn, done && styles.logBtnDone]}>
+                            <Ionicons name={done ? 'checkmark' : 'add'} size={22} color={colors.background} />
+                          </View>
                         </View>
-                      )}
-                      <View style={styles.exerciseInfo}>
-                        {ex.superseries_group && (
-                          <Text style={styles.superTag}>⛓ {ex.superseries_group}</Text>
-                        )}
-                        <Text style={styles.exerciseName}>{ex.name}</Text>
-                        <Text style={styles.exerciseMeta}>
-                          {ex.muscle_group ? `${ex.muscle_group} · ` : ''}{ex.reps_objective} reps · {ex.unit}
-                          {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
-                        </Text>
-                      </View>
-                      <View style={[styles.logBtn, done && styles.logBtnDone]}>
-                        <Ionicons
-                          name={done ? 'checkmark' : 'add'}
-                          size={22}
-                          color={done ? colors.background : colors.background}
-                        />
-                      </View>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              );
-            })}
+                      </Card>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
 
             {exercises.length > 0 && selectedDay && (
               <Card style={styles.noteCard}>
@@ -373,14 +343,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     paddingHorizontal: spacing.xl, paddingVertical: spacing.sm,
   },
+  progressRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.xl, marginBottom: spacing.sm,
+  },
   progressTrack: {
-    height: 4,
+    flex: 1,
+    height: 5,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.sm,
     overflow: 'hidden',
   },
+  progressCount: { fontSize: 11, fontWeight: '900', color: colors.accent, letterSpacing: 0.5 },
   progressFill: {
     height: '100%',
     borderRadius: radius.full,
@@ -388,6 +362,14 @@ const styles = StyleSheet.create({
   },
 
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.sm },
+  ssGroup: {
+    borderLeftWidth: 2, borderLeftColor: colors.accent + '66',
+    paddingLeft: spacing.sm, gap: spacing.xs,
+  },
+  ssHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
+  ssTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: colors.accent },
+  ssHint: { fontSize: 9, fontStyle: 'italic', color: colors.textMuted },
+  ssItem: { marginBottom: spacing.xs },
   exerciseCard: { },
   exerciseCardDone: { borderColor: colors.accent + '66' },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
