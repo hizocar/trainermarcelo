@@ -7,17 +7,13 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { User, TrainingDay, WorkoutPlan, SessionNote } from '../../types';
+import { User, TrainingDay, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { unreadCount } from '../../lib/chat';
-
-const PHASES = [
-  { value: 'acumulacion', label: 'ACUMULACIÓN', color: colors.accent },
-  { value: 'intensificacion', label: 'INTENSIFICACIÓN', color: '#FF9F1C' },
-  { value: 'descarga', label: 'DESCARGA', color: '#4CC9F0' },
-];
+import { fetchFullPlan } from '../../lib/plan';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import MuscleMap from '../../components/common/MuscleMap';
 
 type RouteParams = { client: User };
 
@@ -27,9 +23,8 @@ export default function ClientDetailScreen() {
   const { user } = useAuth();
   const { client } = route.params as RouteParams;
 
-  const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [days, setDays] = useState<TrainingDay[]>([]);
-  const [phase, setPhase] = useState<string | null>(null);
+  const [groupSets, setGroupSets] = useState<{ group: string; sets: number }[]>([]);
   const [notes, setNotes] = useState<(SessionNote & { dayName?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const currentWeek = getCurrentWeek();
@@ -44,27 +39,20 @@ export default function ClientDetailScreen() {
   }, [user?.id, client.id]));
 
   async function fetchPlan() {
-    const { data: planData } = await supabase
-      .from('workout_plans')
-      .select('*')
-      .eq('client_id', client.id)
-      .single();
+    const plan = await fetchFullPlan(client.id);
+    if (plan) {
+      setDays(plan.days.filter(d => !d.name.toLowerCase().includes('libre')));
 
-    if (planData) {
-      setPlan(planData);
-      const { data: daysData } = await supabase
-        .from('training_days')
-        .select('*')
-        .eq('plan_id', planData.id)
-        .order('day_number');
-      const dayList = daysData ?? [];
-      setDays(dayList);
-
-      // fase de la semana actual
-      const { data: ph } = await supabase
-        .from('week_phases').select('phase')
-        .eq('plan_id', planData.id).eq('week_number', currentWeek).maybeSingle();
-      setPhase(ph?.phase ?? null);
+      // series del split semanal por grupo muscular (para ver solapes/repetición)
+      const counts: Record<string, number> = {};
+      plan.days.forEach(d => d.exercises.forEach(e => {
+        const g = e.muscle_group?.trim() || 'Sin grupo';
+        counts[g] = (counts[g] ?? 0) + e.exercise_series.length;
+      }));
+      const rows = Object.entries(counts)
+        .map(([group, sets]) => ({ group, sets }))
+        .sort((a, b) => b.sets - a.sets);
+      setGroupSets([...rows.filter(r => r.group !== 'Sin grupo'), ...rows.filter(r => r.group === 'Sin grupo')]);
 
       // últimas notas del cliente
       const { data: notesData } = await supabase
@@ -72,25 +60,14 @@ export default function ClientDetailScreen() {
         .eq('user_id', client.id)
         .order('created_at', { ascending: false })
         .limit(5);
-      const dayName = Object.fromEntries(dayList.map(d => [d.id, `Día ${d.day_number} · ${d.name}`]));
+      const dayName = Object.fromEntries(plan.days.map(d => [d.id, `Día ${d.day_number} · ${d.name}`]));
       setNotes((notesData ?? []).map(n => ({ ...n, dayName: dayName[n.day_id] })));
     }
     setLoading(false);
   }
 
-  async function setWeekPhase(value: string) {
-    if (!plan) return;
-    if (phase === value) {
-      await supabase.from('week_phases').delete().eq('plan_id', plan.id).eq('week_number', currentWeek);
-      setPhase(null);
-    } else {
-      const { error } = await supabase.from('week_phases').upsert(
-        { plan_id: plan.id, week_number: currentWeek, phase: value },
-        { onConflict: 'plan_id,week_number' },
-      );
-      if (!error) setPhase(value);
-    }
-  }
+  const maxSets = Math.max(...groupSets.map(r => r.sets), 1);
+  const totalSets = groupSets.reduce((a, r) => a + r.sets, 0);
 
   return (
     <View style={styles.container}>
@@ -142,20 +119,27 @@ export default function ClientDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionLabel}>FASE DE LA SEMANA (SEMANA {currentWeek})</Text>
-          <View style={styles.phaseRow}>
-            {PHASES.map(p => (
-              <TouchableOpacity
-                key={p.value}
-                style={[styles.phaseChip, phase === p.value && { backgroundColor: p.color, borderColor: p.color }]}
-                onPress={() => setWeekPhase(p.value)}
-              >
-                <Text style={[styles.phaseChipText, phase === p.value && { color: colors.background }]}>
-                  {p.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {totalSets > 0 && (
+            <Card style={styles.volumeCard}>
+              <Text style={styles.volumeTitle}>VOLUMEN SEMANAL POR GRUPO</Text>
+              <Text style={styles.volumeSub}>
+                {days.length} días · {totalSets} series planificadas — revisa solapes entre grupos
+              </Text>
+              <MuscleMap
+                height={175}
+                highlights={Object.fromEntries(groupSets.map(r => [r.group, r.sets / maxSets]))}
+              />
+              {groupSets.map(r => (
+                <View key={r.group} style={styles.volRow}>
+                  <Text style={styles.volName} numberOfLines={1}>{r.group.toUpperCase()}</Text>
+                  <View style={styles.volBarTrack}>
+                    <View style={[styles.volBarFill, { width: `${(r.sets / maxSets) * 100}%` }]} />
+                  </View>
+                  <Text style={styles.volCount}>{r.sets}</Text>
+                </View>
+              ))}
+            </Card>
+          )}
 
           {notes.length > 0 && (
             <>
@@ -258,13 +242,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
-  phaseRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  phaseChip: {
-    flex: 1, alignItems: 'center',
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface, paddingVertical: spacing.sm,
-  },
-  phaseChipText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5, color: colors.textMuted },
+  volumeCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  volumeTitle: { ...typography.h3, fontSize: 15 },
+  volumeSub: { ...typography.caption },
+  volRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  volName: { ...typography.caption, fontWeight: '800', fontSize: 10, width: 100 },
+  volBarTrack: { flex: 1, height: 8, borderRadius: radius.full, backgroundColor: colors.surface, overflow: 'hidden' },
+  volBarFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.accent },
+  volCount: { fontSize: 13, fontWeight: '900', color: colors.textPrimary, width: 26, textAlign: 'right' },
   noteCard: { gap: spacing.xs },
   noteHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   noteMeta: { ...typography.caption, fontSize: 10, letterSpacing: 0.5 },

@@ -43,12 +43,12 @@ export default function ClientListScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Avatar name={user?.name ?? 'C'} imageUrl={user?.avatar_url} size={44} accent />
+        <View style={styles.nameRow}>
+          <Avatar name={user?.name ?? 'C'} imageUrl={user?.avatar_url} size={46} accent />
           <View style={styles.nameBlock}>
             <Text style={styles.greeting}>HOLA,</Text>
-            <Text style={styles.coachName} numberOfLines={1}>
-              {user?.name?.split(' ')[0].toUpperCase()}
+            <Text style={styles.coachName} numberOfLines={1} adjustsFontSizeToFit>
+              {user?.name?.toUpperCase()}
             </Text>
           </View>
         </View>
@@ -57,20 +57,22 @@ export default function ClientListScreen() {
             onPress={() => navigation.navigate('InviteClient')}
             style={styles.inviteBtn}
           >
-            <Ionicons name="person-add" size={13} color={colors.background} />
+            <Ionicons name="person-add" size={14} color={colors.background} />
             <Text style={styles.inviteBtnText}>CLIENTE</Text>
           </TouchableOpacity>
-          {user?.is_owner && (
-            <TouchableOpacity onPress={() => navigation.navigate('ApproveCoaches')} style={styles.logoutBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+          <View style={styles.headerIcons}>
+            {user?.is_owner && (
+              <TouchableOpacity onPress={() => navigation.navigate('ApproveCoaches')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="calculator-outline" size={18} color={colors.textMuted} />
             </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.logoutBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="calculator-outline" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSignOut} style={styles.logoutBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="log-out-outline" size={19} color={colors.textMuted} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={handleSignOut} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="log-out-outline" size={19} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -114,36 +116,36 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: spacing.xl,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
-  headerLeft: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm + 2,
-    flex: 1,
-    marginRight: spacing.sm,
+    gap: spacing.md,
   },
-  nameBlock: { flexShrink: 1 },
+  nameBlock: { flex: 1 },
   greeting: {
     ...typography.caption,
     letterSpacing: 3,
     color: colors.textMuted,
   },
-  coachName: { ...typography.display, fontSize: 26, color: colors.accent },
+  coachName: { ...typography.display, fontSize: 30, color: colors.accent },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-    flexShrink: 0,
   },
   inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: colors.accent,
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
@@ -152,12 +154,12 @@ const styles = StyleSheet.create({
   inviteBtnText: {
     color: colors.background,
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 1,
   },
-  logoutBtn: {
-    width: 36,
-    height: 36,
+  iconBtn: {
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
