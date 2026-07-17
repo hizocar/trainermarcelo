@@ -47,7 +47,21 @@
           "backgroundColor": "#08090A",
           "imageWidth": 200
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#C8FF00"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "La app usa el micrófono para grabar notas de voz en el chat con tu entrenador."
+        }
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {

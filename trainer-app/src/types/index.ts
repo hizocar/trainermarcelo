@@ -127,7 +127,9 @@ export interface Message {
   coach_id: string;
   client_id: string;
   sender_id: string;
-  body: string;
+  body: string | null;
+  media_type?: 'image' | 'audio' | null;
+  media_path?: string | null;
   created_at: string;
   read_at?: string | null;
 }
