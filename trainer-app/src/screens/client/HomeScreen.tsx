@@ -11,6 +11,7 @@ import { MoodLog } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import MuscleMap from '../../components/common/MuscleMap';
+import { fetchFullPlan, fetchLogs, activeDays } from '../../lib/plan';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
@@ -56,49 +57,33 @@ export default function HomeScreen() {
       .limit(7);
     setMoods(moodData ?? []);
 
-    // series por grupo muscular de la semana en curso
-    const { data: plan } = await supabase
-      .from('workout_plans').select('id')
-      .eq('client_id', user!.id).maybeSingle();
+    // plan completo en una sola consulta anidada
+    const plan = await fetchFullPlan(user!.id);
     if (!plan) { setLoading(false); return; }
 
-    const { data: days } = await supabase
-      .from('training_days').select('id, day_number, name')
-      .eq('plan_id', plan.id).order('day_number');
-    const { data: exs } = await supabase
-      .from('exercises').select('id, muscle_group, day_id')
-      .in('day_id', (days ?? []).map(d => d.id));
-    const { data: series } = await supabase
-      .from('exercise_series').select('id, exercise_id')
-      .in('exercise_id', (exs ?? []).map(e => e.id));
+    const logs = await fetchLogs(plan.seriesIds, currentWeek);
+    const loggedSeries = new Set(logs.map(l => l.series_id));
+    const doneEx = new Set(
+      Object.entries(plan.seriesToExercise)
+        .filter(([sid]) => loggedSeries.has(sid))
+        .map(([, exId]) => exId),
+    );
 
     // días entrenados vs pendientes esta semana
-    const { data: weekLogs } = await supabase
-      .from('workout_logs').select('series_id')
-      .in('series_id', (series ?? []).map(s => s.id))
-      .eq('week_number', currentWeek);
-    const loggedSeries = new Set((weekLogs ?? []).map(l => l.series_id));
-    const doneEx = new Set((series ?? []).filter(s => loggedSeries.has(s.id)).map(s => s.exercise_id));
-    setWeekDays((days ?? [])
-      .filter(d => !d.name.toLowerCase().includes('libre'))
-      .map(d => {
-        const dayExs = (exs ?? []).filter(e => e.day_id === d.id);
-        return {
-          ...d,
-          total: dayExs.length,
-          done: dayExs.filter(e => doneEx.has(e.id)).length,
-        };
-      })
+    setWeekDays(activeDays(plan.days)
+      .map(d => ({
+        id: d.id, day_number: d.day_number, name: d.name,
+        total: d.exercises.length,
+        done: d.exercises.filter(e => doneEx.has(e.id)).length,
+      }))
       .filter(d => d.total > 0));
 
     // total de series del SPLIT semanal por grupo (lo planificado, no lo completado)
-    const exGroup: Record<string, string> = {};
-    (exs ?? []).forEach(e => { exGroup[e.id] = e.muscle_group?.trim() || 'Sin grupo'; });
     const counts: Record<string, number> = {};
-    (series ?? []).forEach(s => {
-      const g = exGroup[s.exercise_id] ?? 'Sin grupo';
-      counts[g] = (counts[g] ?? 0) + 1;
-    });
+    plan.days.forEach(d => d.exercises.forEach(e => {
+      const g = e.muscle_group?.trim() || 'Sin grupo';
+      counts[g] = (counts[g] ?? 0) + e.exercise_series.length;
+    }));
     setGroupSets(counts);
     setLoading(false);
   }

@@ -182,6 +182,18 @@ export default function CoachProfileScreen() {
               </View>
 
               <TouchableOpacity
+                style={styles.chatBtn}
+                onPress={() => navigation.navigate('Chat', {
+                  peerId: coach.id, peerName: coach.name, peerAvatar: coach.avatar_url,
+                  coachId: coach.id, clientId: user!.id,
+                })}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="chatbubble-ellipses" size={18} color={colors.background} />
+                <Text style={styles.chatBtnText}>ESCRIBIR A MI COACH</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.igBtn}
                 onPress={() => Linking.openURL(COACH_INSTAGRAM)}
                 activeOpacity={0.8}
@@ -305,6 +317,11 @@ const styles = StyleSheet.create({
   coachBanner: { height: 130 },
   coachBannerImg: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
   coachBody: { padding: spacing.md, gap: spacing.md, marginTop: -spacing.lg },
+  chatBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: spacing.md,
+  },
+  chatBtnText: { color: colors.background, fontWeight: '900', fontSize: 13, letterSpacing: 1.5 },
   igBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     alignSelf: 'flex-start',

@@ -25,6 +25,7 @@ import ProgressScreen from '../screens/client/ProgressScreen';
 import BodyProgressScreen from '../screens/client/BodyProgressScreen';
 import CoachProfileScreen from '../screens/client/CoachProfileScreen';
 import CalculatorsScreen from '../screens/shared/CalculatorsScreen';
+import ChatScreen from '../screens/shared/ChatScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -110,6 +111,7 @@ export default function AppNavigator() {
             <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
           </>
         ) : (
           <>
@@ -117,6 +119,7 @@ export default function AppNavigator() {
             <Stack.Screen name="WorkoutLog" component={WorkoutLogScreen} />
             <Stack.Screen name="Body" component={BodyProgressScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
           </>
         )}
       </Stack.Navigator>

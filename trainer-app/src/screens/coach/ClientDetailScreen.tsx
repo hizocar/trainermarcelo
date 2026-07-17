@@ -6,6 +6,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { User, TrainingDay, WorkoutPlan, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 
@@ -22,6 +23,7 @@ type RouteParams = { client: User };
 export default function ClientDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
+  const { user } = useAuth();
   const { client } = route.params as RouteParams;
 
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
@@ -107,6 +109,16 @@ export default function ClientDetailScreen() {
               activeOpacity={0.8}
             >
               <Text style={styles.actionBtnText}>✏ EDITAR PLAN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => navigation.navigate('Chat', {
+                peerId: client.id, peerName: client.name, peerAvatar: client.avatar_url,
+                coachId: user!.id, clientId: client.id,
+              })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.actionBtnText}>💬 CHATEAR</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnSecondary]}

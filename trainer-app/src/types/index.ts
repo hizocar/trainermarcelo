@@ -120,3 +120,13 @@ export interface BodyMetric {
   photo_path?: string;
   created_at: string;
 }
+
+export interface Message {
+  id: string;
+  coach_id: string;
+  client_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  read_at?: string | null;
+}

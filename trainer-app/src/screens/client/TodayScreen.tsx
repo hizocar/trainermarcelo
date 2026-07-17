@@ -27,6 +27,7 @@ export default function TodayScreen() {
   const navigation = useNavigation<any>();
   const [days, setDays] = useState<PlanDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<PlanDay | null>(null);
+  const selectedIdRef = React.useRef<string | null>(null);
   const [exercises, setExercises] = useState<PlanExercise[]>([]);
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
@@ -82,11 +83,18 @@ export default function TodayScreen() {
       done: (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total,
     })));
 
-    const todayDay = list.find(d => d.week_day === todayWeekDay);
-    const selected = todayDay ?? list[0] ?? null;
+    // selección: conservar la elección manual; si no hay, el primer día incompleto
+    const isDayComplete = (d: PlanDay) =>
+      (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total;
+
+    const prevId = selectedIdRef.current;
+    const kept = prevId ? list.find(d => d.id === prevId) : undefined;
+    const firstIncomplete = list.find(d => !isDayComplete(d));
+    const selected = kept ?? firstIncomplete ?? list.find(d => d.week_day === todayWeekDay) ?? list[0] ?? null;
+    selectedIdRef.current = selected?.id ?? null;
     setSelectedDay(selected);
     setExercises(selected?.exercises ?? []);
-    if (selected) loadNote(selected.id);
+    if (selected && selected.id !== prevId) loadNote(selected.id);
     setLoading(false);
   }
 
@@ -100,6 +108,7 @@ export default function TodayScreen() {
   }
 
   function selectDay(day: PlanDay) {
+    selectedIdRef.current = day.id;
     setSelectedDay(day);
     setExercises(day.exercises);
     loadNote(day.id);
