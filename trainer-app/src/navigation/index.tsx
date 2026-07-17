@@ -1,11 +1,26 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
+
+export const navigationRef = createNavigationContainerRef<any>();
+
+// Abre el chat correspondiente cuando el usuario toca una notificación de mensaje.
+function openChatFromNotification(data: any) {
+  if (!data || data.type !== 'chat' || !navigationRef.isReady()) return;
+  navigationRef.navigate('Chat', {
+    peerId: data.peerId,
+    peerName: data.peerName ?? 'Chat',
+    peerAvatar: null,
+    coachId: data.coachId,
+    clientId: data.clientId,
+  });
+}
 
 // Auth
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -96,10 +111,23 @@ function ClientTabs() {
 
 export default function AppNavigator() {
   const { session, user, loading } = useAuth();
+
+  React.useEffect(() => {
+    // app abierta desde una notificación tocada
+    const sub = Notifications.addNotificationResponseReceivedListener(res => {
+      openChatFromNotification(res.notification.request.content.data);
+    });
+    // app lanzada desde cero al tocar una notificación
+    Notifications.getLastNotificationResponseAsync().then(res => {
+      if (res) setTimeout(() => openChatFromNotification(res.notification.request.content.data), 600);
+    });
+    return () => sub.remove();
+  }, [session]);
+
   if (loading) return null;
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
           <Stack.Screen name="Login" component={LoginScreen} />

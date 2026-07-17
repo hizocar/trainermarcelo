@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { colors, spacing } from '../../theme';
 import { signedChatMediaUrl } from '../../lib/chat';
 
@@ -23,9 +23,11 @@ export default function AudioBubble({ path, mine }: { path: string; mine: boolea
   const pos = status.currentTime || 0;
   const pct = dur > 0 ? Math.min(pos / dur, 1) : 0;
 
-  function toggle() {
+  async function toggle() {
     if (!url) return;
     if (playing) { player.pause(); return; }
+    // iOS: fuerza salida por altavoz (no auricular) y suena aunque esté en silencio, como WhatsApp
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     if (dur > 0 && pos >= dur - 0.1) player.seekTo(0);
     player.play();
   }

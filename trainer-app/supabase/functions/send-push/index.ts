@@ -12,14 +12,14 @@ const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Método no permitido', { status: 405 });
 
-  let payload: { recipient_id?: string; title?: string; body?: string };
+  let payload: { recipient_id?: string; title?: string; body?: string; data?: Record<string, unknown> };
   try {
     payload = await req.json();
   } catch {
     return new Response('Cuerpo inválido', { status: 400 });
   }
 
-  const { recipient_id, title, body } = payload;
+  const { recipient_id, title, body, data } = payload;
   if (!recipient_id || !body) return new Response('Faltan campos', { status: 400 });
 
   const admin = createClient(
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     sound: 'default',
     priority: 'high',
     channelId: 'chat',
-    data: { type: 'chat' },
+    data: data ?? { type: 'chat' },
   }));
 
   const res = await fetch(EXPO_PUSH, {

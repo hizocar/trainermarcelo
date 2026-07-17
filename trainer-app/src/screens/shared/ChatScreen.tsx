@@ -48,7 +48,10 @@ export default function ChatScreen() {
 
   async function attachImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      showAlert('Permiso de fotos', 'Activa el acceso a tus fotos en Ajustes para enviar imágenes.');
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
     if (res.canceled) return;
     setSending(true);
@@ -75,6 +78,8 @@ export default function ChatScreen() {
   async function stopAndSendRecording(cancel = false) {
     setRecording(false);
     await recorder.stop();
+    // vuelve el audio a modo reproducción por altavoz (grabar lo dejó en el auricular)
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     const uri = recorder.uri;
     if (cancel || !uri) return;
     setSending(true);
