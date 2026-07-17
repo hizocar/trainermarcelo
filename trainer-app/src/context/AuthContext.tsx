@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
+import { registerPushToken, unregisterPushToken } from '../lib/notifications';
 
 interface AuthContextType {
   session: Session | null;
@@ -59,6 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       setUser(data);
+      // registra este dispositivo para recibir push de mensajes (silencioso si falla)
+      registerPushToken(userId).catch(() => {});
     }
     setLoading(false);
   }
@@ -83,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    if (user) await unregisterPushToken(user.id).catch(() => {});
     await supabase.auth.signOut();
   }
 

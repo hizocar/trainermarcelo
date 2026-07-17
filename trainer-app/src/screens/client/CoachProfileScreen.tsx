@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const COACH_INSTAGRAM = 'https://www.instagram.com/marcetherapistt/';
 import { supabase } from '../../lib/supabase';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
@@ -17,6 +17,7 @@ import Avatar from '../../components/common/Avatar';
 import { pickImage, uploadImage } from '../../lib/media';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { scheduleReminders, cancelReminders, notificationsEnabled, getHours, DEFAULT_TRAIN_HOUR, DEFAULT_MOOD_HOUR } from '../../lib/notifications';
+import { unreadCount } from '../../lib/chat';
 import { fetchFullPlan, fetchLogs, activeDays } from '../../lib/plan';
 import { getCurrentWeek } from '../../lib/weeks';
 import { Switch, Platform } from 'react-native';
@@ -29,6 +30,7 @@ export default function CoachProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_url ?? null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [notifOn, setNotifOn] = useState(false);
+  const [unread, setUnread] = useState(0);
   const [trainHour, setTrainHour] = useState(DEFAULT_TRAIN_HOUR);
   const [moodHour, setMoodHour] = useState(DEFAULT_MOOD_HOUR);
 
@@ -38,6 +40,9 @@ export default function CoachProfileScreen() {
     getHours().then(h => { setTrainHour(h.trainHour); setMoodHour(h.moodHour); });
   }, []);
   useEffect(() => { setAvatarUrl(user?.avatar_url ?? null); }, [user?.avatar_url]);
+  useFocusEffect(React.useCallback(() => {
+    if (coach && user) unreadCount(coach.id, user.id, user.id).then(setUnread);
+  }, [coach?.id, user?.id]));
 
   async function fetchCoach() {
     if (!user?.coach_id) { setLoading(false); return; }
@@ -191,6 +196,11 @@ export default function CoachProfileScreen() {
               >
                 <Ionicons name="chatbubble-ellipses" size={18} color={colors.background} />
                 <Text style={styles.chatBtnText}>ESCRIBIR A MI COACH</Text>
+                {unread > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadText}>{unread}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -322,6 +332,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: spacing.md,
   },
   chatBtnText: { color: colors.background, fontWeight: '900', fontSize: 13, letterSpacing: 1.5 },
+  unreadBadge: {
+    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.danger,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
+  },
+  unreadText: { color: '#fff', fontSize: 11, fontWeight: '900' },
   igBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     alignSelf: 'flex-start',

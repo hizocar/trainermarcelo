@@ -2,6 +2,8 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { supabase } from './supabase';
 
 // Recordatorios locales (no requieren servidor).
 //
@@ -23,6 +25,14 @@ export interface ReminderDay {
   week_day?: number | null;
   /** ya completado en la semana en curso: no se avisa */
   done?: boolean;
+}
+
+// Canal de Android para los mensajes de chat (iOS lo ignora)
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('chat', {
+    name: 'Mensajes',
+    importance: Notifications.AndroidImportance.HIGH,
+  });
 }
 
 Notifications.setNotificationHandler({
@@ -139,4 +149,41 @@ export async function refreshReminders(days: ReminderDay[]): Promise<void> {
 export async function cancelReminders(): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
   await AsyncStorage.setItem(ENABLED_KEY, '0');
+}
+
+/**
+ * Registra el token push de Expo de este dispositivo para el usuario.
+ * Se llama al iniciar sesión. Idempotente (upsert).
+ */
+export async function registerPushToken(userId: string): Promise<void> {
+  if (Platform.OS === 'web' || !Device.isDevice) return;
+  if (!(await requestPermission())) return;
+
+  const projectId =
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    (Constants as any).easConfig?.projectId;
+  if (!projectId) return;
+
+  try {
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    await supabase.from('push_tokens').upsert(
+      { user_id: userId, token, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,token' },
+    );
+  } catch {
+    // sin conexión o permiso: se reintenta el próximo login
+  }
+}
+
+/** Elimina el token de este dispositivo (al cerrar sesión). */
+export async function unregisterPushToken(userId: string): Promise<void> {
+  if (Platform.OS === 'web' || !Device.isDevice) return;
+  try {
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      (Constants as any).easConfig?.projectId;
+    if (!projectId) return;
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    await supabase.from('push_tokens').delete().eq('user_id', userId).eq('token', token);
+  } catch {}
 }

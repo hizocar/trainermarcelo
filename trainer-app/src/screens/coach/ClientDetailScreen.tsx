@@ -3,12 +3,13 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { User, TrainingDay, WorkoutPlan, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
+import { unreadCount } from '../../lib/chat';
 
 const PHASES = [
   { value: 'acumulacion', label: 'ACUMULACIÓN', color: colors.accent },
@@ -32,10 +33,15 @@ export default function ClientDetailScreen() {
   const [notes, setNotes] = useState<(SessionNote & { dayName?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const currentWeek = getCurrentWeek();
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     fetchPlan();
   }, []);
+
+  useFocusEffect(React.useCallback(() => {
+    if (user) unreadCount(user.id, client.id, user.id).then(setUnread);
+  }, [user?.id, client.id]));
 
   async function fetchPlan() {
     const { data: planData } = await supabase
@@ -118,7 +124,7 @@ export default function ClientDetailScreen() {
               })}
               activeOpacity={0.8}
             >
-              <Text style={styles.actionBtnText}>💬 CHATEAR</Text>
+              <Text style={styles.actionBtnText}>💬 CHATEAR{unread > 0 ? `  ·  ${unread}` : ''}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnSecondary]}
