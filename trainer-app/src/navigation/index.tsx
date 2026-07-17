@@ -16,6 +16,8 @@ import ClientDetailScreen from '../screens/coach/ClientDetailScreen';
 import DayExercisesScreen from '../screens/coach/DayExercisesScreen';
 import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
+import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
+import ApproveCoachesScreen from '../screens/coach/ApproveCoachesScreen';
 
 // Client
 import HomeScreen from '../screens/client/HomeScreen';
@@ -101,6 +103,8 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
           <Stack.Screen name="Login" component={LoginScreen} />
+        ) : user?.role === 'coach_pending' ? (
+          <Stack.Screen name="CoachPending" component={CoachPendingScreen} />
         ) : user?.role === 'coach' ? (
           <>
             <Stack.Screen name="CoachHome" component={CoachTabs} />
@@ -112,6 +116,7 @@ export default function AppNavigator() {
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="ApproveCoaches" component={ApproveCoachesScreen} />
           </>
         ) : (
           <>

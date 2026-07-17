@@ -60,6 +60,11 @@ export default function ClientListScreen() {
             <Ionicons name="person-add" size={13} color={colors.background} />
             <Text style={styles.inviteBtnText}>CLIENTE</Text>
           </TouchableOpacity>
+          {user?.is_owner && (
+            <TouchableOpacity onPress={() => navigation.navigate('ApproveCoaches')} style={styles.logoutBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.logoutBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="calculator-outline" size={18} color={colors.textMuted} />
           </TouchableOpacity>

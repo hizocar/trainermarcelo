@@ -1,4 +1,4 @@
-export type UserRole = 'coach' | 'client';
+export type UserRole = 'coach' | 'client' | 'coach_pending';
 
 export interface User {
   id: string;
@@ -7,6 +7,7 @@ export interface User {
   coach_id?: string;
   email: string;
   avatar_url?: string;
+  is_owner?: boolean;
 }
 
 export interface WorkoutPlan {
