@@ -10,12 +10,14 @@ import { useAuth } from '../../context/AuthContext';
 import { User, TrainingDay, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { unreadCount } from '../../lib/chat';
-import { fetchFullPlan } from '../../lib/plan';
+import { fetchFullPlan, PlanDay } from '../../lib/plan';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import MuscleMap from '../../components/common/MuscleMap';
 
 type RouteParams = { client: User };
+
+const WEEKDAYS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 
 export default function ClientDetailScreen() {
   const navigation = useNavigation<any>();
@@ -24,6 +26,7 @@ export default function ClientDetailScreen() {
   const { client } = route.params as RouteParams;
 
   const [days, setDays] = useState<TrainingDay[]>([]);
+  const [planDays, setPlanDays] = useState<PlanDay[]>([]);
   const [groupSets, setGroupSets] = useState<{ group: string; sets: number }[]>([]);
   const [notes, setNotes] = useState<(SessionNote & { dayName?: string })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +44,9 @@ export default function ClientDetailScreen() {
   async function fetchPlan() {
     const plan = await fetchFullPlan(client.id);
     if (plan) {
-      setDays(plan.days.filter(d => !d.name.toLowerCase().includes('libre')));
+      const active = plan.days.filter(d => !d.name.toLowerCase().includes('libre'));
+      setDays(active);
+      setPlanDays(active);
 
       // series del split semanal por grupo muscular (para ver solapes/repetición)
       const counts: Record<string, number> = {};
@@ -118,6 +123,56 @@ export default function ClientDetailScreen() {
               <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🧍 MEDIDAS Y FOTOS</Text>
             </TouchableOpacity>
           </View>
+
+          {planDays.length > 0 && (
+            <Card style={styles.weekCard}>
+              <Text style={styles.volumeTitle}>SEMANA PLANIFICADA</Text>
+              <Text style={styles.volumeSub}>
+                Cada columna es un día · desliza para ver todos los ejercicios de la semana
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.weekScroll}
+              >
+                {planDays.map(day => {
+                  const totalDaySets = day.exercises.reduce((a, e) => a + e.exercise_series.length, 0);
+                  return (
+                    <TouchableOpacity
+                      key={day.id}
+                      style={styles.dayColumn}
+                      activeOpacity={0.8}
+                      onPress={() => navigation.navigate('DayExercises', { day, client })}
+                    >
+                      <View style={styles.dayColHeader}>
+                        {day.week_day != null && (
+                          <Text style={styles.dayColWeekday}>{WEEKDAYS[day.week_day] ?? ''}</Text>
+                        )}
+                        <Text style={styles.dayColName} numberOfLines={2}>{day.name.toUpperCase()}</Text>
+                        <Text style={styles.dayColMeta}>{day.exercises.length} ej · {totalDaySets} series</Text>
+                      </View>
+                      {day.exercises.map(e => (
+                        <View key={e.id} style={styles.exItem}>
+                          <View style={styles.exSetsBadge}>
+                            <Text style={styles.exSetsBadgeText}>{e.exercise_series.length}</Text>
+                          </View>
+                          <View style={styles.exItemBody}>
+                            <Text style={styles.exItemName} numberOfLines={2}>{e.name}</Text>
+                            {!!e.muscle_group && (
+                              <Text style={styles.exItemGroup} numberOfLines={1}>{e.muscle_group}</Text>
+                            )}
+                          </View>
+                        </View>
+                      ))}
+                      {day.exercises.length === 0 && (
+                        <Text style={styles.exItemGroup}>Sin ejercicios</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </Card>
+          )}
 
           {totalSets > 0 && (
             <Card style={styles.volumeCard}>
@@ -245,6 +300,37 @@ const styles = StyleSheet.create({
   volumeCard: { gap: spacing.sm, marginBottom: spacing.sm },
   volumeTitle: { ...typography.h3, fontSize: 15 },
   volumeSub: { ...typography.caption },
+
+  weekCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  weekScroll: { gap: spacing.sm, paddingTop: spacing.xs },
+  dayColumn: {
+    width: 150,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  dayColHeader: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.xs,
+    marginBottom: 2,
+  },
+  dayColWeekday: { ...typography.label, fontSize: 9, letterSpacing: 2, color: colors.accent },
+  dayColName: { ...typography.h3, fontSize: 13, marginTop: 1 },
+  dayColMeta: { ...typography.caption, fontSize: 10, marginTop: 2 },
+  exItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingVertical: 3 },
+  exSetsBadge: {
+    minWidth: 18, height: 18, borderRadius: radius.sm,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  exSetsBadgeText: { fontSize: 10, fontWeight: '900', color: colors.accent },
+  exItemBody: { flex: 1 },
+  exItemName: { ...typography.caption, fontSize: 11, color: colors.textPrimary, fontWeight: '600' },
+  exItemGroup: { ...typography.caption, fontSize: 9, color: colors.textMuted },
   volRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   volName: { ...typography.caption, fontWeight: '800', fontSize: 10, width: 100 },
   volBarTrack: { flex: 1, height: 8, borderRadius: radius.full, backgroundColor: colors.surface, overflow: 'hidden' },

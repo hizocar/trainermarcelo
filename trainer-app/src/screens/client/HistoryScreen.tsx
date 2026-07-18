@@ -41,7 +41,6 @@ export default function HistoryScreen({ embedded = false }: { embedded?: boolean
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { if (user?.id) fetchAll(); }, [user?.id]));
 
@@ -117,10 +116,22 @@ export default function HistoryScreen({ embedded = false }: { embedded?: boolean
     return Object.entries(byDate).map(([date, v]) => ({ date, ratio: v.total ? v.done / v.total : 1 }));
   }, [sessions, exercises]);
 
-  const selectedSessions = useMemo(
-    () => sessions.filter(s => s.dateKey === selected),
-    [sessions, selected],
-  );
+  const MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  function openDay(dateKey: string) {
+    const daySessions = sessions.filter(s => s.dateKey === dateKey).map(s => ({
+      dayNumber: s.day.day_number,
+      dayName: s.day.name,
+      week: s.week,
+      date: s.date,
+      exercises: s.exercises,
+    }));
+    if (daySessions.length === 0) return;
+    const [y, m, d] = dateKey.split('-').map(Number);
+    navigation.navigate('SessionDetail', {
+      sessions: daySessions,
+      dateLabel: `${d} de ${MONTHS_ES[m - 1]}`,
+    });
+  }
 
   return (
     <View style={embedded ? styles.containerEmbedded : styles.container}>
@@ -142,44 +153,8 @@ export default function HistoryScreen({ embedded = false }: { embedded?: boolean
           </Card>
         ) : (
           <>
-            <WorkoutCalendar rings={rings} onSelectDate={setSelected} selectedDate={selected} />
-
-            {selected ? (
-              selectedSessions.map(session => (
-                <Card key={session.key} style={styles.sessionCard}>
-                  <View style={styles.sessionHeader}>
-                    <View style={styles.dayBadge}>
-                      <Text style={styles.dayBadgeText}>DÍA {session.day.day_number}</Text>
-                    </View>
-                    <Text style={styles.sessionName}>{session.day.name.toUpperCase()}</Text>
-                    <Text style={styles.sessionDate}>{formatShortDate(session.date)}</Text>
-                  </View>
-                  {session.exercises.map(({ exercise, sets }) => (
-                    <TouchableOpacity
-                      key={exercise.id}
-                      style={styles.exBlock}
-                      onPress={() => navigation.navigate('WorkoutLog', { exercise, week: session.week })}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.exHeader}>
-                        <Text style={styles.exName} numberOfLines={1}>{exercise.name}</Text>
-                        <Ionicons name="pencil" size={11} color={colors.accent} />
-                      </View>
-                      <View style={styles.setsRow}>
-                        {sets.map(s => (
-                          <View key={s.seriesNum} style={styles.setPill}>
-                            <Text style={styles.setPillLabel}>S{s.seriesNum}</Text>
-                            <Text style={styles.setPillValue}>{s.weight}{exercise.unit} × {s.reps}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </Card>
-              ))
-            ) : (
-              <Text style={styles.hint}>Toca un día con anillo para ver ese entrenamiento.</Text>
-            )}
+            <WorkoutCalendar rings={rings} onSelectDate={openDay} />
+            <Text style={styles.hint}>Toca un día con anillo para ver ese entrenamiento.</Text>
           </>
         )}
       </ScrollView>

@@ -77,34 +77,39 @@ export default function WorkoutCalendar({ rings, onSelectDate, selectedDate }: P
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
         while (cells.length % 7 !== 0) cells.push(null);
+        // filas explícitas de 7 con flex:1 (evita el desfase por redondeo de %)
+        const rows: (number | null)[][] = [];
+        for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
 
         return (
           <View key={`${year}-${month}`} style={styles.monthBlock}>
             <Text style={styles.monthLabel}>{MONTHS[month]} {year}</Text>
-            <View style={styles.grid}>
-              {cells.map((day, i) => {
-                if (day == null) return <View key={i} style={styles.cell} />;
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const ratio = ringMap[dateStr] ?? 0;
-                const isToday = dateStr === todayStr;
-                const selected = dateStr === selectedDate;
-                return (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.cell}
-                    onPress={() => ratio > 0 && onSelectDate(dateStr)}
-                    activeOpacity={ratio > 0 ? 0.6 : 1}
-                  >
-                    <View style={styles.ringWrap}>
-                      <Ring ratio={ratio} today={isToday} selected={selected} />
-                      <Text style={[styles.dayNum, isToday && styles.dayNumToday, ratio > 0 && styles.dayNumActive]}>
-                        {day}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {rows.map((row, ri) => (
+              <View key={ri} style={styles.weekRow}>
+                {row.map((day, ci) => {
+                  if (day == null) return <View key={ci} style={styles.cell} />;
+                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const ratio = ringMap[dateStr] ?? 0;
+                  const isToday = dateStr === todayStr;
+                  const selected = dateStr === selectedDate;
+                  return (
+                    <TouchableOpacity
+                      key={ci}
+                      style={styles.cell}
+                      onPress={() => ratio > 0 && onSelectDate(dateStr)}
+                      activeOpacity={ratio > 0 ? 0.6 : 1}
+                    >
+                      <View style={styles.ringWrap}>
+                        <Ring ratio={ratio} today={isToday} selected={selected} />
+                        <Text style={[styles.dayNum, isToday && styles.dayNumToday, ratio > 0 && styles.dayNumActive]}>
+                          {day}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         );
       })}
@@ -116,10 +121,10 @@ const styles = StyleSheet.create({
   container: { gap: spacing.md },
   weekHeader: { flexDirection: 'row', paddingBottom: spacing.xs },
   weekLabel: { flex: 1, textAlign: 'center', ...typography.label, fontSize: 9, color: colors.textMuted },
-  monthBlock: { gap: spacing.sm },
-  monthLabel: { ...typography.h3, fontSize: 15 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  monthBlock: { gap: 2 },
+  monthLabel: { ...typography.h3, fontSize: 15, marginBottom: spacing.xs },
+  weekRow: { flexDirection: 'row' },
+  cell: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   ringWrap: { alignItems: 'center', justifyContent: 'center' },
   dayNum: { position: 'absolute', fontSize: 11, fontWeight: '700', color: colors.textMuted },
   dayNumActive: { color: colors.textPrimary },

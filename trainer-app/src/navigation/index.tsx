@@ -41,6 +41,7 @@ import WorkoutLogScreen from '../screens/client/WorkoutLogScreen';
 import ProgressScreen from '../screens/client/ProgressScreen';
 import BodyProgressScreen from '../screens/client/BodyProgressScreen';
 import CoachProfileScreen from '../screens/client/CoachProfileScreen';
+import SessionDetailScreen from '../screens/client/SessionDetailScreen';
 import CalculatorsScreen from '../screens/shared/CalculatorsScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 
