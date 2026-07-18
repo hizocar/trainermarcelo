@@ -12,11 +12,12 @@ interface Props {
   data: Point[];
   height?: number;
   unit?: string;
+  fromZero?: boolean;   // fija el eje Y en 0 (evita que valores altos parezcan "cero")
 }
 
 // Gráfico de línea liviano en SVG puro: funciona igual en web y nativo
 // (react-native-gifted-charts se rompe en web por reanimated).
-export default function TrendChart({ data, height = 180, unit = '' }: Props) {
+export default function TrendChart({ data, height = 180, unit = '', fromZero = false }: Props) {
   const [width, setWidth] = useState(0);
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
@@ -30,7 +31,8 @@ export default function TrendChart({ data, height = 180, unit = '' }: Props) {
 
   const values = data.map(d => d.value);
   const max = Math.max(...values);
-  const min = Math.min(...values);
+  // con fromZero el eje arranca en 0; si no, un pelín bajo el mínimo para dar aire
+  const min = fromZero ? 0 : Math.min(...values);
   const range = max - min || 1;
 
   const x = (i: number) => padX + (data.length === 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);

@@ -222,9 +222,12 @@ export default function WorkoutLogScreen() {
     }
   }
 
-  // datos para el modal de histórico
+  // datos para el modal de histórico: carga total (Σ peso × reps) por semana
   const chartData = React.useMemo(
-    () => history.slice().reverse().map(h => ({ label: `S${h.week}`, value: Math.max(...h.sets.map(s => s.weight)) })),
+    () => history.slice().reverse().map(h => ({
+      label: `S${h.week}`,
+      value: Math.round(h.sets.reduce((a, s) => a + s.weight * s.reps, 0)),
+    })),
     [history],
   );
   const bestPR = React.useMemo(() => {
@@ -440,8 +443,8 @@ export default function WorkoutLogScreen() {
 
                 {chartData.length >= 2 && (
                   <View style={styles.chartCard}>
-                    <Text style={styles.chartCaption}>PESO MÁXIMO POR SEMANA ({exercise.unit})</Text>
-                    <TrendChart data={chartData} height={150} unit={exercise.unit} />
+                    <Text style={styles.chartCaption}>CARGA TOTAL POR SEMANA ({exercise.unit})</Text>
+                    <TrendChart data={chartData} height={150} unit={exercise.unit} fromZero />
                   </View>
                 )}
 
