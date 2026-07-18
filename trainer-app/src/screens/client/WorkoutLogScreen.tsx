@@ -38,6 +38,8 @@ export default function WorkoutLogScreen() {
   const { user } = useAuth();
 
   const [entries, setEntries] = useState<SeriesEntry[]>([]);
+  const [history, setHistory] = useState<{ week: number; date?: string; sets: { series: number; weight: number; reps: number }[] }[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showImage, setShowImage] = useState(true);
@@ -110,12 +112,11 @@ export default function WorkoutLogScreen() {
 
     if (seriesIds.length === 0) { setLoading(false); return; }
 
-    // logs de esta semana + el registro previo más reciente por serie
+    // todos los logs del ejercicio (para el histórico completo por semana)
     const { data: logsData } = await supabase
       .from('workout_logs')
       .select('*')
       .in('series_id', seriesIds)
-      .lte('week_number', week)
       .order('week_number', { ascending: false });
 
     const currentMap: Record<string, WorkoutLog> = {};
@@ -124,6 +125,21 @@ export default function WorkoutLogScreen() {
       if (l.week_number === week && !currentMap[l.series_id]) currentMap[l.series_id] = l;
       else if (l.week_number < week && !prevMap[l.series_id]) prevMap[l.series_id] = l;
     });
+
+    // histórico agrupado por semana: qué levantó en cada serie
+    const seriesNumById: Record<string, number> = {};
+    seriesList.forEach(s => { seriesNumById[s.id] = s.series_number; });
+    const byWeek: Record<number, { date?: string; sets: { series: number; weight: number; reps: number }[] }> = {};
+    (logsData ?? []).forEach(l => {
+      const g = (byWeek[l.week_number] ??= { date: l.logged_at, sets: [] });
+      if (l.logged_at && (!g.date || l.logged_at < g.date)) g.date = l.logged_at;
+      g.sets.push({ series: seriesNumById[l.series_id] ?? 0, weight: l.weight, reps: l.reps });
+    });
+    setHistory(
+      Object.entries(byWeek)
+        .map(([w, g]) => ({ week: Number(w), date: g.date, sets: g.sets.sort((a, b) => a.series - b.series) }))
+        .sort((a, b) => b.week - a.week),
+    );
 
     setEntries(seriesList.map(s => {
       const prev = prevMap[s.id];
@@ -218,7 +234,16 @@ export default function WorkoutLogScreen() {
           <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
           <Text style={styles.backText}>ATRÁS</Text>
         </TouchableOpacity>
-        <Text style={styles.exerciseName}>{exercise.name.toUpperCase()}</Text>
+        <View style={styles.nameRow}>
+          <Text style={[styles.exerciseName, { flex: 1 }]}>{exercise.name.toUpperCase()}</Text>
+          <TouchableOpacity
+            style={[styles.histBtn, showHistory && styles.histBtnActive]}
+            onPress={() => setShowHistory(v => !v)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="time-outline" size={18} color={showHistory ? colors.background : colors.accent} />
+          </TouchableOpacity>
+        </View>
         {exercise.name_en ? <Text style={styles.nameEn}>{exercise.name_en}</Text> : null}
         <Text style={styles.meta}>
           {week === getCurrentWeek()
@@ -228,6 +253,36 @@ export default function WorkoutLogScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Histórico del ejercicio por semana */}
+        {showHistory && (
+          <Card style={styles.histCard}>
+            <View style={styles.histTitleRow}>
+              <Ionicons name="time-outline" size={14} color={colors.accent} />
+              <Text style={styles.histTitle}>HISTÓRICO · {exercise.name.toUpperCase()}</Text>
+            </View>
+            {history.length === 0 ? (
+              <Text style={styles.histEmpty}>Aún no hay registros de este ejercicio.</Text>
+            ) : (
+              history.map(h => (
+                <View key={h.week} style={styles.histWeek}>
+                  <View style={styles.histWeekHead}>
+                    <Text style={styles.histWeekLabel}>SEMANA {h.week}</Text>
+                    {h.date && <Text style={styles.histWeekDate}>{formatShortDate(h.date)}</Text>}
+                  </View>
+                  <View style={styles.histSets}>
+                    {h.sets.map((s, si) => (
+                      <View key={si} style={styles.histPill}>
+                        <Text style={styles.histPillLabel}>S{s.series}</Text>
+                        <Text style={styles.histPillValue}>{s.weight}{exercise.unit} × {s.reps}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))
+            )}
+          </Card>
+        )}
+
         {/* Ejemplo del ejercicio */}
         {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
@@ -376,7 +431,31 @@ const styles = StyleSheet.create({
   },
   backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   exerciseName: { ...typography.display, fontSize: 28 },
+  histBtn: {
+    width: 40, height: 40, borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.accent + '55',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  histBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  histCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  histTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  histTitle: { ...typography.label, color: colors.accent, letterSpacing: 1.5, flex: 1 },
+  histEmpty: { ...typography.caption, fontStyle: 'italic' },
+  histWeek: { gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
+  histWeekHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  histWeekLabel: { ...typography.label, fontSize: 11, letterSpacing: 1.5, color: colors.textSecondary },
+  histWeekDate: { ...typography.caption, fontSize: 10 },
+  histSets: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  histPill: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: colors.surface, borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 4,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  histPillLabel: { fontSize: 10, fontWeight: '900', color: colors.accent },
+  histPillValue: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
   meta: { ...typography.label, color: colors.accent, letterSpacing: 2 },
   nameEn: { ...typography.caption, fontStyle: 'italic', marginTop: -2 },
   paramRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
