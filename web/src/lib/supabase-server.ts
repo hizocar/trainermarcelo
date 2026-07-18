@@ -3,12 +3,14 @@ import { cookies } from 'next/headers';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+const firstToken = (v?: string) => (v ?? '').trim().split(/\s+/)[0];
+
 export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim(),
+    firstToken(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     {
       cookies: {
         getAll() {
