@@ -140,6 +140,7 @@ export default function AppNavigator() {
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
             <Stack.Screen name="DayExercises" component={DayExercisesScreen} />
             <Stack.Screen name="ClientProgress" component={ProgressScreen} />
+            <Stack.Screen name="SessionDetail" component={SessionDetailScreen} />
             <Stack.Screen name="ClientBody" component={BodyProgressScreen} />
             <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
@@ -150,6 +151,7 @@ export default function AppNavigator() {
         ) : (
           <>
             <Stack.Screen name="ClientHome" component={ClientTabs} />
+            <Stack.Screen name="SessionDetail" component={SessionDetailScreen} />
             <Stack.Screen name="WorkoutLog" component={WorkoutLogScreen} />
             <Stack.Screen name="Body" component={BodyProgressScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
