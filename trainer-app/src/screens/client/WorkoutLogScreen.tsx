@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Image,
+  TextInput, ActivityIndicator, Image, Modal,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Platform } from 'react-native';
@@ -14,6 +14,7 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
+import TrendChart from '../../components/common/TrendChart';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { saveLog } from '../../lib/offline';
@@ -221,6 +222,20 @@ export default function WorkoutLogScreen() {
     }
   }
 
+  // datos para el modal de histórico
+  const chartData = React.useMemo(
+    () => history.slice().reverse().map(h => ({ label: `S${h.week}`, value: Math.max(...h.sets.map(s => s.weight)) })),
+    [history],
+  );
+  const bestPR = React.useMemo(() => {
+    let best: { weight: number; reps: number; week: number } | null = null;
+    const sc = (w: number, r: number) => w * (1 + r / 30);
+    history.forEach(h => h.sets.forEach(s => {
+      if (!best || sc(s.weight, s.reps) > sc(best.weight, best.reps)) best = { weight: s.weight, reps: s.reps, week: h.week };
+    }));
+    return best as { weight: number; reps: number; week: number } | null;
+  }, [history]);
+
   if (loading) return (
     <View style={styles.container}>
       <ActivityIndicator color={colors.accent} style={{ marginTop: 100 }} />
@@ -237,11 +252,12 @@ export default function WorkoutLogScreen() {
         <View style={styles.nameRow}>
           <Text style={[styles.exerciseName, { flex: 1 }]}>{exercise.name.toUpperCase()}</Text>
           <TouchableOpacity
-            style={[styles.histBtn, showHistory && styles.histBtnActive]}
-            onPress={() => setShowHistory(v => !v)}
+            style={styles.histBtn}
+            onPress={() => setShowHistory(true)}
             activeOpacity={0.8}
           >
-            <Ionicons name="time-outline" size={18} color={showHistory ? colors.background : colors.accent} />
+            <Ionicons name="stats-chart" size={15} color={colors.accent} />
+            <Text style={styles.histBtnText}>HISTORIAL</Text>
           </TouchableOpacity>
         </View>
         {exercise.name_en ? <Text style={styles.nameEn}>{exercise.name_en}</Text> : null}
@@ -253,36 +269,6 @@ export default function WorkoutLogScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Histórico del ejercicio por semana */}
-        {showHistory && (
-          <Card style={styles.histCard}>
-            <View style={styles.histTitleRow}>
-              <Ionicons name="time-outline" size={14} color={colors.accent} />
-              <Text style={styles.histTitle}>HISTÓRICO · {exercise.name.toUpperCase()}</Text>
-            </View>
-            {history.length === 0 ? (
-              <Text style={styles.histEmpty}>Aún no hay registros de este ejercicio.</Text>
-            ) : (
-              history.map(h => (
-                <View key={h.week} style={styles.histWeek}>
-                  <View style={styles.histWeekHead}>
-                    <Text style={styles.histWeekLabel}>SEMANA {h.week}</Text>
-                    {h.date && <Text style={styles.histWeekDate}>{formatShortDate(h.date)}</Text>}
-                  </View>
-                  <View style={styles.histSets}>
-                    {h.sets.map((s, si) => (
-                      <View key={si} style={styles.histPill}>
-                        <Text style={styles.histPillLabel}>S{s.series}</Text>
-                        <Text style={styles.histPillValue}>{s.weight}{exercise.unit} × {s.reps}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ))
-            )}
-          </Card>
-        )}
-
         {/* Ejemplo del ejercicio */}
         {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
@@ -414,6 +400,72 @@ export default function WorkoutLogScreen() {
           }
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modal: histórico del ejercicio */}
+      <Modal
+        visible={showHistory}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowHistory(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowHistory(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHead}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalLabel}>HISTÓRICO DEL EJERCICIO</Text>
+                <Text style={styles.modalTitle} numberOfLines={1}>{exercise.name}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowHistory(false)} style={styles.modalClose}>
+                <Ionicons name="close" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {history.length === 0 ? (
+              <View style={styles.modalEmpty}>
+                <Ionicons name="stats-chart-outline" size={36} color={colors.textMuted} />
+                <Text style={styles.histEmpty}>Aún no has registrado este ejercicio.{'\n'}Tu progreso aparecerá aquí semana a semana.</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.xl }}>
+                {bestPR && (
+                  <View style={styles.prRow}>
+                    <Ionicons name="trophy" size={16} color={colors.accent} />
+                    <Text style={styles.prText}>
+                      Mejor marca: <Text style={styles.prStrong}>{bestPR.weight}{exercise.unit} × {bestPR.reps}</Text> (S{bestPR.week})
+                    </Text>
+                  </View>
+                )}
+
+                {chartData.length >= 2 && (
+                  <View style={styles.chartCard}>
+                    <Text style={styles.chartCaption}>PESO MÁXIMO POR SEMANA ({exercise.unit})</Text>
+                    <TrendChart data={chartData} height={150} unit={exercise.unit} />
+                  </View>
+                )}
+
+                {history.map(h => (
+                  <View key={h.week} style={styles.histWeek}>
+                    <View style={styles.histWeekHead}>
+                      <Text style={styles.histWeekLabel}>SEMANA {h.week}</Text>
+                      {h.date && <Text style={styles.histWeekDate}>{formatShortDate(h.date)}</Text>}
+                    </View>
+                    <View style={styles.histSets}>
+                      {h.sets.map((s, si) => (
+                        <View key={si} style={styles.histPill}>
+                          <Text style={styles.histPillLabel}>S{s.series}</Text>
+                          <Text style={styles.histPillValue}>{s.weight}{exercise.unit} × {s.reps}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -434,15 +486,13 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   exerciseName: { ...typography.display, fontSize: 28 },
   histBtn: {
-    width: 40, height: 40, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.accent + '55',
-    alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent + '55',
+    backgroundColor: colors.accentSoft,
+    paddingHorizontal: spacing.sm + 2, paddingVertical: 7,
   },
-  histBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  histCard: { gap: spacing.sm, marginBottom: spacing.sm },
-  histTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  histTitle: { ...typography.label, color: colors.accent, letterSpacing: 1.5, flex: 1 },
-  histEmpty: { ...typography.caption, fontStyle: 'italic' },
+  histBtnText: { ...typography.label, fontSize: 10, color: colors.accent, letterSpacing: 1 },
+  histEmpty: { ...typography.caption, fontStyle: 'italic', textAlign: 'center', lineHeight: 18 },
   histWeek: { gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
   histWeekHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   histWeekLabel: { ...typography.label, fontSize: 11, letterSpacing: 1.5, color: colors.textSecondary },
@@ -456,6 +506,42 @@ const styles = StyleSheet.create({
   },
   histPillLabel: { fontSize: 10, fontWeight: '900', color: colors.accent },
   histPillValue: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
+
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay },
+  modalSheet: {
+    backgroundColor: colors.backgroundElevated,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.lg,
+    maxHeight: '82%',
+    borderTopWidth: 1, borderColor: colors.border,
+  },
+  modalHandle: {
+    alignSelf: 'center', width: 40, height: 4, borderRadius: 2,
+    backgroundColor: colors.borderLight, marginBottom: spacing.md,
+  },
+  modalHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  modalLabel: { ...typography.label, color: colors.accent, letterSpacing: 1.5, fontSize: 10 },
+  modalTitle: { ...typography.h2, fontSize: 22, marginTop: 2 },
+  modalClose: {
+    width: 34, height: 34, borderRadius: radius.full,
+    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
+  },
+  modalEmpty: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xxl },
+  prRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.accentSoft, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.accent + '44',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+  },
+  prText: { ...typography.body, fontSize: 14, flex: 1 },
+  prStrong: { fontWeight: '900', color: colors.accent },
+  chartCard: {
+    backgroundColor: colors.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    padding: spacing.md, gap: spacing.xs,
+  },
+  chartCaption: { ...typography.label, fontSize: 9, letterSpacing: 1.5 },
   meta: { ...typography.label, color: colors.accent, letterSpacing: 2 },
   nameEn: { ...typography.caption, fontStyle: 'italic', marginTop: -2 },
   paramRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
