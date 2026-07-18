@@ -177,6 +177,15 @@ export default function ProgressScreen() {
       });
   }, [closedLogs, exercises, seriesExMap]);
 
+  // agrupado por día del plan (Torso 1, Pierna, ...) en el orden del plan
+  const toneOf = (d: number | null): 'up' | 'flat' | 'down' =>
+    d == null ? 'flat' : d > 1 ? 'up' : d < -1 ? 'down' : 'flat';
+  const byDay = useMemo(() => {
+    return planDays
+      .map(day => ({ day, rows: progress.filter(p => p.exercise.day_id === day.id) }))
+      .filter(g => g.rows.length > 0);
+  }, [planDays, progress]);
+
   const improving = progress.filter(p => p.delta != null && p.delta > 1)
     .sort((a, b) => b.delta! - a.delta!);
   const steady = progress.filter(p => p.delta != null && p.delta >= -1 && p.delta <= 1);
@@ -391,6 +400,24 @@ export default function ProgressScreen() {
               </Card>
             )}
 
+            {byDay.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="calendar-outline" size={14} color={colors.accent} />
+                  <Text style={[styles.sectionLabel, { color: colors.accent }]}>PROGRESO POR DÍA</Text>
+                </View>
+                {byDay.map(({ day, rows }) => (
+                  <View key={day.id} style={styles.dayGroup}>
+                    <Text style={styles.dayGroupTitle}>DÍA {day.day_number} · {day.name.toUpperCase()}</Text>
+                    {rows.map(p => renderRow(p, toneOf(p.delta)))}
+                  </View>
+                ))}
+              </>
+            )}
+
+            <View style={styles.rankingDivider} />
+            <Text style={styles.rankingHint}>Ranking global · de mayor a menor cambio</Text>
+
             {improving.length > 0 && (
               <>
                 <View style={styles.sectionHeader}>
@@ -490,6 +517,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   sectionLabel: { ...typography.label, letterSpacing: 2 },
+  dayGroup: { gap: spacing.sm, marginTop: spacing.xs },
+  dayGroupTitle: { ...typography.label, fontSize: 11, letterSpacing: 1.5, color: colors.textSecondary },
+  rankingDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.lg },
+  rankingHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic', marginTop: spacing.xs },
   energyCard: { gap: spacing.sm, marginTop: spacing.sm },
   energyHeadline: { ...typography.h3, fontSize: 15, lineHeight: 21 },
   energyCompare: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs },
