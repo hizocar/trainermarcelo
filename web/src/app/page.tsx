@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 export default function LandingPage() {
   return (
@@ -6,8 +7,7 @@ export default function LandingPage() {
       <nav className="nav">
         <div className="container nav-inner">
           <a href="#" className="brand">
-            <span className="brand-dot" />
-            Marcelo Herrera
+            <Logo />
           </a>
           <div className="nav-links">
             <a href="#como-funciona">Cómo funciona</a>
@@ -204,7 +204,7 @@ export default function LandingPage() {
               <summary>¿Cómo consigo acceso a la app?</summary>
               <p>
                 El acceso es por invitación de tu coach. Escríbenos con el botón de abajo y te
-                conectamos con Marcelo para comenzar tu plan.
+                conectamos con Marcelo Herrera, coach fundador de EliteFit, para comenzar tu plan.
               </p>
             </details>
             <details>
@@ -251,8 +251,7 @@ export default function LandingPage() {
           <div className="footer-grid">
             <div>
               <div className="brand">
-                <span className="brand-dot" />
-                Marcelo Herrera
+                <Logo />
               </div>
               <p className="tagline">
                 Entrenamiento personalizado con seguimiento real. Cada serie cuenta.
@@ -272,10 +271,11 @@ export default function LandingPage() {
             <div className="footer-col">
               <h4>Contacto</h4>
               <a href="mailto:hizocar@gmail.com">hizocar@gmail.com</a>
+              <span className="muted" style={{ fontSize: 13 }}>Coach fundador: Marcelo Herrera</span>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} Marcelo Herrera · Entrenamiento personalizado</span>
+            <span>© {new Date().getFullYear()} EliteFit · Entrenamiento personalizado</span>
             <span>Hecho con 🏋️ en Chile</span>
           </div>
         </div>

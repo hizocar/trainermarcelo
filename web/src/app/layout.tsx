@@ -7,20 +7,20 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-body' });
 
 export const metadata: Metadata = {
   title: {
-    default: 'Marcelo Herrera · Entrenamiento personalizado',
-    template: '%s · Marcelo Herrera',
+    default: 'EliteFit · Entrenamiento personalizado',
+    template: '%s · EliteFit',
   },
   description:
     'Entrena con un plan diseñado por tu coach, registra cada serie y mira tu progreso semana a semana. App de entrenamiento personalizado con seguimiento real.',
-  applicationName: 'Marcelo Herrera Trainer',
+  applicationName: 'EliteFit',
   keywords: ['entrenamiento personalizado', 'coach', 'gimnasio', 'progreso', 'plan de entrenamiento', 'fitness'],
   openGraph: {
-    title: 'Marcelo Herrera · Entrenamiento personalizado',
+    title: 'EliteFit · Entrenamiento personalizado',
     description:
       'Tu plan. Tu progreso. En serio. Registra cada serie y entrena con un plan hecho para ti por tu coach.',
     type: 'website',
     locale: 'es_CL',
-    siteName: 'Marcelo Herrera Trainer',
+    siteName: 'EliteFit',
   },
 };
 

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase-server';
 import type { AppUser, PlanDay } from '@/lib/types';
 import PlanEditor from './PlanEditor';
+import Logo from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,8 +62,7 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
       <header className="app-header">
         <div className="container inner">
           <Link href="/dashboard" className="brand">
-            <span className="brand-dot" />
-            Marcelo Herrera
+            <Logo />
           </Link>
           <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
             ← CLIENTES

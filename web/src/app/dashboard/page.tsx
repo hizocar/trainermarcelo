@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase-server';
 import { signOut } from '../actions';
+import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -33,8 +34,7 @@ export default async function DashboardPage() {
       <header className="app-header">
         <div className="container inner">
           <div className="brand">
-            <span className="brand-dot" />
-            Marcelo Herrera
+            <Logo />
           </div>
           <form action={signOut}>
             <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>SALIR</button>

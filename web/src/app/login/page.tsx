@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase-browser';
+import Logo from '@/components/Logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -51,8 +52,7 @@ export default function LoginPage() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="brand" style={{ marginBottom: 20 }}>
-          <span className="brand-dot" />
-          Marcelo Herrera
+          <Logo />
         </div>
         <h1>Panel de coach</h1>
         <p className="muted" style={{ fontSize: 14 }}>Gestiona los planes de tus clientes.</p>
