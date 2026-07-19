@@ -82,6 +82,8 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
   }
   function removeDay(di: number) {
     const day = days[di];
+    if (day.exercises.length > 0 &&
+        !window.confirm(`¿Eliminar "${day.name}" y sus ${day.exercises.length} ejercicios?`)) return;
     if (!isTmp(day.id)) {
       setDelDays((x) => [...x, day.id]);
       setDelEx((x) => [...x, ...day.exercises.filter((e) => !isTmp(e.id)).map((e) => e.id)]);
@@ -101,24 +103,36 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
   }
   function removeExercise(di: number, ei: number) {
     const ex = days[di].exercises[ei];
+    if (!isTmp(ex.id) && ex.name &&
+        !window.confirm(`¿Eliminar "${ex.name}"?`)) return;
     if (!isTmp(ex.id)) setDelEx((x) => [...x, ex.id]);
     mutate((d) => { d[di].exercises.splice(ei, 1); return d; });
   }
 
   function changeSeries(di: number, ei: number, delta: number) {
+    // el marcado para borrar va FUERA del updater: React puede re-ejecutarlo (StrictMode)
+    if (delta < 0) {
+      const list = days[di].exercises[ei].series;
+      if (list.length <= 1) return;
+      const removed = list[list.length - 1];
+      if (!isTmp(removed.id)) setDelSeries((x) => [...x, removed.id]);
+    }
     mutate((d) => {
       const list = d[di].exercises[ei].series;
-      if (delta > 0) {
-        list.push({ id: tmpId(), series_number: list.length + 1 });
-      } else if (list.length > 1) {
-        const removed = list.pop()!;
-        if (!isTmp(removed.id)) setDelSeries((x) => [...x, removed.id]);
-      }
+      if (delta > 0) list.push({ id: tmpId(), series_number: list.length + 1 });
+      else if (list.length > 1) list.pop();
       return d;
     });
   }
 
   async function save() {
+    const unnamed = days.flatMap((d, i) =>
+      d.exercises.some((e) => !e.name.trim()) ? [`Día ${i + 1}`] : [],
+    );
+    if (unnamed.length > 0) {
+      setError(`Hay ejercicios sin nombre en: ${unnamed.join(', ')}. Ponles nombre o elimínalos antes de guardar.`);
+      return;
+    }
     setSaving(true);
     setError(null);
     setMsg(null);
@@ -165,14 +179,16 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
 
         for (let ei = 0; ei < day.exercises.length; ei++) {
           const ex = day.exercises[ei];
+          const refNum = Number(ex.ref_weight.replace(',', '.'));
+          const restNum = parseInt(ex.rest_seconds, 10);
           const fields = {
-            name: ex.name,
-            muscle_group: ex.muscle_group || null,
-            reps_objective: ex.reps_objective,
+            name: ex.name.trim(),
+            muscle_group: ex.muscle_group.trim() || null,
+            reps_objective: ex.reps_objective.trim(),
             unit: ex.unit,
-            ref_weight: ex.ref_weight === '' ? null : Number(ex.ref_weight.replace(',', '.')),
-            rest_seconds: ex.rest_seconds === '' ? null : parseInt(ex.rest_seconds, 10),
-            target_rir: ex.target_rir || null,
+            ref_weight: ex.ref_weight.trim() === '' || isNaN(refNum) ? null : refNum,
+            rest_seconds: isNaN(restNum) ? null : restNum,
+            target_rir: ex.target_rir.trim() || null,
             order_index: ei,
           };
           let exId = ex.id;
@@ -213,7 +229,12 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
       setDirty(false);
       setMsg('Cambios guardados ✓ — ya se ven en la app del cliente.');
     } catch (e: any) {
-      setError(e?.message ?? 'No se pudieron guardar los cambios.');
+      // 23503 = violación de foreign key: la serie/ejercicio ya tiene entrenamientos registrados
+      setError(
+        e?.code === '23503'
+          ? 'No se pudo eliminar: el cliente ya registró entrenamientos en esas series. Recarga la página para restaurar el plan.'
+          : e?.message ?? 'No se pudieron guardar los cambios.',
+      );
     } finally {
       setSaving(false);
     }

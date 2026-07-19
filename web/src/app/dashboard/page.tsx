@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       </header>
 
       <main className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
-        <span className="label accent">Panel de coach</span>
+        <span className="label accent">Panel de coach · {me?.name ?? ''}</span>
         <h1 className="display" style={{ fontSize: 40 }}>Mis clientes</h1>
         <p className="muted" style={{ marginTop: 4 }}>
           {list.length} {list.length === 1 ? 'cliente' : 'clientes'} · toca uno para editar su plan
