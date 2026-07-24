@@ -72,6 +72,10 @@ export default function PlanEditorScreen() {
   const [editingEx, setEditingEx] = useState<Exercise | null>(null);
   const [suggestions, setSuggestions] = useState<{ id: string; name: string; name_en: string | null; muscle_group: string; equipment: string | null }[]>([]);
   const [exLibrary, setExLibrary] = useState<{ name_en: string | null; library_id: string | null }>({ name_en: null, library_id: null });
+  const [showLibForm, setShowLibForm] = useState(false);
+  const [libNameEn, setLibNameEn] = useState('');
+  const [libEquipment, setLibEquipment] = useState('');
+  const [libSaving, setLibSaving] = useState(false);
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchPlan(); fetchTemplates(); }, []);
@@ -147,13 +151,13 @@ export default function PlanEditorScreen() {
 
     const { data: daysData } = await supabase
       .from('training_days').select('*')
-      .eq('plan_id', currentPlan.id).order('week_day');
+      .eq('plan_id', currentPlan.id).eq('archived', false).order('week_day');
 
     const daysWithEx: DayWithExercises[] = [];
     for (const d of (daysData ?? [])) {
       const { data: exData } = await supabase
         .from('exercises').select('*')
-        .eq('day_id', d.id).order('order_index');
+        .eq('day_id', d.id).eq('archived', false).order('order_index');
       daysWithEx.push({ ...d, exercises: exData ?? [] });
     }
     setDays(daysWithEx);
@@ -178,8 +182,9 @@ export default function PlanEditorScreen() {
   }
 
   function deleteDay(dayId: string) {
-    showConfirm('Eliminar día', '¿Seguro? Se eliminarán todos los ejercicios.', async () => {
-      await supabase.from('training_days').delete().eq('id', dayId);
+    showConfirm('Eliminar día', 'Se quitará del plan. El historial que el cliente ya registró se conserva.', async () => {
+      // archivado, no borrado: los logs del cliente siguen apuntando a este día
+      await supabase.from('training_days').update({ archived: true }).eq('id', dayId);
       setDays(prev => prev.filter(d => d.id !== dayId));
     }, 'Eliminar');
   }
@@ -243,6 +248,34 @@ export default function PlanEditorScreen() {
     setExMuscle(s.muscle_group);
     setExLibrary({ name_en: s.name_en, library_id: s.id });
     setSuggestions([]);
+    setShowLibForm(false);
+  }
+
+  async function addToLibrary() {
+    const name = exName.trim();
+    if (!name) return;
+    if (!exMuscle) {
+      showAlert('Falta el grupo muscular', 'Selecciona el grupo muscular (más abajo) antes de agregar el ejercicio a la biblioteca.');
+      return;
+    }
+    setLibSaving(true);
+    const { data, error } = await supabase
+      .from('exercise_library')
+      .insert({
+        name,
+        name_en: libNameEn.trim() || null,
+        muscle_group: exMuscle,
+        equipment: libEquipment.trim() || null,
+        coach_id: user!.id,
+      })
+      .select('id, name, name_en, muscle_group')
+      .single();
+    setLibSaving(false);
+    if (error) { showAlert('No se pudo agregar', error.message); return; }
+    setExLibrary({ name_en: data.name_en, library_id: data.id });
+    setSuggestions([]);
+    setShowLibForm(false);
+    setLibNameEn(''); setLibEquipment('');
   }
 
   async function chooseImage() {
@@ -260,6 +293,13 @@ export default function PlanEditorScreen() {
 
   async function saveExercise() {
     if (!exName.trim()) return;
+    if (!editingEx && !exLibrary.library_id) {
+      showAlert(
+        'Elige un ejercicio de la biblioteca',
+        'Busca el ejercicio y selecciónalo de la lista. Si no existe, agrégalo a la biblioteca con el botón bajo el buscador.',
+      );
+      return;
+    }
     setSaving(true);
     const seriesCount = parseInt(exSeries) || 3;
 
@@ -307,8 +347,8 @@ export default function PlanEditorScreen() {
     };
 
     if (editingEx) {
+      // el nombre no se actualiza: identifica al ejercicio y su historial
       const { data, error } = await supabase.from('exercises').update({
-        name: exName.trim(),
         reps_objective: exReps,
         unit: exUnit,
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
@@ -409,8 +449,9 @@ export default function PlanEditorScreen() {
   }
 
   function deleteExercise(ex: Exercise) {
-    showConfirm('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, async () => {
-      await supabase.from('exercises').delete().eq('id', ex.id);
+    showConfirm('Eliminar ejercicio', `"${ex.name}" se quitará del plan. El historial del cliente se conserva.`, async () => {
+      // archivado, no borrado: el historial del cliente queda intacto
+      await supabase.from('exercises').update({ archived: true }).eq('id', ex.id);
       setDays(prev => prev.map(d => ({
         ...d,
         exercises: d.exercises.filter(e => e.id !== ex.id)
@@ -594,29 +635,82 @@ export default function PlanEditorScreen() {
               {editingEx ? 'EDITAR EJERCICIO' : 'NUEVO EJERCICIO'}
             </Text>
 
-            <Text style={styles.inputLabel}>NOMBRE</Text>
-            <TextInput
-              style={styles.input}
-              value={exName}
-              onChangeText={onExNameChange}
-              placeholder="ej: Press banca, Sentadilla"
-              placeholderTextColor={colors.textMuted}
-              autoFocus
-            />
-            {suggestions.length > 0 && (
-              <View style={styles.suggestBox}>
-                {suggestions.map(s => (
-                  <TouchableOpacity key={s.name} style={styles.suggestRow} onPress={() => pickSuggestion(s)}>
-                    <View style={styles.suggestInfo}>
-                      <Text style={styles.suggestName} numberOfLines={1}>{s.name}</Text>
-                      <Text style={styles.suggestMeta} numberOfLines={1}>
-                        {s.muscle_group}{s.equipment ? ` · ${s.equipment}` : ''}
-                      </Text>
-                    </View>
-                    <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <Text style={styles.inputLabel}>EJERCICIO</Text>
+            {editingEx ? (
+              <>
+                <View style={styles.lockedName}>
+                  <Text style={styles.lockedNameText} numberOfLines={1}>{exName}</Text>
+                  <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+                </View>
+                <Text style={styles.lockHint}>
+                  El nombre identifica el historial del cliente. Para cambiar el ejercicio, elimínalo y agrega otro de la biblioteca.
+                </Text>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={exName}
+                  onChangeText={onExNameChange}
+                  placeholder="Busca en la biblioteca: press, remo, sentadilla..."
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                />
+                {suggestions.length > 0 && (
+                  <View style={styles.suggestBox}>
+                    {suggestions.map(s => (
+                      <TouchableOpacity key={s.name} style={styles.suggestRow} onPress={() => pickSuggestion(s)}>
+                        <View style={styles.suggestInfo}>
+                          <Text style={styles.suggestName} numberOfLines={1}>{s.name}</Text>
+                          <Text style={styles.suggestMeta} numberOfLines={1}>
+                            {s.muscle_group}{s.equipment ? ` · ${s.equipment}` : ''}
+                          </Text>
+                        </View>
+                        <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                {exLibrary.library_id ? (
+                  <View style={styles.pickedRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                    <Text style={styles.pickedText}>
+                      De la biblioteca{exLibrary.name_en ? ` · ${exLibrary.name_en}` : ''}
+                    </Text>
+                  </View>
+                ) : exName.trim().length >= 3 ? (
+                  <>
+                    {!showLibForm ? (
+                      <TouchableOpacity style={styles.addLibBtn} onPress={() => setShowLibForm(true)}>
+                        <Ionicons name="library-outline" size={15} color={colors.accent} />
+                        <Text style={styles.addLibText}>¿No está? Agregar "{exName.trim()}" a la biblioteca</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.libForm}>
+                        <Text style={styles.libFormTitle}>NUEVO EN LA BIBLIOTECA</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={libNameEn}
+                          onChangeText={setLibNameEn}
+                          placeholder="Nombre en inglés (opcional)"
+                          placeholderTextColor={colors.textMuted}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          value={libEquipment}
+                          onChangeText={setLibEquipment}
+                          placeholder="Equipo (opcional): barra, mancuerna, máquina..."
+                          placeholderTextColor={colors.textMuted}
+                        />
+                        <Text style={styles.libFormHint}>Elige también el grupo muscular más abajo.</Text>
+                        <TouchableOpacity style={styles.libFormBtn} onPress={addToLibrary} disabled={libSaving}>
+                          <Text style={styles.libFormBtnText}>{libSaving ? 'AGREGANDO...' : 'AGREGAR A BIBLIOTECA'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
+                ) : null}
+              </>
             )}
 
             <Text style={styles.inputLabel}>GRUPO / SUPERSERIE (opcional)</Text>
@@ -887,6 +981,33 @@ const styles = StyleSheet.create({
   exInfo: { flex: 1 },
   superTag: { ...typography.caption, color: colors.accent, marginBottom: 2 },
   exName: { ...typography.h3 },
+  lockedName: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+  },
+  lockedNameText: { ...typography.h3, fontSize: 15, flex: 1 },
+  lockHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic', marginTop: spacing.xs },
+  pickedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  pickedText: { ...typography.caption, fontSize: 11, color: colors.success },
+  addLibBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    marginTop: spacing.xs, paddingVertical: spacing.xs,
+  },
+  addLibText: { ...typography.caption, fontSize: 11, color: colors.accent, flex: 1 },
+  libForm: {
+    gap: spacing.sm, marginTop: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.accent + '44', padding: spacing.md,
+  },
+  libFormTitle: { ...typography.label, fontSize: 10, color: colors.accent, letterSpacing: 1.5 },
+  libFormHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },
+  libFormBtn: {
+    backgroundColor: colors.accent, borderRadius: radius.sm,
+    alignItems: 'center', paddingVertical: spacing.sm + 2,
+  },
+  libFormBtnText: { color: colors.background, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 },
   exMeta: { ...typography.caption, marginTop: 2 },
   exActions: { flexDirection: 'row', gap: spacing.sm },
   editBtn: {

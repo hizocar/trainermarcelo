@@ -31,10 +31,10 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
     .select(`
       id,
       training_days (
-        id, plan_id, day_number, name, week_day,
+        id, plan_id, day_number, name, week_day, archived,
         exercises (
-          id, day_id, name, muscle_group, reps_objective, unit,
-          ref_weight, order_index, rest_seconds, target_rir, tempo, notes,
+          id, day_id, name, name_en, library_id, muscle_group, reps_objective, unit,
+          ref_weight, order_index, rest_seconds, target_rir, tempo, notes, archived,
           exercise_series ( id, exercise_id, series_number )
         )
       )
@@ -42,10 +42,13 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
     .eq('client_id', id)
     .maybeSingle();
 
+  // archivados fuera del editor: siguen existiendo solo como historial del cliente
   const days: PlanDay[] = ((plan as any)?.training_days ?? [])
+    .filter((d: any) => !d.archived)
     .map((d: any) => ({
       ...d,
       exercises: (d.exercises ?? [])
+        .filter((e: any) => !e.archived)
         .slice()
         .sort((a: any, b: any) => a.order_index - b.order_index)
         .map((e: any) => ({

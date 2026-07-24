@@ -34,10 +34,10 @@ export async function fetchFullPlan(clientId: string): Promise<FullPlan | null> 
     .select(`
       id,
       training_days (
-        id, plan_id, day_number, name, week_day,
+        id, plan_id, day_number, name, week_day, archived,
         exercises (
           id, day_id, name, name_en, muscle_group, superseries_group,
-          reps_objective, unit, ref_weight, order_index,
+          reps_objective, unit, ref_weight, order_index, archived,
           image_url, video_url, notes, tempo, rest_seconds, target_rir,
           exercise_series ( id, series_number )
         )
@@ -48,10 +48,13 @@ export async function fetchFullPlan(clientId: string): Promise<FullPlan | null> 
 
   if (error || !data) return null;
 
+  // archivados fuera del plan activo (su historial sigue vivo en las vistas de historial)
   const days: PlanDay[] = ((data as any).training_days ?? [])
+    .filter((d: any) => !d.archived)
     .map((d: any) => ({
       ...d,
       exercises: (d.exercises ?? [])
+        .filter((e: any) => !e.archived)
         .slice()
         .sort((a: any, b: any) => a.order_index - b.order_index)
         .map((e: any) => ({

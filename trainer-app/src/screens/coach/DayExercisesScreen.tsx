@@ -27,6 +27,7 @@ export default function DayExercisesScreen() {
       .from('exercises')
       .select('*')
       .eq('day_id', day.id)
+      .eq('archived', false)
       .order('order_index');
     setExercises(data ?? []);
     setLoading(false);
