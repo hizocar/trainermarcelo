@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
-import { colors, spacing, radius, typography } from '../../theme';
+import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import TrendChart from '../../components/common/TrendChart';
 import { getCurrentWeek } from '../../lib/weeks';
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   summaryCard: { gap: spacing.md, marginBottom: spacing.sm },
   summaryTop: { flexDirection: 'row', alignItems: 'center' },
   summaryStat: { flex: 1, alignItems: 'center', gap: 2 },
-  summaryValue: { fontSize: 28, fontWeight: '900', color: colors.textPrimary },
+  summaryValue: { fontFamily: fonts.mono, fontSize: 26, color: colors.textPrimary },
   summaryLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, color: colors.textMuted },
   summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
   summaryBarTrack: {
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
   energyHeadline: { ...typography.h3, fontSize: 15, lineHeight: 21 },
   energyCompare: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs },
   energyCol: { flex: 1, alignItems: 'center', gap: 2 },
-  energyVal: { fontSize: 22, fontWeight: '900' },
+  energyVal: { fontFamily: fonts.mono, fontSize: 20 },
   energyColLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
   energyDays: { fontSize: 9, color: colors.textMuted },
   energyFoot: { ...typography.caption, fontSize: 10, textAlign: 'center', fontStyle: 'italic' },
@@ -534,13 +534,13 @@ const styles = StyleSheet.create({
   exRowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   exRowInfo: { flex: 1 },
   exRowName: { ...typography.h3, fontSize: 15 },
-  exRowMeta: { ...typography.caption, marginTop: 2 },
+  exRowMeta: { ...typography.monoSm, fontSize: 11, marginTop: 2 },
   deltaBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderWidth: 1, borderRadius: radius.full,
     paddingHorizontal: spacing.sm, paddingVertical: 3,
   },
-  deltaText: { fontSize: 12, fontWeight: '900' },
+  deltaText: { ...typography.mono, fontSize: 12, fontWeight: undefined },
 
   noHistoryText: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
   noHistoryHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },

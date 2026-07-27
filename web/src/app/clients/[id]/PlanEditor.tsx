@@ -414,31 +414,31 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => changeSeries(di, ei, -1)}>−</button>
-                        <strong style={{ minWidth: 16, textAlign: 'center' }}>{ex.series.length}</strong>
+                        <strong className="ex-mono" style={{ minWidth: 16, textAlign: 'center' }}>{ex.series.length}</strong>
                         <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => changeSeries(di, ei, 1)}>+</button>
                       </div>
                     </td>
                     <td>
-                      <input className="ex-input" value={ex.reps_objective}
+                      <input className="ex-input ex-input-mono" value={ex.reps_objective}
                         onChange={(e) => updateEx(di, ei, { reps_objective: e.target.value })} placeholder="10-12" />
                     </td>
                     <td>
-                      <input className="ex-input narrow" value={ex.ref_weight}
+                      <input className="ex-input ex-input-mono narrow" value={ex.ref_weight}
                         onChange={(e) => updateEx(di, ei, { ref_weight: e.target.value })} placeholder="0" inputMode="decimal" />
                     </td>
                     <td>
-                      <select className="ex-input narrow" value={ex.unit}
+                      <select className="ex-input ex-input-mono narrow" value={ex.unit}
                         onChange={(e) => updateEx(di, ei, { unit: e.target.value as 'kg' | 'lb' })}>
                         <option value="kg">kg</option>
                         <option value="lb">lb</option>
                       </select>
                     </td>
                     <td>
-                      <input className="ex-input narrow" value={ex.rest_seconds}
+                      <input className="ex-input ex-input-mono narrow" value={ex.rest_seconds}
                         onChange={(e) => updateEx(di, ei, { rest_seconds: e.target.value })} placeholder="seg" inputMode="numeric" />
                     </td>
                     <td>
-                      <input className="ex-input narrow" value={ex.target_rir}
+                      <input className="ex-input ex-input-mono narrow" value={ex.target_rir}
                         onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
                     </td>
                     <td>

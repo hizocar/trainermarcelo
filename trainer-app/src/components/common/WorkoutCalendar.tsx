@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { colors, spacing, typography } from '../../theme';
+import { colors, spacing, typography, fonts } from '../../theme';
 
 // Calendario de entrenamientos estilo Apple Fitness: un anillo por día.
 // El anillo se llena según cuántos ejercicios de esa sesión se completaron.
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   weekRow: { flexDirection: 'row' },
   cell: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   ringWrap: { alignItems: 'center', justifyContent: 'center' },
-  dayNum: { position: 'absolute', fontSize: 11, fontWeight: '700', color: colors.textMuted },
+  dayNum: { position: 'absolute', fontFamily: fonts.mono, fontSize: 11, color: colors.textMuted },
   dayNumActive: { color: colors.textPrimary },
   dayNumToday: { color: colors.accent, fontWeight: '900' },
 });

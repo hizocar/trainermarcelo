@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import Svg, { Polyline, Polygon, Circle, Line } from 'react-native-svg';
-import { colors, typography } from '../../theme';
+import { colors, typography, fonts } from '../../theme';
 
 interface Point {
   label: string;
@@ -95,8 +95,8 @@ export default function TrendChart({ data, height = 180, unit = '', fromZero = f
 const styles = StyleSheet.create({
   lastValue: {
     position: 'absolute',
-    fontSize: 11,
-    fontWeight: '900',
+    fontFamily: fonts.mono,
+    fontSize: 13,
     color: colors.accent,
     width: 72,
     textAlign: 'center',
@@ -106,8 +106,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     textAlign: 'center',
+    fontFamily: fonts.mono,
     fontSize: 9,
-    fontWeight: '700',
     color: colors.textMuted,
   },
 });

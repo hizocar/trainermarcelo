@@ -275,170 +275,73 @@ a {
 .fade-up.d2 { animation-delay: 0.16s; }
 .fade-up.d3 { animation-delay: 0.24s; }
 
-/* ── Mockup del teléfono ─────────────────────────────── */
+/* ── Firma: barra cargándose ───────────────────────────── */
 .hero-visual {
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 30px 0;
+  padding: 40px 0;
 }
-.phone {
-  position: relative;
-  width: 290px;
-  border-radius: 44px;
-  border: 1px solid var(--border-light);
-  background: linear-gradient(165deg, #101215, #15181b);
-  box-shadow: 0 50px 100px rgba(0, 0, 0, 0.6), 0 0 0 9px #0b0c0e,
-    0 0 80px rgba(200, 255, 0, 0.07);
-  padding: 22px 18px 26px;
+.barbell-hero {
+  width: 100%;
+  max-width: 460px;
   display: flex;
   flex-direction: column;
-  gap: 13px;
-}
-.phone .notch {
-  align-self: center;
-  width: 96px;
-  height: 24px;
-  background: #0b0c0e;
-  border-radius: 999px;
-  margin-bottom: 4px;
-}
-.phone-label {
-  font-size: 10px;
-  letter-spacing: 2.5px;
-  color: var(--accent);
-  font-weight: 800;
-}
-.phone-title {
-  font-family: var(--font-display), sans-serif;
-  font-size: 27px;
-  text-transform: uppercase;
-  line-height: 1;
-}
-.phone-days {
-  display: flex;
-  gap: 7px;
-  margin-top: 4px;
-}
-.phone-day {
-  flex: 1;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 10px;
-  text-align: center;
-  padding: 8px 2px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-}
-.phone-day.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #08090a;
-}
-.phone-progress {
-  height: 5px;
-  border-radius: 999px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.phone-progress i {
-  display: block;
-  height: 100%;
-  width: 83%;
-  background: var(--accent);
-  border-radius: 999px;
-}
-.phone-row {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  padding: 12px;
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 28px;
 }
-.phone-row strong {
-  font-size: 13.5px;
-  display: block;
+.barbell-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
 }
-.phone-row small {
-  color: var(--text-muted);
-  font-size: 10.5px;
+.bb-bar,
+.bb-collar {
+  fill: #3a4048;
 }
-.phone-check {
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  background: var(--success);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #08090a;
-  font-weight: 900;
-  font-size: 14px;
-  flex-shrink: 0;
+.bb-plate rect {
+  fill: var(--accent);
 }
-.phone-check.pending {
-  background: var(--accent);
+.bb-plate-l {
+  animation: plateInLeft 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
+.bb-plate-r {
+  animation: plateInRight 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+/* discos exteriores entran primero (más livianos, más rápido); el más
+   cercano al centro carga al final — imita el orden real de cargar una barra */
+.bb-p3 { animation-delay: 0.05s; }
+.bb-p2 { animation-delay: 0.22s; }
+.bb-p1 { animation-delay: 0.4s; }
 
-/* tarjetas flotantes */
-.float-card {
-  position: absolute;
-  background: rgba(22, 25, 28, 0.92);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-light);
-  border-radius: 16px;
-  padding: 13px 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  animation: floaty 5s ease-in-out infinite;
-}
-.float-card .fc-label {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 4px;
-}
-.float-card .fc-value {
-  font-size: 15px;
-  font-weight: 900;
-}
-.float-pr {
-  top: 8%;
-  left: -4%;
-  animation-delay: 0.6s;
-}
-.float-trend {
-  bottom: 10%;
-  right: -6%;
-}
-.float-trend .fc-value {
-  color: var(--success);
-}
-.spark {
+.bb-readout {
   display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 26px;
-  margin-top: 6px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
 }
-.spark i {
-  width: 7px;
-  border-radius: 2px;
-  background: var(--accent);
-  opacity: 0.55;
+.bb-readout-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
-.spark i:nth-child(1) { height: 30%; }
-.spark i:nth-child(2) { height: 45%; }
-.spark i:nth-child(3) { height: 55%; }
-.spark i:nth-child(4) { height: 70%; }
-.spark i:nth-child(5) { height: 100%; opacity: 1; }
+.bb-readout-value {
+  font-family: var(--font-mono), monospace;
+  font-weight: 600;
+  font-size: clamp(40px, 6vw, 56px);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 40px var(--accent-glow);
+}
+.bb-readout-delta {
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Secciones ───────────────────────────────────────── */
 .section {
@@ -918,6 +821,12 @@ a {
   width: 78px;
   text-align: center;
 }
+/* campos de datos medidos (reps, ref, descanso, RIR): cifras tabulares monoespaciadas */
+.ex-input-mono,
+.ex-mono {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
 .icon-btn {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1041,13 +950,13 @@ a {
     transform: translateY(0);
   }
 }
-@keyframes floaty {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-9px);
-  }
+@keyframes plateInLeft {
+  0% { transform: translateX(-70px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes plateInRight {
+  0% { transform: translateX(70px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
 }
 @keyframes pulse {
   0%, 100% {
@@ -1059,7 +968,7 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
   .fade-up,
-  .float-card,
+  .bb-plate,
   .hero-badge::before {
     animation: none;
   }
@@ -1078,16 +987,11 @@ a {
     padding: 60px 0 70px;
   }
   .hero-visual {
-    padding: 20px 0 10px;
+    padding: 10px 0;
   }
-  .phone {
-    width: 260px;
-  }
-  .float-pr {
-    left: 0;
-  }
-  .float-trend {
-    right: 0;
+  .barbell-hero {
+    max-width: 340px;
+    gap: 20px;
   }
   .steps,
   .features {

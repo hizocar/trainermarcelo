@@ -46,7 +46,10 @@ export default async function DashboardPage() {
         <span className="label accent">Panel de coach · {me?.name ?? ''}</span>
         <h1 className="display" style={{ fontSize: 40 }}>Mis clientes</h1>
         <p className="muted" style={{ marginTop: 4 }}>
-          {list.length} {list.length === 1 ? 'cliente' : 'clientes'} · toca uno para editar su plan
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)', fontWeight: 600 }}>
+            {list.length}
+          </span>{' '}
+          {list.length === 1 ? 'cliente' : 'clientes'} · toca uno para editar su plan
         </p>
 
         {list.length === 0 ? (

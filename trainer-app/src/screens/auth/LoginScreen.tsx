@@ -82,7 +82,7 @@ export default function LoginScreen() {
             <Text style={styles.brandKicker}>ENTRENAMIENTO PERSONALIZADO</Text>
           </View>
           <Text style={styles.logo}>ELITE</Text>
-          <Text style={styles.logoAccent}>FIT</Text>
+          <Text style={styles.logoAccent}>FITNESS</Text>
           <Text style={styles.subtitle}>TU PLAN · TU PROGRESO · EN SERIO</Text>
         </View>
 

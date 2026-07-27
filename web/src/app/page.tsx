@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import BarbellHero from '@/components/BarbellHero';
 
 export default function LandingPage() {
   return (
@@ -47,49 +48,7 @@ export default function LandingPage() {
           </div>
 
           <div className="hero-visual fade-up d2">
-            <div className="phone">
-              <div className="notch" />
-              <span className="phone-label">VIE 18 JUL · SEMANA 5</span>
-              <span className="phone-title">Sebastián</span>
-              <div className="phone-days">
-                <div className="phone-day">DÍA 1<br />TORSO</div>
-                <div className="phone-day">DÍA 2<br />PIERNA</div>
-                <div className="phone-day">DÍA 3<br />TORSO</div>
-                <div className="phone-day active">DÍA 4<br />FULL</div>
-              </div>
-              <div className="phone-progress"><i /></div>
-              <div className="phone-row">
-                <div>
-                  <strong>Press banca</strong>
-                  <small>Pecho · 3 series · 8-12 reps</small>
-                </div>
-                <div className="phone-check">✓</div>
-              </div>
-              <div className="phone-row">
-                <div>
-                  <strong>Remo en máquina</strong>
-                  <small>Espalda · 3 series · 10-12 reps</small>
-                </div>
-                <div className="phone-check">✓</div>
-              </div>
-              <div className="phone-row">
-                <div>
-                  <strong>Leg press</strong>
-                  <small>Cuádriceps · 3 series · 10-12</small>
-                </div>
-                <div className="phone-check pending">+</div>
-              </div>
-            </div>
-
-            <div className="float-card float-pr">
-              <span className="fc-label">🏆 Mejor marca</span>
-              <span className="fc-value">20kg × 12</span>
-            </div>
-            <div className="float-card float-trend">
-              <span className="fc-label">Carga total</span>
-              <span className="fc-value">+24% ↗</span>
-              <div className="spark"><i /><i /><i /><i /><i /></div>
-            </div>
+            <BarbellHero />
           </div>
         </div>
       </header>
@@ -204,7 +163,7 @@ export default function LandingPage() {
               <summary>¿Cómo consigo acceso a la app?</summary>
               <p>
                 El acceso es por invitación de tu coach. Escríbenos con el botón de abajo y te
-                conectamos con Marcelo Herrera, coach fundador de EliteFit, para comenzar tu plan.
+                conectamos con Marcelo Herrera, coach fundador de EliteFitness, para comenzar tu plan.
               </p>
             </details>
             <details>
@@ -275,7 +234,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} EliteFit · Entrenamiento personalizado</span>
+            <span>© {new Date().getFullYear()} EliteFitness · Entrenamiento personalizado</span>
             <span>Hecho con 🏋️ en Chile</span>
           </div>
         </div>

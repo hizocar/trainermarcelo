@@ -23,8 +23,11 @@ export const colors = {
 } as const;
 
 // Anton: display condensada estilo cartel deportivo (una sola weight, usar en mayúsculas)
+// JetBrains Mono: solo para datos medidos (pesos, reps, fechas, %) — cifras tabulares,
+// separa visualmente "lo que se mide" de "lo que se lee".
 export const fonts = {
   display: 'Anton_400Regular',
+  mono: 'JetBrainsMono_600SemiBold',
 };
 
 export const typography = {
@@ -48,6 +51,10 @@ export const typography = {
   body: { fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary, lineHeight: 21 },
   caption: { fontSize: 12, fontWeight: '500' as const, color: colors.textMuted },
   label: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 1.2, color: colors.textMuted },
+  // datos medidos: pesos, reps, fechas, deltas — cifras tabulares monoespaciadas
+  mono: { fontFamily: fonts.mono, fontSize: 15, color: colors.textPrimary },
+  monoLg: { fontFamily: fonts.mono, fontSize: 22, color: colors.textPrimary },
+  monoSm: { fontFamily: fonts.mono, fontSize: 11, color: colors.textMuted, letterSpacing: 0.3 },
 };
 
 export const spacing = {

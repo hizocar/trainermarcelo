@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Exercise, ExerciseSeries, WorkoutLog } from '../../types';
-import { colors, spacing, radius, typography } from '../../theme';
+import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   histPillLabel: { fontSize: 10, fontWeight: '900', color: colors.accent },
-  histPillValue: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
+  histPillValue: { ...typography.mono, fontSize: 12, color: colors.textPrimary },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay },
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
   },
   prText: { ...typography.body, fontSize: 14, flex: 1 },
-  prStrong: { fontWeight: '900', color: colors.accent },
+  prStrong: { ...typography.mono, fontWeight: undefined, fontSize: 15, color: colors.accent },
   chartCard: {
     backgroundColor: colors.card, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
@@ -644,7 +644,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   prevText: {
-    ...typography.caption,
+    ...typography.monoSm,
     fontSize: 11,
     paddingHorizontal: spacing.sm,
     paddingTop: 4,
@@ -655,8 +655,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
     color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.mono,
+    fontSize: 17,
     textAlign: 'center',
     borderWidth: 1,
     borderColor: colors.border,

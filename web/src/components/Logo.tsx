@@ -12,13 +12,13 @@ export function Dumbbell({ size = 24 }: { size?: number }) {
   );
 }
 
-/** Wordmark EliteFit: mancuerna + ELITE blanco / FIT lima. Usar dentro de .brand */
+/** Wordmark EliteFitness: mancuerna + ELITE blanco / FITNESS lima. Usar dentro de .brand */
 export default function Logo({ size = 24 }: { size?: number }) {
   return (
     <>
       <Dumbbell size={size} />
       <span>
-        ELITE<span className="accent">FIT</span>
+        ELITE<span className="accent">FITNESS</span>
       </span>
     </>
   );

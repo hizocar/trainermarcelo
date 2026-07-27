@@ -11,7 +11,7 @@ import { User, TrainingDay, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { unreadCount } from '../../lib/chat';
 import { fetchFullPlan, PlanDay } from '../../lib/plan';
-import { colors, spacing, radius, typography } from '../../theme';
+import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import MuscleMap from '../../components/common/MuscleMap';
 
@@ -320,14 +320,14 @@ const styles = StyleSheet.create({
   },
   dayColWeekday: { ...typography.label, fontSize: 9, letterSpacing: 2, color: colors.accent },
   dayColName: { ...typography.h3, fontSize: 13, marginTop: 1 },
-  dayColMeta: { ...typography.caption, fontSize: 10, marginTop: 2 },
+  dayColMeta: { ...typography.monoSm, fontSize: 9.5, marginTop: 2 },
   exItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingVertical: 3 },
   exSetsBadge: {
     minWidth: 18, height: 18, borderRadius: radius.sm,
     backgroundColor: colors.accentSoft,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
-  exSetsBadgeText: { fontSize: 10, fontWeight: '900', color: colors.accent },
+  exSetsBadgeText: { fontFamily: fonts.mono, fontSize: 10, color: colors.accent },
   exItemBody: { flex: 1 },
   exItemName: { ...typography.caption, fontSize: 11, color: colors.textPrimary, fontWeight: '600' },
   exItemGroup: { ...typography.caption, fontSize: 9, color: colors.textMuted },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   volName: { ...typography.caption, fontWeight: '800', fontSize: 10, width: 100 },
   volBarTrack: { flex: 1, height: 8, borderRadius: radius.full, backgroundColor: colors.surface, overflow: 'hidden' },
   volBarFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.accent },
-  volCount: { fontSize: 13, fontWeight: '900', color: colors.textPrimary, width: 26, textAlign: 'right' },
+  volCount: { fontFamily: fonts.mono, fontSize: 13, color: colors.textPrimary, width: 26, textAlign: 'right' },
   noteCard: { gap: spacing.xs },
   noteHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   noteMeta: { ...typography.caption, fontSize: 10, letterSpacing: 0.5 },
