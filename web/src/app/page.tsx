@@ -235,7 +235,10 @@ export default function LandingPage() {
           </div>
           <div className="footer-bottom">
             <span>© {new Date().getFullYear()} EliteFitness · Entrenamiento personalizado</span>
-            <span>Hecho con 🏋️ en Chile</span>
+            <span style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <Link href="/privacy">Privacidad</Link>
+              Hecho con 🏋️ en Chile
+            </span>
           </div>
         </div>
       </footer>
