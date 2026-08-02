@@ -13,6 +13,7 @@ export default function LandingPage() {
           <div className="nav-links">
             <a href="#como-funciona">Cómo funciona</a>
             <a href="#caracteristicas">Características</a>
+            <a href="#precios">Precios</a>
             <a href="#coach">Para coaches</a>
             <a href="#descargar">Descargar</a>
           </div>
@@ -148,6 +149,94 @@ export default function LandingPage() {
               <Link className="btn btn-primary" href="/login">Entrar al panel</Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* PRECIOS */}
+      <section className="section" id="precios">
+        <div className="container">
+          <div className="section-head">
+            <span className="label accent">Precios</span>
+            <h2>Para un entrenador o para todo un gimnasio</h2>
+            <p className="lead">
+              El precio escala con cuántos <em style={{ fontStyle: 'normal', color: 'var(--text)' }}>entrenadores</em> hay,
+              no con cuántos clientes tengan — clientes siempre ilimitados. Primeros 14 días gratis, sin tarjeta.
+            </p>
+          </div>
+
+          <div className="price-grid">
+            <div className="price-card">
+              <span className="price-name">Solo</span>
+              <span className="price-seats">1 entrenador</span>
+              <span className="price-value">$4.990<small>/mes</small></span>
+              <span className="price-annual">$49.900/año · 2 meses gratis</span>
+              <ul>
+                <li>Para el entrenador independiente</li>
+                <li>Clientes ilimitados</li>
+                <li>App iOS + panel web</li>
+                <li>Historial, progreso y calendario</li>
+              </ul>
+              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Solo">Empezar</a>
+            </div>
+
+            <div className="price-card">
+              <span className="price-name">Starter</span>
+              <span className="price-seats">2–3 entrenadores</span>
+              <span className="price-value">$9.990<small>/mes</small></span>
+              <span className="price-annual">$99.900/año · 2 meses gratis</span>
+              <ul>
+                <li>Todo lo de Solo</li>
+                <li>Cada coach ve solo a sus clientes</li>
+                <li>Biblioteca de ejercicios del equipo</li>
+              </ul>
+              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Starter">Empezar</a>
+            </div>
+
+            <div className="price-card rec">
+              <span className="price-flag">Más elegido</span>
+              <span className="price-name">Growth</span>
+              <span className="price-seats">4–8 entrenadores</span>
+              <span className="price-value">$19.990<small>/mes</small></span>
+              <span className="price-annual">$199.900/año · 2 meses gratis</span>
+              <ul>
+                <li>Todo lo de Starter</li>
+                <li><b>Panel con tu marca</b> — logo y color del gimnasio</li>
+                <li>Vista del dueño con todo el equipo</li>
+                <li>Soporte prioritario</li>
+              </ul>
+              <a className="btn btn-primary" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Growth">Empezar</a>
+            </div>
+
+            <div className="price-card">
+              <span className="price-name">Pro</span>
+              <span className="price-seats">9–20 entrenadores</span>
+              <span className="price-value">$39.990<small>/mes</small></span>
+              <span className="price-annual">$399.900/año · 2 meses gratis</span>
+              <ul>
+                <li>Todo lo de Growth</li>
+                <li>Reportes de uso por entrenador</li>
+                <li>Onboarding asistido del equipo</li>
+              </ul>
+              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Pro">Empezar</a>
+            </div>
+
+            <div className="price-card">
+              <span className="price-name">Enterprise</span>
+              <span className="price-seats">20+ · multi-sede</span>
+              <span className="price-value" style={{ fontSize: 22 }}>A medida</span>
+              <span className="price-annual">&nbsp;</span>
+              <ul>
+                <li>Entrenadores ilimitados</li>
+                <li><b>Marca 100% propia</b> — ícono y nombre en el App Store</li>
+                <li>Múltiples sedes en una cuenta</li>
+              </ul>
+              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20un%20plan%20Enterprise">Conversemos</a>
+            </div>
+          </div>
+
+          <p className="price-note">
+            Cupo extra $1.490/entrenador/mes sobre el límite del plan · Precios en pesos chilenos, IVA incluido
+          </p>
         </div>
       </section>
 

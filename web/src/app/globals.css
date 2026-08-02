@@ -1,20 +1,20 @@
 :root {
-  --bg: #08090a;
-  --bg-elevated: #0e1012;
-  --surface: #15181b;
-  --card: #16191c;
-  --card-elevated: #1d2126;
-  --accent: #c8ff00;
-  --accent-dark: #9acc00;
-  --accent-soft: rgba(200, 255, 0, 0.1);
-  --accent-glow: rgba(200, 255, 0, 0.22);
-  --text: #ffffff;
-  --text-secondary: #b4bac1;
-  --text-muted: #6e757d;
-  --border: #23272c;
-  --border-light: #31363c;
-  --danger: #ff5252;
-  --success: #3ddc84;
+  --bg: #00030d;
+  --bg-elevated: #080b14;
+  --surface: #10131c;
+  --card: #12151e;
+  --card-elevated: #1b1e27;
+  --accent: #d8d9d7;
+  --accent-dark: #bfbfbf;
+  --accent-soft: rgba(216, 217, 215, 0.08);
+  --accent-glow: rgba(216, 217, 215, 0.16);
+  --text: #d8d9d7;
+  --text-secondary: #949da6;
+  --text-muted: #626b73;
+  --border: #232732;
+  --border-light: #333844;
+  --danger: #626b73;
+  --success: #d8d9d7;
 }
 
 * {
@@ -43,7 +43,7 @@ a {
 
 ::selection {
   background: var(--accent);
-  color: #08090a;
+  color: #00030d;
 }
 
 .display {
@@ -96,8 +96,8 @@ a {
 }
 .btn-primary {
   background: var(--accent);
-  color: #08090a;
-  box-shadow: 0 0 0 rgba(200, 255, 0, 0);
+  color: #00030d;
+  box-shadow: 0 0 0 rgba(216, 217, 215, 0);
 }
 .btn-primary:hover {
   background: var(--accent-dark);
@@ -123,7 +123,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(8, 9, 10, 0.78);
+  background: rgba(0, 3, 13, 0.78);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
@@ -182,7 +182,7 @@ a {
   right: -140px;
   width: 640px;
   height: 640px;
-  background: radial-gradient(circle, rgba(200, 255, 0, 0.14), transparent 62%);
+  background: radial-gradient(circle, rgba(216, 217, 215, 0.14), transparent 62%);
   pointer-events: none;
 }
 .hero::after {
@@ -192,7 +192,7 @@ a {
   left: -180px;
   width: 560px;
   height: 560px;
-  background: radial-gradient(circle, rgba(200, 255, 0, 0.06), transparent 60%);
+  background: radial-gradient(circle, rgba(216, 217, 215, 0.06), transparent 60%);
   pointer-events: none;
 }
 .hero-grid {
@@ -207,7 +207,7 @@ a {
   align-items: center;
   gap: 8px;
   background: var(--accent-soft);
-  border: 1px solid rgba(200, 255, 0, 0.3);
+  border: 1px solid rgba(216, 217, 215, 0.3);
   border-radius: 999px;
   padding: 7px 16px;
   font-size: 11px;
@@ -397,7 +397,7 @@ a {
   height: 42px;
   border-radius: 12px;
   background: var(--accent);
-  color: #08090a;
+  color: #00030d;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -431,7 +431,7 @@ a {
 }
 .feature:hover {
   transform: translateY(-4px);
-  border-color: rgba(200, 255, 0, 0.45);
+  border-color: rgba(216, 217, 215, 0.45);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
 }
 .feature .ico {
@@ -439,7 +439,7 @@ a {
   height: 46px;
   border-radius: 13px;
   background: var(--accent-soft);
-  border: 1px solid rgba(200, 255, 0, 0.25);
+  border: 1px solid rgba(216, 217, 215, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -459,8 +459,8 @@ a {
 .coach-band {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(115deg, rgba(200, 255, 0, 0.09), rgba(200, 255, 0, 0.02) 55%, transparent);
-  border: 1px solid rgba(200, 255, 0, 0.2);
+  background: linear-gradient(115deg, var(--accent-soft), rgba(216, 217, 215, 0.02) 55%, transparent);
+  border: 1px solid rgba(216, 217, 215, 0.18);
   border-radius: 28px;
   padding: 52px;
   display: grid;
@@ -507,6 +507,118 @@ a {
   font-size: 24px;
   text-transform: uppercase;
   line-height: 1.05;
+}
+
+/* ── Precios ─────────────────────────────────────────── */
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.price-card {
+  background: var(--card);
+  padding: 26px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+.price-card.rec {
+  background: var(--surface);
+}
+.price-card.rec::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+}
+.price-flag {
+  align-self: flex-start;
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--accent);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.price-name {
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.price-seats {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: -8px;
+}
+.price-value {
+  font-family: var(--font-mono), monospace;
+  font-weight: 600;
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.price-value small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.price-annual {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: -8px;
+}
+.price-card ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+  margin: 4px 0 0;
+}
+.price-card li {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  padding-left: 15px;
+  position: relative;
+  line-height: 1.45;
+}
+.price-card li::before {
+  content: '✓';
+  position: absolute; left: 0; top: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.price-card li b { color: var(--text); }
+.price-card .btn {
+  margin-top: 6px;
+  padding: 11px 16px;
+  font-size: 11.5px;
+  width: 100%;
+}
+.price-note {
+  margin-top: 20px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+@media (max-width: 980px) {
+  .price-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .price-grid { grid-template-columns: 1fr; }
 }
 
 /* FAQ */
@@ -564,7 +676,7 @@ a {
   position: absolute;
   inset: auto 0 -300px 0;
   height: 500px;
-  background: radial-gradient(ellipse at bottom, rgba(200, 255, 0, 0.12), transparent 65%);
+  background: radial-gradient(ellipse at bottom, rgba(216, 217, 215, 0.12), transparent 65%);
   pointer-events: none;
 }
 .final-cta h2 {
@@ -644,7 +756,7 @@ a {
   right: -160px;
   width: 560px;
   height: 560px;
-  background: radial-gradient(circle, rgba(200, 255, 0, 0.1), transparent 62%);
+  background: radial-gradient(circle, rgba(216, 217, 215, 0.1), transparent 62%);
   pointer-events: none;
 }
 .auth-card {
@@ -706,7 +818,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgba(8, 9, 10, 0.85);
+  background: rgba(0, 3, 13, 0.85);
   backdrop-filter: blur(12px);
 }
 .app-header .inner {
@@ -848,7 +960,7 @@ a {
 .save-bar {
   position: sticky;
   bottom: 0;
-  background: rgba(8, 9, 10, 0.92);
+  background: rgba(0, 3, 13, 0.92);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   padding: 14px 0;
