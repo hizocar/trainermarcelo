@@ -8,6 +8,16 @@ export interface User {
   email: string;
   avatar_url?: string;
   is_owner?: boolean;
+  gym_id?: string;
+}
+
+export interface Gym {
+  id: string;
+  name: string;
+  owner_id: string;
+  plan_tier: string;
+  coach_limit: number;
+  created_at: string;
 }
 
 export interface WorkoutPlan {

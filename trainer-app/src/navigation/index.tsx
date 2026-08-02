@@ -32,7 +32,7 @@ import DayExercisesScreen from '../screens/coach/DayExercisesScreen';
 import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
-import ApproveCoachesScreen from '../screens/coach/ApproveCoachesScreen';
+import GymScreen from '../screens/coach/GymScreen';
 
 // Client
 import HomeScreen from '../screens/client/HomeScreen';
@@ -146,7 +146,7 @@ export default function AppNavigator() {
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
-            <Stack.Screen name="ApproveCoaches" component={ApproveCoachesScreen} />
+            <Stack.Screen name="Gym" component={GymScreen} />
           </>
         ) : (
           <>

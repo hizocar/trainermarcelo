@@ -9,7 +9,6 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpCoach: (name: string, email: string, password: string) => Promise<{ error: string | null }>;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -71,16 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   }
 
-  // Registro de entrenador: entra como coach_pending (el trigger lo fuerza).
-  async function signUpCoach(name: string, email: string, password: string) {
-    const { error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: { data: { name: name.trim(), role: 'coach_pending' } },
-    });
-    return { error: error?.message ?? null };
-  }
-
   async function refreshProfile() {
     if (session) await fetchProfile(session.user.id);
   }
@@ -91,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signUpCoach, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading, signIn, refreshProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

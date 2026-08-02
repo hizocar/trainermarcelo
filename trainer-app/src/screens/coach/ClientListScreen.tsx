@@ -62,8 +62,8 @@ export default function ClientListScreen() {
           </TouchableOpacity>
           <View style={styles.headerIcons}>
             {user?.is_owner && (
-              <TouchableOpacity onPress={() => navigation.navigate('ApproveCoaches')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+              <TouchableOpacity onPress={() => navigation.navigate('Gym')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="business-outline" size={18} color={colors.accent} />
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
