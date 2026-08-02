@@ -62,7 +62,7 @@ export default function LoginScreen() {
     >
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['rgba(10,10,10,0.25)', 'rgba(10,10,10,0.75)', '#0A0A0A']}
+        colors={['rgba(0,3,13,0.25)', 'rgba(0,3,13,0.75)', '#00030D']}
         locations={[0, 0.55, 0.88]}
         style={StyleSheet.absoluteFill}
       />

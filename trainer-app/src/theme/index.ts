@@ -1,25 +1,28 @@
 import { Platform } from 'react-native';
 
+// Monocromo puro: 5 grises, sin matiz de color. La jerarquía se construye por
+// brillo, no por tono — "success" es más claro (vitalidad/progreso), "danger"
+// más oscuro (se apaga), en vez de verde/rojo.
 export const colors = {
-  background: '#08090A',
-  backgroundElevated: '#0E1012',
-  surface: '#15181B',
-  card: '#16191C',
-  cardElevated: '#1D2126',
-  accent: '#C8FF00',
-  accentDark: '#9ACC00',
-  accentSoft: 'rgba(200, 255, 0, 0.10)',
-  accentGlow: 'rgba(200, 255, 0, 0.22)',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#B4BAC1',
-  textMuted: '#6E757D',
-  border: '#23272C',
-  borderLight: '#31363C',
-  danger: '#FF5252',
-  warning: '#FF9F1C',
-  success: '#3DDC84',
-  info: '#4CC9F0',
-  overlay: 'rgba(0, 0, 0, 0.72)',
+  background: '#00030D',
+  backgroundElevated: '#080B14',
+  surface: '#10131C',
+  card: '#12151E',
+  cardElevated: '#1B1E27',
+  accent: '#D8D9D7',
+  accentDark: '#BFBFBF',
+  accentSoft: 'rgba(216, 217, 215, 0.08)',
+  accentGlow: 'rgba(216, 217, 215, 0.16)',
+  textPrimary: '#D8D9D7',
+  textSecondary: '#949DA6',
+  textMuted: '#626B73',
+  border: '#232732',
+  borderLight: '#333844',
+  danger: '#626B73',
+  warning: '#949DA6',
+  success: '#D8D9D7',
+  info: '#949DA6',
+  overlay: 'rgba(0, 3, 13, 0.78)',
 } as const;
 
 // Anton: display condensada estilo cartel deportivo (una sola weight, usar en mayúsculas)

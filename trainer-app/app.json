@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A0A0A",
+    "backgroundColor": "#00030D",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.trainermarcelo.app",
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.trainermarcelo.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0A0A0A",
+        "backgroundColor": "#00030D",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -44,7 +44,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#08090A",
+          "backgroundColor": "#00030D",
           "imageWidth": 200
         }
       ],
@@ -52,7 +52,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#C8FF00"
+          "color": "#D8D9D7"
         }
       ],
       [

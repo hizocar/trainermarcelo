@@ -162,7 +162,7 @@ export default function CoachProfileScreen() {
               resizeMode="cover"
             >
               <LinearGradient
-                colors={['rgba(26,26,26,0)', 'rgba(26,26,26,0.35)', '#1A1A1A']}
+                colors={['rgba(0,3,13,0)', 'rgba(0,3,13,0.35)', '#00030D']}
                 locations={[0, 0.6, 1]}
                 style={StyleSheet.absoluteFill}
               />

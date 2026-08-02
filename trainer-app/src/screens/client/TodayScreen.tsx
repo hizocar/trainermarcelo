@@ -18,8 +18,8 @@ import { refreshReminders } from '../../lib/notifications';
 
 const PHASE_INFO: Record<string, { label: string; color: string }> = {
   acumulacion: { label: 'ACUMULACIÓN', color: colors.accent },
-  intensificacion: { label: 'INTENSIFICACIÓN', color: '#FF9F1C' },
-  descarga: { label: 'DESCARGA', color: '#4CC9F0' },
+  intensificacion: { label: 'INTENSIFICACIÓN', color: colors.textSecondary },
+  descarga: { label: 'DESCARGA', color: colors.textMuted },
 };
 
 export default function TodayScreen() {
