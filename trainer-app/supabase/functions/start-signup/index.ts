@@ -14,7 +14,7 @@ import { flowPlanEnvVar, isPlanTier, type Billing } from '../_shared/plans.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 

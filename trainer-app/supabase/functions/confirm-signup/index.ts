@@ -14,7 +14,7 @@ import { PLAN_COACH_LIMIT, flowPlanEnvVar, isPlanTier, type Billing } from '../_
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
