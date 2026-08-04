@@ -1,9 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { firstToken } from './env';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
-
-const firstToken = (v?: string) => (v ?? '').trim().split(/\s+/)[0];
 
 export async function createClient() {
   const cookieStore = await cookies();

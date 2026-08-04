@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import { firstToken } from '@/lib/env';
 
 const PLANS = [
   { tier: 'solo', name: 'Solo', seats: '1 entrenador', monthly: 4990, annual: 49900 },
@@ -34,12 +35,12 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/start-signup`,
+        `${firstToken(process.env.NEXT_PUBLIC_SUPABASE_URL)}/functions/v1/start-signup`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+            apikey: firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
           },
           body: JSON.stringify({
             name: name.trim(),

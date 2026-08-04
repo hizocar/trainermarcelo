@@ -1,10 +1,7 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-
-// Toma solo el primer token: tolera valores mal pegados en Vercel
-// (p. ej. la clave duplicada con un salto de línea en medio).
-const firstToken = (v?: string) => (v ?? '').trim().split(/\s+/)[0];
+import { firstToken } from './env';
 
 export function createClient() {
   return createBrowserClient(

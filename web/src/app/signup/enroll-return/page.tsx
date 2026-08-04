@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import { firstToken } from '@/lib/env';
 
 // Página a la que Flow redirige al terminar el registro de tarjeta
 // (url_return de /customer/register). Acá recién se crea la suscripción
@@ -23,11 +24,11 @@ function EnrollReturnInner() {
       return;
     }
 
-    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/confirm-signup`, {
+    fetch(`${firstToken(process.env.NEXT_PUBLIC_SUPABASE_URL)}/functions/v1/confirm-signup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        apikey: firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
       },
       body: JSON.stringify({ registerToken }),
     })

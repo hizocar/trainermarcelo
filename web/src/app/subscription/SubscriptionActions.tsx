@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
+import { firstToken } from '@/lib/env';
 
 export default function SubscriptionActions({ hasFlow }: { hasFlow: boolean }) {
   const supabase = createClient();
@@ -17,12 +18,12 @@ export default function SubscriptionActions({ hasFlow }: { hasFlow: boolean }) {
     if (!session) { setError('Sesión expirada.'); setLoading(null); return; }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-subscription`, {
+      const res = await fetch(`${firstToken(process.env.NEXT_PUBLIC_SUPABASE_URL)}/functions/v1/manage-subscription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          apikey: firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
         },
         body: JSON.stringify({ action }),
       });

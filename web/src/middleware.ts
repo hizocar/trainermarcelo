@@ -1,9 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { firstToken } from './lib/env';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
-
-const firstToken = (v?: string) => (v ?? '').trim().split(/\s+/)[0];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
