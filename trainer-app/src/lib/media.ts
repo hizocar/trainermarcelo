@@ -34,8 +34,18 @@ export async function pickVideo(): Promise<ImagePicker.ImagePickerAsset | null> 
   return result.canceled ? null : result.assets[0];
 }
 
-function contentTypeOf(asset: ImagePicker.ImagePickerAsset): string {
-  return asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+// asset.type y asset.mimeType son opcionales y a veces vienen vacíos (sobre
+// todo en video, algunas versiones de iOS/Android) — cuando faltan, NO hay que
+// asumir imagen: quien llama ya sabe qué pidió al picker (fotos o videos) y lo
+// indica explícitamente para no mandar un video con Content-Type: image/jpeg
+// (sube "bien" pero después ningún reproductor lo abre).
+function contentTypeOf(asset: ImagePicker.ImagePickerAsset, kind: 'image' | 'video'): string {
+  if (asset.mimeType) return asset.mimeType;
+  if (kind === 'video') {
+    const ext = videoExtension(asset);
+    return `video/${ext === 'mov' ? 'quicktime' : ext}`;
+  }
+  return 'image/jpeg';
 }
 
 // Sube el asset al bucket. En web usa blob; en nativo sube directo desde el
@@ -46,8 +56,9 @@ async function uploadToBucket(
   path: string,
   asset: ImagePicker.ImagePickerAsset,
   maxBytes: number,
+  kind: 'image' | 'video',
 ): Promise<void> {
-  const contentType = contentTypeOf(asset);
+  const contentType = contentTypeOf(asset, kind);
   const tooBig = `El archivo supera el máximo de ${Math.round(maxBytes / 1024 / 1024)}MB.`;
 
   if (Platform.OS === 'web') {
@@ -92,8 +103,9 @@ export async function uploadMedia(
   bucket: 'exercise-media' | 'avatars',
   path: string,
   asset: ImagePicker.ImagePickerAsset,
+  kind: 'image' | 'video' = 'image',
 ): Promise<string> {
-  await uploadToBucket(bucket, path, asset, MAX_UPLOAD_BYTES);
+  await uploadToBucket(bucket, path, asset, MAX_UPLOAD_BYTES, kind);
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   // cache-bust: el path es estable pero el contenido cambia al re-subir
   return `${data.publicUrl}?v=${Date.now()}`;
@@ -107,7 +119,7 @@ export async function uploadPrivatePhoto(
   path: string,
   asset: ImagePicker.ImagePickerAsset,
 ): Promise<string> {
-  await uploadToBucket('progress-photos', path, asset, MAX_PHOTO_BYTES);
+  await uploadToBucket('progress-photos', path, asset, MAX_PHOTO_BYTES, 'image');
   return path;
 }
 

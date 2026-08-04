@@ -895,6 +895,83 @@ a {
   font-size: 17px;
   flex-shrink: 0;
 }
+/* ── Pizarra semanal ─────────────────────────────────── */
+.board-scroll {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.board-col {
+  background: var(--card);
+  min-width: 180px;
+  flex: 1 0 180px;
+  padding: 14px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.board-col-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+.board-col-weekday {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.board-col-name {
+  display: block;
+  font-family: var(--font-display), sans-serif;
+  font-size: 15px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.board-col-meta {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.board-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.board-ex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 8px 8px 12px;
+}
+.board-ex-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-ex-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.board-ex-actions .icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .ex-table {
   width: 100%;
   border-collapse: collapse;

@@ -187,6 +187,17 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
     mutate((d) => { d[di].exercises.splice(ei, 1); return d; });
   }
 
+  // reordena un ejercicio dentro de su día — usado por la pizarra semanal
+  function moveExercise(di: number, ei: number, dir: -1 | 1) {
+    const j = ei + dir;
+    if (j < 0 || j >= days[di].exercises.length) return;
+    mutate((d) => {
+      const list = d[di].exercises;
+      [list[ei], list[j]] = [list[j], list[ei]];
+      return d;
+    });
+  }
+
   function changeSeries(di: number, ei: number, delta: number) {
     // el marcado para borrar va FUERA del updater: React puede re-ejecutarlo (StrictMode)
     if (delta < 0) {
@@ -354,6 +365,49 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
 
   return (
     <div style={{ marginTop: 12 }}>
+      {/* Pizarra: el split semanal completo, columna por día, editable */}
+      {days.length > 0 && (
+        <div className="editor-day" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '20px 22px 4px' }}>
+            <h3 style={{ marginBottom: 4 }}>Pizarra semanal</h3>
+            <p className="muted" style={{ fontSize: 13 }}>
+              Todo el split de un vistazo. Reordena o quita ejercicios acá; para editar reps,
+              peso, descanso o RIR usa la tabla de cada día más abajo.
+            </p>
+          </div>
+          <div className="board-scroll">
+            {days.map((day, di) => (
+              <div key={day.id} className="board-col">
+                <div className="board-col-head">
+                  {day.week_day != null && (
+                    <span className="board-col-weekday">{WEEKDAYS[WEEKDAY_VALUE.indexOf(day.week_day)] ?? ''}</span>
+                  )}
+                  <span className="board-col-name">{day.name || `Día ${di + 1}`}</span>
+                  <span className="board-col-meta">{day.exercises.length} ejercicios</span>
+                </div>
+                {day.exercises.length === 0 ? (
+                  <span className="board-empty">Sin ejercicios</span>
+                ) : (
+                  day.exercises.map((ex, ei) => (
+                    <div key={ex.id} className="board-ex">
+                      <span className="board-ex-name">{ex.name || '(sin nombre)'}</span>
+                      <div className="board-ex-actions">
+                        <button className="icon-btn" style={{ width: 24, height: 24, fontSize: 11 }}
+                          onClick={() => moveExercise(di, ei, -1)} disabled={ei === 0}>↑</button>
+                        <button className="icon-btn" style={{ width: 24, height: 24, fontSize: 11 }}
+                          onClick={() => moveExercise(di, ei, 1)} disabled={ei === day.exercises.length - 1}>↓</button>
+                        <button className="icon-btn" style={{ width: 24, height: 24, fontSize: 11 }}
+                          onClick={() => removeExercise(di, ei)}>✕</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {days.map((day, di) => (
         <div key={day.id} className="editor-day">
           <div className="editor-day-head">

@@ -36,9 +36,12 @@ export default async function DashboardPage() {
           <div className="brand">
             <Logo />
           </div>
-          <form action={signOut}>
-            <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>SALIR</button>
-          </form>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
+            <form action={signOut}>
+              <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>SALIR</button>
+            </form>
+          </div>
         </div>
       </header>
 

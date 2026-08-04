@@ -324,6 +324,7 @@ export default function PlanEditorScreen() {
           'exercise-media',
           `${user!.id}/vid-${Date.now()}.${videoExtension(exNewVideo)}`,
           exNewVideo,
+          'video',
         );
       } catch (e: any) {
         setSaving(false);

@@ -67,9 +67,14 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
           <Link href="/dashboard" className="brand">
             <Logo />
           </Link>
-          <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            ← CLIENTES
-          </Link>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+              PROGRESO
+            </Link>
+            <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+              ← CLIENTES
+            </Link>
+          </div>
         </div>
       </header>
 
