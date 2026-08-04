@@ -58,20 +58,21 @@ export default async function SubscriptionPage() {
 
           {gym?.subscription_status === 'past_due' && (
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              El último cobro falló. Actualiza tu método de pago en el portal de facturación para no perder acceso.
+              El último cobro falló. Actualiza tu método de pago para no perder acceso.
             </p>
           )}
           {gym?.subscription_status === 'canceled' && (
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Tu suscripción está cancelada. El historial de tus clientes se conserva — reactívala cuando quieras desde el portal.
+              Tu suscripción está cancelada. El historial de tus clientes se conserva — reactívala cuando quieras.
             </p>
           )}
 
-          <SubscriptionActions hasStripe={!!gym?.stripe_customer_id} />
+          <SubscriptionActions hasFlow={!!gym?.flow_customer_id} />
         </div>
 
         <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>
-          El portal de facturación es de Stripe: ahí puedes ver boletas, cambiar tarjeta o cancelar.
+          Los cobros se procesan con Flow, la pasarela de pago chilena. Ahí puedes actualizar tu
+          tarjeta cuando quieras; para cancelar usa el botón de arriba.
         </p>
       </main>
     </>

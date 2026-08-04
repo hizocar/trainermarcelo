@@ -145,7 +145,7 @@ export default function SignupPage() {
           {error && <div className="form-error">{error}</div>}
 
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }} disabled={loading}>
-            {loading ? 'CONECTANDO CON STRIPE…' : 'CONTINUAR AL PAGO'}
+            {loading ? 'CONECTANDO CON FLOW…' : 'CONTINUAR AL PAGO'}
           </button>
         </form>
 

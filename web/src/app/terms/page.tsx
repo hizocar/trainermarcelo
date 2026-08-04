@@ -44,11 +44,11 @@ export default function TermsPage() {
           <section>
             <h2 style={{ fontSize: 18, color: 'var(--text)', marginBottom: 8 }}>3. Precio y facturación</h2>
             <p>
-              Los planes se cobran de forma recurrente (mensual o anual) a través de Stripe.
-              Los nuevos gimnasios acceden a 14 días de prueba; si no cancelas antes de que
-              termine, se realiza el primer cobro automáticamente. Los precios están en pesos
-              chilenos, IVA incluido, y pueden actualizarse — te avisaremos con anticipación
-              si esto ocurre para tu plan.
+              Los planes se cobran de forma recurrente (mensual o anual) a través de Flow, la
+              pasarela de pago chilena. Los nuevos gimnasios acceden a 14 días de prueba; si no
+              cancelas antes de que termine, se realiza el primer cobro automáticamente. Los
+              precios están en pesos chilenos, IVA incluido, y pueden actualizarse — te
+              avisaremos con anticipación si esto ocurre para tu plan.
             </p>
           </section>
 

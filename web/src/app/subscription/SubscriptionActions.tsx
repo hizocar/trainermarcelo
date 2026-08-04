@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 
-export default function SubscriptionActions({ hasStripe }: { hasStripe: boolean }) {
+export default function SubscriptionActions({ hasFlow }: { hasFlow: boolean }) {
   const supabase = createClient();
-  const [loading, setLoading] = useState<'portal' | 'cancel' | null>(null);
+  const [loading, setLoading] = useState<'update-card' | 'cancel' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function call(action: 'portal' | 'cancel') {
+  async function call(action: 'update-card' | 'cancel') {
     setLoading(action);
     setError(null);
     setMessage(null);
@@ -36,14 +36,14 @@ export default function SubscriptionActions({ hasStripe }: { hasStripe: boolean 
     setLoading(null);
   }
 
-  if (!hasStripe) {
-    return <p className="muted" style={{ fontSize: 13 }}>Esta cuenta no tiene facturación de Stripe asociada.</p>;
+  if (!hasFlow) {
+    return <p className="muted" style={{ fontSize: 13 }}>Esta cuenta no tiene facturación de Flow asociada.</p>;
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <button className="btn btn-primary" onClick={() => call('portal')} disabled={loading !== null}>
-        {loading === 'portal' ? 'ABRIENDO…' : 'PORTAL DE FACTURACIÓN'}
+      <button className="btn btn-primary" onClick={() => call('update-card')} disabled={loading !== null}>
+        {loading === 'update-card' ? 'ABRIENDO…' : 'ACTUALIZAR TARJETA'}
       </button>
       <button
         className="btn btn-ghost"
