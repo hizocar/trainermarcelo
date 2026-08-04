@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase-server';
 import type { AppUser, PlanDay } from '@/lib/types';
 import PlanEditor from './PlanEditor';
+import AssignToClients from './AssignToClients';
 import Logo from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,14 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
     .maybeSingle();
 
   if (!client || (client as AppUser).coach_id !== user.id) notFound();
+
+  const { data: otherClients } = await supabase
+    .from('users')
+    .select('id, name, email')
+    .eq('role', 'client')
+    .eq('coach_id', user.id)
+    .neq('id', id)
+    .order('name');
 
   const { data: plan } = await supabase
     .from('workout_plans')
@@ -80,7 +89,15 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 40 }}>
         <span className="label accent">Editar plan</span>
-        <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+          {plan && (
+            <AssignToClients
+              sourceClientId={id}
+              otherClients={(otherClients ?? []) as { id: string; name: string; email: string }[]}
+            />
+          )}
+        </div>
 
         {!plan ? (
           <p className="muted" style={{ marginTop: 30 }}>
