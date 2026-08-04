@@ -12,14 +12,16 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nosebyewczvhsdohqrse.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_rPQucbfzvbzDoPc43fnHMQ_6xPdmB-1"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_rPQucbfzvbzDoPc43fnHMQ_6xPdmB-1",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nosebyewczvhsdohqrse.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_rPQucbfzvbzDoPc43fnHMQ_6xPdmB-1"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_rPQucbfzvbzDoPc43fnHMQ_6xPdmB-1",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
   },
