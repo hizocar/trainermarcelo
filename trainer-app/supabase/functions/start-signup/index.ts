@@ -80,11 +80,11 @@ Deno.serve(async (req) => {
     if (pendingErr) throw new Error(pendingErr.message);
 
     // 3) pedir la URL de registro de tarjeta. Flow redirige de vuelta a
-    // url_return al terminar, pasando el token de registro (por query o por
-    // POST según el medio de pago); confirm-signup lo recibe ahí.
+    // url_return con un POST (no GET) — pasa por /api/flow/return, que
+    // normaliza el token a query param antes de entregarlo a la página.
     const register = await flowPost(creds, '/customer/register', {
       customerId,
-      url_return: `${site}/signup/enroll-return`,
+      url_return: `${site}/api/flow/return?to=%2Fsignup%2Fenroll-return`,
     });
 
     return json({ url: `${register.url}?token=${register.token}` });

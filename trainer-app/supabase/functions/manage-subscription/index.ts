@@ -56,10 +56,12 @@ Deno.serve(async (req) => {
     }
 
     // por defecto: reenrolar tarjeta (Flow no tiene un portal de facturación
-    // como Stripe — el flujo equivalente es volver a registrar la tarjeta)
+    // como Stripe — el flujo equivalente es volver a registrar la tarjeta).
+    // Flow redirige de vuelta con un POST — pasa por /api/flow/return.
+    const returnTo = body.returnUrl ?? '/subscription';
     const register = await flowPost(creds, '/customer/register', {
       customerId: gym.flow_customer_id,
-      url_return: body.returnUrl ?? `${site}/subscription`,
+      url_return: `${site}/api/flow/return?to=${encodeURIComponent(returnTo)}`,
     });
     return json({ url: `${register.url}?token=${register.token}` });
   } catch (e) {
