@@ -31,6 +31,13 @@ export function weekStartDate(week: number): Date {
   return new Date(TRAINING_EPOCH.getTime() + (week - 1) * 7 * 86400000);
 }
 
+/** Fecha exacta de un día de semana (0=Dom..6=Sáb) dentro de una semana del programa. */
+export function dateForWeekDay(week: number, weekDay: number): Date {
+  const monday = weekStartDate(week);
+  const offset = weekDay === 0 ? 6 : weekDay - 1; // Lun=0 ... Dom=6
+  return new Date(monday.getTime() + offset * 86400000);
+}
+
 /** "lun 13 jul" — cuándo arranca la semana indicada. */
 export function weekStartLabel(week: number): string {
   return formatShortDate(weekStartDate(week).toISOString());

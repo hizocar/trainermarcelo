@@ -12,7 +12,7 @@ import { fetchFullPlan, fetchLogs, activeDays, PlanDay, PlanExercise } from '../
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
-import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek } from '../../lib/weeks';
+import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
 
@@ -35,12 +35,18 @@ export default function TodayScreen() {
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [allLogs, setAllLogs] = useState<{ series_id: string; week_number: number }[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
+  const seriesToExerciseRef = React.useRef<Record<string, string> | undefined>(undefined);
 
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
   const currentWeek = getCurrentWeek();
+  const viewingPastWeek = selectedWeek !== currentWeek;
 
   // refresca al volver de WorkoutLog para actualizar los checks de completado
   useFocusEffect(useCallback(() => { if (user?.id) fetchPlan(); }, [user?.id]));
+  // al cambiar de semana recalculamos sin volver a pedir el plan completo
+  React.useEffect(() => { if (user?.id && days.length > 0) applyWeek(days, allLogs); }, [selectedWeek]);
 
   async function fetchPlan() {
     if (!user?.id) return;
@@ -49,19 +55,33 @@ export default function TodayScreen() {
 
     const { data: ph } = await supabase
       .from('week_phases').select('phase')
-      .eq('plan_id', plan.id).eq('week_number', currentWeek).maybeSingle();
+      .eq('plan_id', plan.id).eq('week_number', selectedWeek).maybeSingle();
     setPhase(ph?.phase ?? null);
 
     const list = activeDays(plan.days);
     setDays(list);
 
-    // logs de la semana: una consulta para todo el plan
-    const logs = await fetchLogs(plan.seriesIds, currentWeek);
-    const loggedSeries = new Set(logs.map(l => l.series_id));
+    // todos los logs del plan en una consulta: navegar entre semanas no vuelve a pedir nada
+    const logs = await fetchLogs(plan.seriesIds);
+    setAllLogs(logs);
+    applyWeek(list, logs, plan.seriesToExercise);
+
+    setLoading(false);
+  }
+
+  // recalcula estado (ejercicios hechos, progreso, recordatorios) para la semana elegida
+  function applyWeek(
+    list: PlanDay[],
+    logs: { series_id: string; week_number: number }[],
+    seriesToExercise?: Record<string, string>,
+  ) {
+    const map = seriesToExercise ?? seriesToExerciseRef.current;
+    if (!map) return;
+    seriesToExerciseRef.current = map;
+
+    const loggedSeries = new Set(logs.filter(l => l.week_number === selectedWeek).map(l => l.series_id));
     const doneEx = new Set(
-      Object.entries(plan.seriesToExercise)
-        .filter(([sid]) => loggedSeries.has(sid))
-        .map(([, exId]) => exId),
+      Object.entries(map).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
     );
     setLoggedExercises(doneEx);
 
@@ -74,14 +94,16 @@ export default function TodayScreen() {
     });
     setDayStatus(status);
 
-    // los recordatorios solo avisan de días pendientes: reprogramar al cambiar el estado
-    refreshReminders(list.map(d => ({
-      id: d.id,
-      day_number: d.day_number,
-      name: d.name,
-      week_day: d.week_day,
-      done: (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total,
-    })));
+    // los recordatorios siempre miran la semana REAL de hoy, no la que se está navegando
+    const currentLoggedSeries = new Set(logs.filter(l => l.week_number === currentWeek).map(l => l.series_id));
+    const currentDoneEx = new Set(
+      Object.entries(map).filter(([sid]) => currentLoggedSeries.has(sid)).map(([, exId]) => exId),
+    );
+    refreshReminders(list.map(d => {
+      const total = d.exercises.length;
+      const done = d.exercises.filter(e => currentDoneEx.has(e.id)).length;
+      return { id: d.id, day_number: d.day_number, name: d.name, week_day: d.week_day, done: total > 0 && done >= total };
+    }));
 
     // selección: conservar la elección manual; si no hay, el primer día incompleto
     const isDayComplete = (d: PlanDay) =>
@@ -94,14 +116,13 @@ export default function TodayScreen() {
     selectedIdRef.current = selected?.id ?? null;
     setSelectedDay(selected);
     setExercises(selected?.exercises ?? []);
-    if (selected && selected.id !== prevId) loadNote(selected.id);
-    setLoading(false);
+    if (selected) loadNote(selected.id);
   }
 
   async function loadNote(dayId: string) {
     const { data } = await supabase
       .from('session_notes').select('note')
-      .eq('user_id', user!.id).eq('day_id', dayId).eq('week_number', currentWeek)
+      .eq('user_id', user!.id).eq('day_id', dayId).eq('week_number', selectedWeek)
       .maybeSingle();
     setNote(data?.note ?? '');
     setNoteDirty(false);
@@ -117,16 +138,16 @@ export default function TodayScreen() {
   async function saveNote() {
     if (!selectedDay || !note.trim()) return;
     const { error } = await supabase.from('session_notes').upsert(
-      { user_id: user!.id, day_id: selectedDay.id, week_number: currentWeek, note: note.trim() },
+      { user_id: user!.id, day_id: selectedDay.id, week_number: selectedWeek, note: note.trim() },
       { onConflict: 'user_id,day_id,week_number' },
     );
     if (error) showAlert('No se pudo guardar', error.message);
     else setNoteDirty(false);
   }
 
-  const isToday = (day: TrainingDay) => day.week_day === todayWeekDay;
+  const isToday = (day: TrainingDay) => !viewingPastWeek && day.week_day === todayWeekDay;
 
-  // ¿todos los días del plan completados esta semana?
+  // ¿todos los días del plan completados en la semana que se está viendo?
   const weekComplete = days.length > 0 && days.every(d => {
     const st = dayStatus[d.id];
     return st && st.total > 0 && st.done >= st.total;
@@ -160,6 +181,44 @@ export default function TodayScreen() {
           </View>
         )}
       </View>
+
+      {!loading && days.length > 0 && (
+        <View style={styles.weekNav}>
+          <TouchableOpacity
+            style={styles.weekNavBtn}
+            onPress={() => setSelectedWeek(w => Math.max(1, w - 1))}
+            disabled={selectedWeek <= 1}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-back" size={16} color={selectedWeek <= 1 ? colors.textMuted : colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.weekNavLabel}>
+            SEMANA {selectedWeek}{viewingPastWeek ? ' · PASADA' : ''}
+          </Text>
+          <TouchableOpacity
+            style={styles.weekNavBtn}
+            onPress={() => setSelectedWeek(w => Math.min(currentWeek, w + 1))}
+            disabled={selectedWeek >= currentWeek}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-forward" size={16} color={selectedWeek >= currentWeek ? colors.textMuted : colors.textPrimary} />
+          </TouchableOpacity>
+          {viewingPastWeek && (
+            <TouchableOpacity style={styles.weekNavToday} onPress={() => setSelectedWeek(currentWeek)}>
+              <Text style={styles.weekNavTodayText}>VOLVER A HOY</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {viewingPastWeek && (
+        <View style={styles.pastBanner}>
+          <Ionicons name="time-outline" size={14} color={colors.accent} />
+          <Text style={styles.pastBannerText}>
+            ¿Se te quedó pendiente un día? Regístralo acá — quedará guardado en la fecha que indiques.
+          </Text>
+        </View>
+      )}
 
       {loading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
@@ -229,7 +288,7 @@ export default function TodayScreen() {
           >
             <SyncBanner />
 
-            {weekComplete && (
+            {weekComplete && !viewingPastWeek && (
               <Card highlight style={styles.doneCard}>
                 <View style={styles.doneHeader}>
                   <Ionicons name="trophy" size={22} color={colors.accent} />
@@ -261,7 +320,13 @@ export default function TodayScreen() {
               return (
                 <TouchableOpacity
                   key={ex.id}
-                  onPress={() => navigation.navigate('WorkoutLog', { exercise: ex, week: currentWeek })}
+                  onPress={() => navigation.navigate('WorkoutLog', {
+                    exercise: ex,
+                    week: selectedWeek,
+                    date: selectedDay?.week_day != null
+                      ? dateForWeekDay(selectedWeek, selectedDay.week_day).toISOString()
+                      : undefined,
+                  })}
                   activeOpacity={0.7}
                 >
                   <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
@@ -343,6 +408,30 @@ const styles = StyleSheet.create({
   weekBadgeToday: { backgroundColor: colors.accent, borderColor: colors.accent },
   weekBadgeText: { color: colors.background, fontWeight: '900', fontSize: 16 },
   weekBadgeTextIdle: { color: colors.accent },
+  weekNav: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingHorizontal: spacing.xl, marginBottom: spacing.sm,
+  },
+  weekNavBtn: {
+    width: 30, height: 30, borderRadius: radius.full,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  weekNavLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 11 },
+  weekNavToday: {
+    marginLeft: 'auto',
+    borderWidth: 1, borderColor: colors.accent, borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 4,
+  },
+  weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.accent },
+  pastBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    marginHorizontal: spacing.xl, marginBottom: spacing.sm,
+    backgroundColor: colors.accentSoft, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: colors.accent + '33',
+    paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2,
+  },
+  pastBannerText: { ...typography.caption, fontSize: 11, flex: 1, color: colors.textSecondary },
   phaseBadge: {
     alignSelf: 'flex-start', marginTop: spacing.xs,
     borderWidth: 1, borderRadius: radius.sm,

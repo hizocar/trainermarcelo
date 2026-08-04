@@ -54,7 +54,7 @@ export default function SessionDetailScreen() {
             {session.exercises.map(({ exercise, sets }) => (
               <TouchableOpacity
                 key={exercise.id}
-                onPress={() => navigation.navigate('WorkoutLog', { exercise, week: session.week })}
+                onPress={() => navigation.navigate('WorkoutLog', { exercise, week: session.week, date: session.date })}
                 activeOpacity={0.7}
               >
                 <Card style={styles.exCard}>

@@ -16,11 +16,14 @@ import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
 import TrendChart from '../../components/common/TrendChart';
 import { showAlert } from '../../lib/alert';
-import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
+import { formatShortDate, dateForWeekDay, WEEK_DAYS_SHORT } from '../../lib/weeks';
 import { saveLog } from '../../lib/offline';
 import { suggestProgression } from '../../lib/progress';
 
-type RouteParams = { exercise: Exercise; week: number };
+type RouteParams = { exercise: Exercise; week: number; date?: string };
+
+// Lun..Dom — orden de los chips de "¿cuándo lo hiciste?" (getDay(): 0=Dom..6=Sáb)
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 interface SeriesEntry {
   series: ExerciseSeries;
@@ -35,9 +38,10 @@ interface SeriesEntry {
 export default function WorkoutLogScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const { exercise, week } = route.params as RouteParams;
+  const { exercise, week, date } = route.params as RouteParams;
   const { user } = useAuth();
 
+  const [logDate, setLogDate] = useState(date ?? new Date().toISOString());
   const [entries, setEntries] = useState<SeriesEntry[]>([]);
   const [history, setHistory] = useState<{ week: number; date?: string; sets: { series: number; weight: number; reps: number }[] }[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -194,7 +198,6 @@ export default function WorkoutLogScreen() {
     }
 
     setSaving(true);
-    const now = new Date().toISOString();
     let queued = 0;
 
     for (const entry of toSave) {
@@ -204,7 +207,7 @@ export default function WorkoutLogScreen() {
         weight: entry.weightNum!,
         reps: entry.repsNum!,
         rir: entry.rirNum,
-        logged_at: now,
+        logged_at: logDate,
         logged_by: user!.id,
       });
       if (result === 'queued') queued++;
@@ -265,13 +268,35 @@ export default function WorkoutLogScreen() {
         </View>
         {exercise.name_en ? <Text style={styles.nameEn}>{exercise.name_en}</Text> : null}
         <Text style={styles.meta}>
-          {week === getCurrentWeek()
-            ? formatShortDate(new Date().toISOString()).toUpperCase()
-            : `EDITANDO REGISTRO ANTERIOR`} · {exercise.reps_objective} REPS · {exercise.unit.toUpperCase()}
+          {formatShortDate(logDate).toUpperCase()} · {exercise.reps_objective} REPS · {exercise.unit.toUpperCase()}
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* ¿Cuándo lo hiciste? — corrige la fecha real si registras un día atrasado */}
+        <View style={styles.whenCard}>
+          <Text style={styles.whenLabel}>¿CUÁNDO LO HICISTE?</Text>
+          <View style={styles.whenRow}>
+            {WEEKDAY_ORDER.map(wd => {
+              const d = dateForWeekDay(week, wd);
+              const iso = d.toISOString();
+              const isFuture = d.getTime() > Date.now();
+              const selected = new Date(logDate).toDateString() === d.toDateString();
+              return (
+                <TouchableOpacity
+                  key={wd}
+                  style={[styles.whenChip, selected && styles.whenChipActive, isFuture && styles.whenChipDisabled]}
+                  onPress={() => !isFuture && setLogDate(iso)}
+                  disabled={isFuture}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.whenChipDay, selected && styles.whenChipDayActive]}>{WEEK_DAYS_SHORT[wd]}</Text>
+                  <Text style={[styles.whenChipNum, selected && styles.whenChipNumActive]}>{d.getDate()}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
         {/* Ejemplo del ejercicio */}
         {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
@@ -487,6 +512,20 @@ const styles = StyleSheet.create({
   backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  whenCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  whenLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
+  whenRow: { flexDirection: 'row', gap: spacing.xs + 2 },
+  whenChip: {
+    flex: 1, alignItems: 'center', gap: 2,
+    paddingVertical: spacing.sm, borderRadius: radius.sm,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  whenChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  whenChipDisabled: { opacity: 0.35 },
+  whenChipDay: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5, color: colors.textMuted },
+  whenChipDayActive: { color: colors.background },
+  whenChipNum: { ...typography.mono, fontSize: 13, color: colors.textPrimary },
+  whenChipNumActive: { color: colors.background },
   exerciseName: { ...typography.display, fontSize: 28 },
   histBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
