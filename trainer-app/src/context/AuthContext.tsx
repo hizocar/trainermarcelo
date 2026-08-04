@@ -58,7 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
     } else {
-      setUser(data);
+      let gymStatus: string | undefined;
+      if (data.role === 'coach' && data.gym_id) {
+        const { data: gym } = await supabase
+          .from('gyms').select('subscription_status').eq('id', data.gym_id).maybeSingle();
+        gymStatus = gym?.subscription_status;
+      }
+      setUser({ ...data, gymStatus });
       // registra este dispositivo para recibir push de mensajes (silencioso si falla)
       registerPushToken(userId).catch(() => {});
     }

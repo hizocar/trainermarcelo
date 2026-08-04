@@ -32,6 +32,7 @@ import DayExercisesScreen from '../screens/coach/DayExercisesScreen';
 import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
+import SubscriptionExpiredScreen from '../screens/coach/SubscriptionExpiredScreen';
 import GymScreen from '../screens/coach/GymScreen';
 
 // Client
@@ -127,6 +128,9 @@ export default function AppNavigator() {
 
   if (loading) return null;
 
+  // el gimnasio no está al día: se pausa el panel de coach (los datos no se tocan)
+  const subscriptionBlocked = user?.role === 'coach' && !!user.gymStatus && !['active', 'trialing'].includes(user.gymStatus);
+
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -134,6 +138,8 @@ export default function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : user?.role === 'coach_pending' ? (
           <Stack.Screen name="CoachPending" component={CoachPendingScreen} />
+        ) : subscriptionBlocked ? (
+          <Stack.Screen name="SubscriptionExpired" component={SubscriptionExpiredScreen} />
         ) : user?.role === 'coach' ? (
           <>
             <Stack.Screen name="CoachHome" component={CoachTabs} />

@@ -14,7 +14,7 @@ export default async function DashboardPage() {
 
   const { data: me } = await supabase
     .from('users')
-    .select('id, name, role')
+    .select('id, name, role, is_owner')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -38,6 +38,9 @@ export default async function DashboardPage() {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
+            {me?.is_owner && (
+              <Link href="/subscription" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SUSCRIPCIÓN</Link>
+            )}
             <form action={signOut}>
               <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>SALIR</button>
             </form>

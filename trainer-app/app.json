@@ -61,7 +61,8 @@
           "microphonePermission": "La app usa el micrófono para grabar notas de voz en el chat con tu entrenador."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "@sentry/react-native"
     ],
     "extra": {
       "eas": {

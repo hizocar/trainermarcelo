@@ -160,7 +160,7 @@ export default function LandingPage() {
             <h2>Para un entrenador o para todo un gimnasio</h2>
             <p className="lead">
               El precio escala con cuántos <em style={{ fontStyle: 'normal', color: 'var(--text)' }}>entrenadores</em> hay,
-              no con cuántos clientes tengan — clientes siempre ilimitados. Primeros 14 días gratis, sin tarjeta.
+              no con cuántos clientes tengan — clientes siempre ilimitados. Primeros 14 días gratis, cancela cuando quieras.
             </p>
           </div>
 
@@ -176,7 +176,7 @@ export default function LandingPage() {
                 <li>App iOS + panel web</li>
                 <li>Historial, progreso y calendario</li>
               </ul>
-              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Solo">Empezar</a>
+              <Link className="btn btn-ghost" href="/signup?plan=solo">Empezar</Link>
             </div>
 
             <div className="price-card">
@@ -189,7 +189,7 @@ export default function LandingPage() {
                 <li>Cada coach ve solo a sus clientes</li>
                 <li>Biblioteca de ejercicios del equipo</li>
               </ul>
-              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Starter">Empezar</a>
+              <Link className="btn btn-ghost" href="/signup?plan=starter">Empezar</Link>
             </div>
 
             <div className="price-card rec">
@@ -204,7 +204,7 @@ export default function LandingPage() {
                 <li>Vista del dueño con todo el equipo</li>
                 <li>Soporte prioritario</li>
               </ul>
-              <a className="btn btn-primary" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Growth">Empezar</a>
+              <Link className="btn btn-primary" href="/signup?plan=growth">Empezar</Link>
             </div>
 
             <div className="price-card">
@@ -217,7 +217,7 @@ export default function LandingPage() {
                 <li>Reportes de uso por entrenador</li>
                 <li>Onboarding asistido del equipo</li>
               </ul>
-              <a className="btn btn-ghost" href="mailto:hizocar@gmail.com?subject=Quiero%20el%20plan%20Pro">Empezar</a>
+              <Link className="btn btn-ghost" href="/signup?plan=pro">Empezar</Link>
             </div>
 
             <div className="price-card">
@@ -326,6 +326,7 @@ export default function LandingPage() {
             <span>© {new Date().getFullYear()} EliteFitness · Entrenamiento personalizado</span>
             <span style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
               <Link href="/privacy">Privacidad</Link>
+              <Link href="/terms">Términos</Link>
               Hecho con 🏋️ en Chile
             </span>
           </div>

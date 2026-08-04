@@ -9,6 +9,7 @@ export interface User {
   avatar_url?: string;
   is_owner?: boolean;
   gym_id?: string;
+  gymStatus?: string; // subscription_status del gimnasio, calculado en AuthContext (no viene de la tabla users)
 }
 
 export interface Gym {
