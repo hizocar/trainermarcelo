@@ -323,9 +323,17 @@ export default function TodayScreen() {
                   onPress={() => navigation.navigate('WorkoutLog', {
                     exercise: ex,
                     week: selectedWeek,
-                    date: selectedDay?.week_day != null
+                    // Registrando en vivo (semana actual): la fecha es HOY de
+                    // verdad, sin importar qué día de la semana le toca a este
+                    // entrenamiento en el split — si lo entrenaste antes o
+                    // después de lo calendarizado, igual queda con la fecha
+                    // real. Solo al ponerse al día con una semana PASADA tiene
+                    // sentido usar la fecha calendarizada de ese día (acá sí
+                    // se puede corregir a mano con los chips "¿cuándo lo
+                    // hiciste?" si hace falta).
+                    date: viewingPastWeek && selectedDay?.week_day != null
                       ? dateForWeekDay(selectedWeek, selectedDay.week_day).toISOString()
-                      : undefined,
+                      : new Date().toISOString(),
                   })}
                   activeOpacity={0.7}
                 >

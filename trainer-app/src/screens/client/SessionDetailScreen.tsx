@@ -1,10 +1,14 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { Exercise } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
+import { dateForWeekDay, WEEK_DAYS_SHORT } from '../../lib/weeks';
+import { showAlert } from '../../lib/alert';
 
 interface SessionData {
   dayNumber: number;
@@ -16,12 +20,41 @@ interface SessionData {
 
 type RouteParams = { sessions: SessionData[]; dateLabel: string };
 
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Lun..Dom
+
 export default function SessionDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
+  const { user } = useAuth();
   const { sessions, dateLabel } = route.params as RouteParams;
+  const [fixingIndex, setFixingIndex] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const primary = sessions[0];
+
+  // Mueve TODOS los ejercicios registrados en esta sesión a otra fecha de
+  // una sola vez — evita tener que corregir uno por uno.
+  async function fixSessionDate(session: SessionData, newDate: Date) {
+    setSaving(true);
+    const exerciseIds = session.exercises.map(e => e.exercise.id);
+    const { data: seriesRows, error: seriesErr } = await supabase
+      .from('exercise_series').select('id').in('exercise_id', exerciseIds);
+    if (seriesErr || !seriesRows) {
+      setSaving(false);
+      showAlert('No se pudo corregir', seriesErr?.message ?? 'Intenta de nuevo.');
+      return;
+    }
+    const { error } = await supabase
+      .from('workout_logs')
+      .update({ logged_at: newDate.toISOString() })
+      .eq('logged_by', user!.id)
+      .eq('week_number', session.week)
+      .in('series_id', seriesRows.map(s => s.id));
+    setSaving(false);
+    setFixingIndex(null);
+    if (error) { showAlert('No se pudo corregir', error.message); return; }
+    showAlert('Fecha corregida', 'Toda la sesión quedó registrada en el día correcto.', () => navigation.goBack());
+  }
 
   return (
     <View style={styles.container}>
@@ -48,9 +81,19 @@ export default function SessionDetailScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {sessions.map((session, si) => (
           <View key={si} style={styles.sessionBlock}>
-            {sessions.length > 1 && (
-              <Text style={styles.sessionTag}>DÍA {session.dayNumber} · {session.dayName.toUpperCase()} · S{session.week}</Text>
-            )}
+            <View style={styles.sessionHead}>
+              {sessions.length > 1 && (
+                <Text style={styles.sessionTag}>DÍA {session.dayNumber} · {session.dayName.toUpperCase()} · S{session.week}</Text>
+              )}
+              <TouchableOpacity
+                style={styles.fixBtn}
+                onPress={() => setFixingIndex(si)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="calendar-outline" size={13} color={colors.accent} />
+                <Text style={styles.fixBtnText}>CORREGIR FECHA DE LA SESIÓN</Text>
+              </TouchableOpacity>
+            </View>
             {session.exercises.map(({ exercise, sets }) => (
               <TouchableOpacity
                 key={exercise.id}
@@ -93,6 +136,47 @@ export default function SessionDetailScreen() {
         ))}
         <Text style={styles.hint}>Toca un ejercicio para revisar o corregir lo registrado.</Text>
       </ScrollView>
+
+      {/* Modal: elegir el día correcto de esa semana para toda la sesión */}
+      <Modal
+        visible={fixingIndex !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setFixingIndex(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setFixingIndex(null)} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>¿Cuándo la hiciste en realidad?</Text>
+            <Text style={styles.modalSub}>
+              Se corrige la fecha de los {fixingIndex != null ? sessions[fixingIndex].exercises.length : 0} ejercicios de esta sesión de una vez.
+            </Text>
+            <View style={styles.chipsRow}>
+              {fixingIndex != null && WEEKDAY_ORDER.map(wd => {
+                const session = sessions[fixingIndex];
+                const d = dateForWeekDay(session.week, wd);
+                const isFuture = d.getTime() > Date.now();
+                const isCurrent = new Date(session.date).toDateString() === d.toDateString();
+                return (
+                  <TouchableOpacity
+                    key={wd}
+                    style={[styles.chip, isCurrent && styles.chipActive, isFuture && styles.chipDisabled]}
+                    onPress={() => !isFuture && !saving && fixSessionDate(session, d)}
+                    disabled={isFuture || saving}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipDay, isCurrent && styles.chipDayActive]}>{WEEK_DAYS_SHORT[wd]}</Text>
+                    <Text style={[styles.chipNum, isCurrent && styles.chipNumActive]}>{d.getDate()}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity style={styles.modalCancel} onPress={() => setFixingIndex(null)} disabled={saving}>
+              <Text style={styles.modalCancelText}>{saving ? 'GUARDANDO…' : 'CANCELAR'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -115,7 +199,15 @@ const styles = StyleSheet.create({
 
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
   sessionBlock: { gap: spacing.sm },
-  sessionTag: { ...typography.label, letterSpacing: 2, fontSize: 10, marginTop: spacing.sm },
+  sessionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.sm },
+  sessionTag: { ...typography.label, letterSpacing: 2, fontSize: 10 },
+  fixBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent + '55',
+    backgroundColor: colors.accentSoft,
+    paddingHorizontal: spacing.sm + 2, paddingVertical: 6, marginLeft: 'auto',
+  },
+  fixBtnText: { fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.accent },
 
   exCard: { gap: spacing.sm },
   exRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -138,4 +230,28 @@ const styles = StyleSheet.create({
   setPillLabel: { fontSize: 10, fontWeight: '900', color: colors.accent },
   setPillValue: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
   hint: { ...typography.caption, textAlign: 'center', fontStyle: 'italic', marginTop: spacing.sm },
+
+  modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay },
+  modalCard: {
+    width: '100%', backgroundColor: colors.backgroundElevated,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,
+    padding: spacing.xl, gap: spacing.md,
+  },
+  modalTitle: { ...typography.h2, fontSize: 19 },
+  modalSub: { ...typography.caption, marginTop: -spacing.sm },
+  chipsRow: { flexDirection: 'row', gap: spacing.xs + 2 },
+  chip: {
+    flex: 1, alignItems: 'center', gap: 2,
+    paddingVertical: spacing.sm, borderRadius: radius.sm,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipDisabled: { opacity: 0.35 },
+  chipDay: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5, color: colors.textMuted },
+  chipDayActive: { color: colors.background },
+  chipNum: { ...typography.mono, fontSize: 13, color: colors.textPrimary },
+  chipNumActive: { color: colors.background },
+  modalCancel: { alignSelf: 'center', paddingVertical: spacing.sm },
+  modalCancelText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
 });
