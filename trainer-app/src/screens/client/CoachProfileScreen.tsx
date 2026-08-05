@@ -284,6 +284,16 @@ export default function CoachProfileScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.calcBtn}
+          onPress={() => navigation.navigate('Settings')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="settings-outline" size={18} color={colors.accent} />
+          <Text style={styles.calcBtnText}>AJUSTES</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
+
         <View style={styles.logoutSection}>
           <TouchableOpacity onPress={handleSignOut}>
             <Text style={styles.logoutBtn}>CERRAR SESIÓN</Text>

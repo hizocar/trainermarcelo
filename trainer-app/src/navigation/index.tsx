@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../context/AuthContext';
+import { useBiometricLock } from '../hooks/useBiometricLock';
 import { colors } from '../theme';
 
 export const navigationRef = createNavigationContainerRef<any>();
@@ -34,6 +35,8 @@ import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
 import SubscriptionExpiredScreen from '../screens/coach/SubscriptionExpiredScreen';
 import GymScreen from '../screens/coach/GymScreen';
+import AppLockScreen from '../screens/shared/AppLockScreen';
+import SettingsScreen from '../screens/shared/SettingsScreen';
 
 // Client
 import HomeScreen from '../screens/client/HomeScreen';
@@ -113,6 +116,7 @@ function ClientTabs() {
 
 export default function AppNavigator() {
   const { session, user, loading } = useAuth();
+  const { locked, ready: lockReady, tryUnlock } = useBiometricLock(user?.id);
 
   React.useEffect(() => {
     // app abierta desde una notificación tocada
@@ -126,7 +130,11 @@ export default function AppNavigator() {
     return () => sub.remove();
   }, [session]);
 
-  if (loading) return null;
+  if (loading || (session && !lockReady)) return null;
+
+  // Face ID activado por el usuario: bloquea toda la app hasta verificar.
+  // Los datos no se tocan — solo se pausa la vista hasta desbloquear.
+  if (session && locked) return <AppLockScreen onUnlock={tryUnlock} />;
 
   // el gimnasio no está al día: se pausa el panel de coach (los datos no se tocan)
   const subscriptionBlocked = user?.role === 'coach' && !!user.gymStatus && !['active', 'trialing'].includes(user.gymStatus);
@@ -153,6 +161,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="Gym" component={GymScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
         ) : (
           <>
@@ -162,6 +171,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Body" component={BodyProgressScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
         )}
       </Stack.Navigator>

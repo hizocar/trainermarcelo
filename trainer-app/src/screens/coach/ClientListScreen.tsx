@@ -69,6 +69,9 @@ export default function ClientListScreen() {
             <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="calculator-outline" size={18} color={colors.textMuted} />
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleSignOut} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="log-out-outline" size={19} color={colors.textMuted} />
             </TouchableOpacity>
