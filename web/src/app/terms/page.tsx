@@ -45,8 +45,7 @@ export default function TermsPage() {
             <h2 style={{ fontSize: 18, color: 'var(--text)', marginBottom: 8 }}>3. Precio y facturación</h2>
             <p>
               Los planes se cobran de forma recurrente (mensual o anual) a través de Flow, la
-              pasarela de pago chilena. Los nuevos gimnasios acceden a 14 días de prueba; si no
-              cancelas antes de que termine, se realiza el primer cobro automáticamente. Los
+              pasarela de pago chilena. El primer cobro se realiza al registrar tu tarjeta. Los
               precios están en pesos chilenos, IVA incluido, y pueden actualizarse — te
               avisaremos con anticipación si esto ocurre para tu plan.
             </p>

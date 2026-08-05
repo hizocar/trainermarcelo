@@ -160,7 +160,7 @@ export default function LandingPage() {
             <h2>Para un entrenador o para todo un gimnasio</h2>
             <p className="lead">
               El precio escala con cuántos <em style={{ fontStyle: 'normal', color: 'var(--text)' }}>entrenadores</em> hay,
-              no con cuántos clientes tengan — clientes siempre ilimitados. Primeros 14 días gratis, cancela cuando quieras.
+              no con cuántos clientes tengan — clientes siempre ilimitados. Cancela cuando quieras.
             </p>
           </div>
 

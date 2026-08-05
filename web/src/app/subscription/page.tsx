@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   active: { label: 'Activa', tone: 'var(--text)' },
-  trialing: { label: 'En prueba (14 días)', tone: 'var(--text)' },
+  trialing: { label: 'En prueba', tone: 'var(--text)' },
   past_due: { label: 'Pago atrasado', tone: 'var(--text-muted)' },
   canceled: { label: 'Cancelada', tone: 'var(--text-muted)' },
   incomplete: { label: 'Pendiente de pago', tone: 'var(--text-muted)' },
