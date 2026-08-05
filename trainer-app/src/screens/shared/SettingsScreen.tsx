@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, typography } from '../../theme';
@@ -8,6 +9,7 @@ import { isBiometricSupported, isBiometricEnabled, setBiometricEnabled, authenti
 import { showAlert } from '../../lib/alert';
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -39,13 +41,19 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>AJUSTES</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
+          <Text style={styles.backText}>ATRÁS</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>AJUSTES</Text>
+      </View>
 
       <Card style={styles.card}>
         <View style={styles.row}>
           <Ionicons name="scan-outline" size={18} color={colors.accent} />
           <View style={styles.info}>
-            <Text style={styles.title}>DESBLOQUEO CON FACE ID</Text>
+            <Text style={styles.rowTitle}>DESBLOQUEO CON FACE ID</Text>
             <Text style={styles.sub}>
               {supported
                 ? 'Pide Face ID (o tu huella) cada vez que abres la app'
@@ -66,11 +74,14 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: 70, paddingHorizontal: spacing.xl, gap: spacing.md },
-  sectionLabel: { ...typography.label, letterSpacing: 3 },
+  container: { flex: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: spacing.xl, gap: spacing.lg },
+  header: { gap: spacing.xs },
+  backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
+  backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
+  headerTitle: { ...typography.display, fontSize: 30 },
   card: { gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   info: { flex: 1 },
-  title: { ...typography.label, color: colors.textPrimary, letterSpacing: 1.5 },
+  rowTitle: { ...typography.label, color: colors.textPrimary, letterSpacing: 1.5 },
   sub: { ...typography.caption, fontSize: 10, marginTop: 2 },
 });
