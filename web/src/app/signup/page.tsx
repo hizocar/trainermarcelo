@@ -157,6 +157,12 @@ export default function SignupPage() {
         <p style={{ marginTop: 12, fontSize: 13 }}>
           <Link href="/login" className="muted">¿Ya tienes cuenta? Inicia sesión</Link>
         </p>
+        <p style={{ marginTop: 12, fontSize: 13 }} className="muted">
+          ¿Dudas antes de registrarte?{' '}
+          <a href="https://wa.me/56949684325" target="_blank" rel="noopener noreferrer" className="accent">
+            Escríbenos por WhatsApp
+          </a>
+        </p>
       </div>
     </div>
   );

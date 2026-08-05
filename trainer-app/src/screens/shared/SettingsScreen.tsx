@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -68,6 +68,21 @@ export default function SettingsScreen() {
             thumbColor={colors.textPrimary}
           />
         </View>
+      </Card>
+
+      <Card style={styles.card}>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => Linking.openURL('https://wa.me/56949684325')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="logo-whatsapp" size={18} color={colors.accent} />
+          <View style={styles.info}>
+            <Text style={styles.rowTitle}>DUDAS COMERCIALES</Text>
+            <Text style={styles.sub}>Escríbenos por WhatsApp — +56 9 4968 4325</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
       </Card>
     </View>
   );

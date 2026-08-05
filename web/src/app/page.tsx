@@ -251,8 +251,8 @@ export default function LandingPage() {
             <details>
               <summary>¿Cómo consigo acceso a la app?</summary>
               <p>
-                El acceso es por invitación de tu coach. Escríbenos con el botón de abajo y te
-                conectamos con Marcelo Herrera, coach fundador de EliteFitness, para comenzar tu plan.
+                Si eres entrenador, te registras directo en la sección de precios de arriba. Si
+                eres cliente, el acceso es por invitación de tu entrenador — pídesela a él.
               </p>
             </details>
             <details>
@@ -319,6 +319,7 @@ export default function LandingPage() {
             <div className="footer-col">
               <h4>Contacto</h4>
               <a href="mailto:hizocar@gmail.com">hizocar@gmail.com</a>
+              <a href="https://wa.me/56949684325" target="_blank" rel="noopener noreferrer">WhatsApp +56 9 4968 4325</a>
               <span className="muted" style={{ fontSize: 13 }}>Coach fundador: Marcelo Herrera</span>
             </div>
           </div>
