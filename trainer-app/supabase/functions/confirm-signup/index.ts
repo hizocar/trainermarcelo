@@ -71,8 +71,10 @@ Deno.serve(async (req) => {
     if (existingUser) {
       userId = existingUser.id;
     } else {
+      const site = Deno.env.get('SITE_URL') ?? 'https://elitefitapp.com';
       const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(pending.email, {
         data: { name: pending.name, role: 'coach_pending' },
+        redirectTo: `${site}/set-password`,
       });
       if (inviteErr || !invited.user) throw new Error(inviteErr?.message ?? 'No se pudo invitar al coach');
       userId = invited.user.id;
