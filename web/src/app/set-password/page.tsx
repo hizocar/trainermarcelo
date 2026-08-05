@@ -7,9 +7,9 @@ import { createClient } from '@/lib/supabase-browser';
 import Logo from '@/components/Logo';
 
 // Destino del link de invitación/recuperación de contraseña que manda
-// Supabase Auth. El cliente de Supabase detecta la sesión a partir del
-// token en la URL automáticamente (createBrowserClient), así que acá solo
-// falta pedir la contraseña nueva y guardarla.
+// Supabase Auth. A diferencia del cliente estándar de supabase-js, el
+// cliente de @supabase/ssr NO parsea solo el token del hash de la URL —
+// hay que leerlo nosotros y armar la sesión con setSession() a mano.
 function SetPasswordInner() {
   const router = useRouter();
   const supabase = createClient();
@@ -21,10 +21,26 @@ function SetPasswordInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    async function init() {
+      const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+      const params = new URLSearchParams(hash);
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+      if (access_token && refresh_token) {
+        const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (!setErr) {
+          // limpia el token de la URL — no queda dando vueltas en el historial
+          window.history.replaceState(null, '', window.location.pathname);
+          setHasSession(true);
+          setChecking(false);
+          return;
+        }
+      }
+      const { data } = await supabase.auth.getSession();
       setHasSession(!!data.session);
       setChecking(false);
-    });
+    }
+    init();
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) setHasSession(true);
     });
