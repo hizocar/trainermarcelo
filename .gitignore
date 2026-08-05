@@ -4,3 +4,6 @@ node_modules/
 .DS_Store
 *.xlsx
 .playwright-mcp/
+Captura de pantalla*.png
+Screen Shot*.png
+Screenshot*.png
