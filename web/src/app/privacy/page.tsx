@@ -26,8 +26,10 @@ export default function PrivacyPage() {
             <h2 style={{ fontSize: 18, color: 'var(--text)', marginBottom: 8 }}>1. Quiénes somos</h2>
             <p>
               EliteFitness es una aplicación de entrenamiento personalizado que conecta a
-              entrenadores con sus clientes. El acceso es por invitación: no existe registro
-              público abierto. Si tienes preguntas sobre esta política, escríbenos a{' '}
+              entrenadores con sus clientes. Los entrenadores se registran directamente en{' '}
+              <a href="https://elitefitapp.com/signup" className="accent">elitefitapp.com/signup</a>;
+              sus clientes acceden por invitación del entrenador. Si tienes preguntas sobre
+              esta política, escríbenos a{' '}
               <a href="mailto:hizocar@gmail.com" className="accent">hizocar@gmail.com</a>.
             </p>
           </section>
