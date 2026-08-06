@@ -13,6 +13,7 @@ import Card from '../../components/common/Card';
 import TrendChart from '../../components/common/TrendChart';
 import { getCurrentWeek } from '../../lib/weeks';
 import { energyPerformance } from '../../lib/progress';
+import { resolveActiveWeek, PlanWeek } from '../../lib/plan';
 import HistoryScreen from './HistoryScreen';
 
 type RouteParams = { client?: User; clientId?: string; clientName?: string };
@@ -29,7 +30,14 @@ interface ExerciseInfo {
   name: string;
   unit: string;
   day_id: string;
+  library_id: string | null;
 }
+
+// Con "Gestión de semanas" cada semana duplicada crea FILAS de ejercicio
+// nuevas (mismo ejercicio, id distinto) — sin esto, "Press banca" se vería
+// como varios ejercicios sueltos de un solo punto cada vez que el coach
+// duplica una semana, en vez de una sola línea de progreso continua.
+const contKey = (e: ExerciseInfo) => e.library_id ?? e.name.trim().toLowerCase();
 
 interface PlanDay {
   id: string;
@@ -79,14 +87,22 @@ export default function ProgressScreen() {
     if (!plan) { setLoading(false); return; }
 
     const { data: days } = await supabase
-      .from('training_days').select('id, day_number, name')
+      .from('training_days').select('id, day_number, name, plan_week_id')
       .eq('plan_id', plan.id).order('day_number');
-    setPlanDays(days ?? []);
     const dayIds = (days ?? []).map(d => d.id);
     if (dayIds.length === 0) { setLoading(false); return; }
 
+    // "días del plan" para agrupar/filtrar en pantalla = solo los de la
+    // semana activa ahora mismo; el HISTORIAL (más abajo) sí mira todas las
+    // semanas que alguna vez existieron, para no perder progreso pasado
+    const { data: weeksData } = await supabase
+      .from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false);
+    const activeWeek = resolveActiveWeek((weeksData ?? []) as PlanWeek[], getCurrentWeek());
+    const currentDays = activeWeek ? (days ?? []).filter(d => d.plan_week_id === activeWeek.id) : [];
+    setPlanDays(currentDays);
+
     const { data: exs } = await supabase
-      .from('exercises').select('id, name, unit, day_id')
+      .from('exercises').select('id, name, unit, day_id, library_id')
       .in('day_id', dayIds).order('order_index');
     setExercises(exs ?? []);
 
@@ -147,35 +163,45 @@ export default function ProgressScreen() {
 
   // ── progresión por ejercicio ──────────────────────────────────────────────
   const progress = useMemo<ExProgress[]>(() => {
-    const byEx: Record<string, Record<number, LogRow[]>> = {};
+    const exById: Record<string, ExerciseInfo> = {};
+    exercises.forEach(e => { exById[e.id] = e; });
+    const currentDayIds = new Set(planDays.map(d => d.id));
+
+    // agrupado por CONTINUIDAD (misma biblioteca o mismo nombre), no por id
+    // de fila — así una semana duplicada no fragmenta el progreso
+    const byKey: Record<string, Record<number, LogRow[]>> = {};
+    const repByKey: Record<string, ExerciseInfo> = {};
     closedLogs.forEach(l => {
       const exId = seriesExMap[l.series_id];
-      if (!exId) return;
-      ((byEx[exId] ??= {})[l.week_number] ??= []).push(l);
+      const ex = exId ? exById[exId] : undefined;
+      if (!ex) return;
+      const key = contKey(ex);
+      ((byKey[key] ??= {})[l.week_number] ??= []).push(l);
+      // preferimos como "representante" (nombre/unidad/día a mostrar) el que
+      // pertenece a la semana activa ahora mismo
+      if (!repByKey[key] || currentDayIds.has(ex.day_id)) repByKey[key] = ex;
     });
 
-    return exercises
-      .filter(e => byEx[e.id])
-      .map(e => {
-        const weeks = Object.keys(byEx[e.id]).map(Number).sort((a, b) => a - b);
-        const points = weeks.map(w => ({
-          week: w,
-          score: Math.max(...byEx[e.id][w].map(l => score(l.weight, l.reps))),
-        }));
-        const last = points[points.length - 1];
-        const prev = points.length > 1 ? points[points.length - 2] : null;
-        const delta = prev ? ((last.score - prev.score) / prev.score) * 100 : null;
+    return Object.keys(byKey).map(key => {
+      const weeks = Object.keys(byKey[key]).map(Number).sort((a, b) => a - b);
+      const points = weeks.map(w => ({
+        week: w,
+        score: Math.max(...byKey[key][w].map(l => score(l.weight, l.reps))),
+      }));
+      const last = points[points.length - 1];
+      const prev = points.length > 1 ? points[points.length - 2] : null;
+      const delta = prev ? ((last.score - prev.score) / prev.score) * 100 : null;
 
-        let best = { weight: 0, reps: 0, week: 0 };
-        weeks.forEach(w => byEx[e.id][w].forEach(l => {
-          if (score(l.weight, l.reps) > score(best.weight, best.reps)) {
-            best = { weight: l.weight, reps: l.reps, week: w };
-          }
-        }));
+      let best = { weight: 0, reps: 0, week: 0 };
+      weeks.forEach(w => byKey[key][w].forEach(l => {
+        if (score(l.weight, l.reps) > score(best.weight, best.reps)) {
+          best = { weight: l.weight, reps: l.reps, week: w };
+        }
+      }));
 
-        return { exercise: e, points, delta, lastWeek: last.week, best };
-      });
-  }, [closedLogs, exercises, seriesExMap]);
+      return { exercise: repByKey[key], points, delta, lastWeek: last.week, best };
+    });
+  }, [closedLogs, exercises, seriesExMap, planDays]);
 
   // agrupado por día del plan (Torso 1, Pierna, ...) en el orden del plan
   const toneOf = (d: number | null): 'up' | 'flat' | 'down' =>

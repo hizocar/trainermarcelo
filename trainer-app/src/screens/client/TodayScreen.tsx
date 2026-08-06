@@ -8,13 +8,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { TrainingDay, Exercise } from '../../types';
-import { fetchFullPlan, fetchLogs, activeDays, PlanDay, PlanExercise } from '../../lib/plan';
+import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, PlanDay, PlanExercise } from '../../lib/plan';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
+
+// Colores estables para biseries/triseries — el mismo texto de grupo siempre
+// se ve del mismo color, así el cliente identifica de un vistazo qué
+// ejercicios van encadenados sin descanso entre ellos.
+const GROUP_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#22c55e', '#ef4444'];
+function groupColor(group: string) {
+  let h = 0;
+  for (let i = 0; i < group.length; i++) h = (h * 31 + group.charCodeAt(i)) >>> 0;
+  return GROUP_COLORS[h % GROUP_COLORS.length];
+}
 
 const PHASE_INFO: Record<string, { label: string; color: string }> = {
   acumulacion: { label: 'ACUMULACIÓN', color: colors.accent },
@@ -35,53 +45,49 @@ export default function TodayScreen() {
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [allLogs, setAllLogs] = useState<{ series_id: string; week_number: number }[]>([]);
+  // null mientras carga; false = hay semana definida; true = el coach no
+  // planificó esta semana calendario (ni hay una anterior marcada "repetir")
+  const [noPlanForWeek, setNoPlanForWeek] = useState(false);
+  const [noPlanAtAll, setNoPlanAtAll] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
-  const seriesToExerciseRef = React.useRef<Record<string, string> | undefined>(undefined);
 
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
   const currentWeek = getCurrentWeek();
   const viewingPastWeek = selectedWeek !== currentWeek;
 
-  // refresca al volver de WorkoutLog para actualizar los checks de completado
-  useFocusEffect(useCallback(() => { if (user?.id) fetchPlan(); }, [user?.id]));
-  // al cambiar de semana recalculamos sin volver a pedir el plan completo
-  React.useEffect(() => { if (user?.id && days.length > 0) applyWeek(days, allLogs); }, [selectedWeek]);
+  // cada semana es un plan independiente: hay que volver a pedirlo al
+  // cambiar de semana, no solo recalcular los checks localmente
+  useFocusEffect(useCallback(() => { if (user?.id) fetchWeek(selectedWeek); }, [user?.id, selectedWeek]));
 
-  async function fetchPlan() {
+  async function fetchWeek(week: number) {
     if (!user?.id) return;
-    const plan = await fetchFullPlan(user.id);
-    if (!plan) { setLoading(false); return; }
+    setLoading(true);
+    const plan = await fetchFullPlan(user.id, week);
+    if (!plan) { setLoading(false); setDays([]); setNoPlanAtAll(true); setNoPlanForWeek(true); return; }
+    setNoPlanAtAll(false);
 
-    const { data: ph } = await supabase
-      .from('week_phases').select('phase')
-      .eq('plan_id', plan.id).eq('week_number', selectedWeek).maybeSingle();
-    setPhase(ph?.phase ?? null);
+    setPhase(plan.activeWeek?.is_deload ? 'descarga' : null);
+    setNoPlanForWeek(!plan.activeWeek);
 
     const list = activeDays(plan.days);
     setDays(list);
 
-    // todos los logs del plan en una consulta: navegar entre semanas no vuelve a pedir nada
-    const logs = await fetchLogs(plan.seriesIds);
-    setAllLogs(logs);
-    applyWeek(list, logs, plan.seriesToExercise);
+    const logs = await fetchLogs(plan.seriesIds, week);
+    applyWeek(list, logs, plan.seriesToExercise, week === currentWeek);
 
     setLoading(false);
   }
 
-  // recalcula estado (ejercicios hechos, progreso, recordatorios) para la semana elegida
+  // recalcula estado (ejercicios hechos, progreso, recordatorios) de la semana ya cargada
   function applyWeek(
     list: PlanDay[],
     logs: { series_id: string; week_number: number }[],
-    seriesToExercise?: Record<string, string>,
+    seriesToExercise: Record<string, string>,
+    isCurrentWeek: boolean,
   ) {
-    const map = seriesToExercise ?? seriesToExerciseRef.current;
-    if (!map) return;
-    seriesToExerciseRef.current = map;
-
-    const loggedSeries = new Set(logs.filter(l => l.week_number === selectedWeek).map(l => l.series_id));
+    const loggedSeries = new Set(logs.map(l => l.series_id));
     const doneEx = new Set(
-      Object.entries(map).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
+      Object.entries(seriesToExercise).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
     );
     setLoggedExercises(doneEx);
 
@@ -94,16 +100,14 @@ export default function TodayScreen() {
     });
     setDayStatus(status);
 
-    // los recordatorios siempre miran la semana REAL de hoy, no la que se está navegando
-    const currentLoggedSeries = new Set(logs.filter(l => l.week_number === currentWeek).map(l => l.series_id));
-    const currentDoneEx = new Set(
-      Object.entries(map).filter(([sid]) => currentLoggedSeries.has(sid)).map(([, exId]) => exId),
-    );
-    refreshReminders(list.map(d => {
-      const total = d.exercises.length;
-      const done = d.exercises.filter(e => currentDoneEx.has(e.id)).length;
-      return { id: d.id, day_number: d.day_number, name: d.name, week_day: d.week_day, done: total > 0 && done >= total };
-    }));
+    // los recordatorios solo se tocan viendo la semana REAL de hoy — navegar
+    // semanas pasadas no debería reprogramar notificaciones
+    if (isCurrentWeek) {
+      refreshReminders(list.map(d => {
+        const st = status[d.id];
+        return { id: d.id, day_number: d.day_number, name: d.name, week_day: d.week_day, done: !!st && st.total > 0 && st.done >= st.total };
+      }));
+    }
 
     // selección: conservar la elección manual; si no hay, el primer día incompleto
     const isDayComplete = (d: PlanDay) =>
@@ -224,8 +228,12 @@ export default function TodayScreen() {
         <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
       ) : days.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>SIN PLAN</Text>
-          <Text style={styles.emptyText}>Tu coach aún no ha configurado tu plan de entrenamiento.</Text>
+          <Text style={styles.emptyTitle}>{noPlanAtAll ? 'SIN PLAN' : `SIN PLAN · SEMANA ${selectedWeek}`}</Text>
+          <Text style={styles.emptyText}>
+            {noPlanAtAll
+              ? 'Tu coach aún no ha configurado tu plan de entrenamiento.'
+              : 'Tu coach todavía no planificó esta semana. Prueba mirando otra semana con las flechas de arriba.'}
+          </Text>
         </View>
       ) : (
         <>
@@ -315,51 +323,68 @@ export default function TodayScreen() {
                 </Text>
               </Card>
             )}
-            {exercises.map(ex => {
-              const done = loggedExercises.has(ex.id);
-              return (
-                <TouchableOpacity
-                  key={ex.id}
-                  onPress={() => navigation.navigate('WorkoutLog', {
-                    exercise: ex,
-                    week: selectedWeek,
-                    // Registrando en vivo (semana actual): la fecha es HOY de
-                    // verdad, sin importar qué día de la semana le toca a este
-                    // entrenamiento en el split — si lo entrenaste antes o
-                    // después de lo calendarizado, igual queda con la fecha
-                    // real. Solo al ponerse al día con una semana PASADA tiene
-                    // sentido usar la fecha calendarizada de ese día (acá sí
-                    // se puede corregir a mano con los chips "¿cuándo lo
-                    // hiciste?" si hace falta).
-                    date: viewingPastWeek && selectedDay?.week_day != null
-                      ? dateForWeekDay(selectedWeek, selectedDay.week_day).toISOString()
-                      : new Date().toISOString(),
-                  })}
-                  activeOpacity={0.7}
-                >
-                  <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
-                    <View style={styles.exerciseRow}>
-                      {ex.image_url ? (
-                        <Image source={{ uri: ex.image_url }} style={styles.thumb} />
-                      ) : (
-                        <View style={[styles.thumb, styles.thumbPlaceholder]}>
-                          <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
+            {groupBySuperseries(exercises).map(group => {
+              const color = group.superseries ? groupColor(group.superseries) : null;
+              const body = group.exercises.map(ex => {
+                const done = loggedExercises.has(ex.id);
+                return (
+                  <TouchableOpacity
+                    key={ex.id}
+                    onPress={() => navigation.navigate('WorkoutLog', {
+                      exercise: ex,
+                      week: selectedWeek,
+                      // Registrando en vivo (semana actual): la fecha es HOY de
+                      // verdad, sin importar qué día de la semana le toca a este
+                      // entrenamiento en el split — si lo entrenaste antes o
+                      // después de lo calendarizado, igual queda con la fecha
+                      // real. Solo al ponerse al día con una semana PASADA tiene
+                      // sentido usar la fecha calendarizada de ese día (acá sí
+                      // se puede corregir a mano con los chips "¿cuándo lo
+                      // hiciste?" si hace falta).
+                      date: viewingPastWeek && selectedDay?.week_day != null
+                        ? dateForWeekDay(selectedWeek, selectedDay.week_day).toISOString()
+                        : new Date().toISOString(),
+                    })}
+                    activeOpacity={0.7}
+                  >
+                    <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
+                      <View style={styles.exerciseRow}>
+                        {ex.image_url ? (
+                          <Image source={{ uri: ex.image_url }} style={styles.thumb} />
+                        ) : (
+                          <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                            <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
+                          </View>
+                        )}
+                        <View style={styles.exerciseInfo}>
+                          <Text style={styles.exerciseName}>{ex.name}</Text>
+                          <Text style={styles.exerciseMeta}>
+                            {ex.muscle_group ? `${ex.muscle_group} · ` : ''}
+                            {ex.exercise_series.length} series · {ex.reps_objective} reps
+                            {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
+                          </Text>
                         </View>
-                      )}
-                      <View style={styles.exerciseInfo}>
-                        <Text style={styles.exerciseName}>{ex.name}</Text>
-                        <Text style={styles.exerciseMeta}>
-                          {ex.muscle_group ? `${ex.muscle_group} · ` : ''}
-                          {ex.exercise_series.length} series · {ex.reps_objective} reps
-                          {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
-                        </Text>
+                        <View style={[styles.logBtn, done && styles.logBtnDone]}>
+                          <Ionicons name={done ? 'checkmark' : 'add'} size={22} color={colors.background} />
+                        </View>
                       </View>
-                      <View style={[styles.logBtn, done && styles.logBtnDone]}>
-                        <Ionicons name={done ? 'checkmark' : 'add'} size={22} color={colors.background} />
-                      </View>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
+                    </Card>
+                  </TouchableOpacity>
+                );
+              });
+
+              if (!color) return <React.Fragment key={group.key}>{body}</React.Fragment>;
+
+              return (
+                <View key={group.key} style={[styles.superGroup, { borderColor: color }]}>
+                  <View style={[styles.superGroupTag, { backgroundColor: color }]}>
+                    <Ionicons name="link" size={11} color={colors.background} />
+                    <Text style={styles.superGroupTagText}>
+                      {group.exercises.length >= 3 ? 'TRISERIE' : 'BISERIE'} {group.superseries}
+                    </Text>
+                  </View>
+                  <View style={{ gap: spacing.sm }}>{body}</View>
+                </View>
               );
             })}
 
@@ -512,6 +537,15 @@ const styles = StyleSheet.create({
   nextLabel: { ...typography.label, letterSpacing: 2, fontSize: 9 },
   nextText: { ...typography.body, fontSize: 14 },
   nextHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },
+  superGroup: {
+    borderWidth: 1.5, borderRadius: radius.md,
+    padding: spacing.sm, marginBottom: spacing.sm, gap: spacing.sm,
+  },
+  superGroupTag: {
+    flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 4,
+    borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3,
+  },
+  superGroupTagText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.background },
   exerciseCard: { },
   exerciseCardDone: { borderColor: colors.accent + '66' },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },

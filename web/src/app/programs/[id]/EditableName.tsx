@@ -9,6 +9,7 @@ export default function EditableName({ templateId, initialName }: { templateId: 
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   async function commit() {
     const trimmed = name.trim();
@@ -16,18 +17,36 @@ export default function EditableName({ templateId, initialName }: { templateId: 
     setSaving(true);
     const { error } = await supabase.from('program_templates').update({ name: trimmed }).eq('id', templateId);
     setSaving(false);
-    if (!error) router.refresh();
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+      router.refresh();
+    }
   }
 
   return (
-    <input
-      className="display"
-      style={{ fontSize: 40, background: 'transparent', border: 'none', outline: 'none', width: '100%', padding: 0 }}
-      value={name}
-      onChange={(e) => setName(e.target.value)}
-      onBlur={commit}
-      disabled={saving}
-      placeholder="Nombre del programa"
-    />
+    <div>
+      <input
+        className="display"
+        style={{
+          fontSize: 40,
+          background: 'transparent',
+          border: 'none',
+          borderBottom: '2px dashed var(--border)',
+          outline: 'none',
+          width: '100%',
+          padding: '0 0 4px',
+        }}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        disabled={saving}
+        placeholder="Nombre del programa"
+      />
+      <span className="label muted" style={{ fontSize: 10, letterSpacing: 1 }}>
+        ✎ {saving ? 'guardando…' : saved ? 'guardado' : 'toca para editar el nombre'}
+      </span>
+    </div>
   );
 }

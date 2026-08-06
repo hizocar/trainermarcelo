@@ -5,11 +5,20 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useBiometricLock } from '../hooks/useBiometricLock';
 import { colors } from '../theme';
 
 export const navigationRef = createNavigationContainerRef<any>();
+
+// iOS puede matar la app en segundo plano (poca RAM / poca señal en el
+// gimnasio) sin avisar. Sin esto, al volver React Navigation arranca de
+// cero y el usuario "pierde" el ejercicio que tenía abierto. Guardamos el
+// árbol de navegación en cada cambio y lo restauramos al abrir de nuevo —
+// pero SOLO si sigue siendo el mismo usuario logueado, para no aterrizar
+// en una pantalla de coach estando logueado como cliente (o viceversa).
+const NAV_STATE_KEY = 'nav-state-v1';
 
 // Abre el chat correspondiente cuando el usuario toca una notificación de mensaje.
 function openChatFromNotification(data: any) {
@@ -31,6 +40,9 @@ import ClientListScreen from '../screens/coach/ClientListScreen';
 import ClientDetailScreen from '../screens/coach/ClientDetailScreen';
 import DayExercisesScreen from '../screens/coach/DayExercisesScreen';
 import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
+import WeekManagerScreen from '../screens/coach/WeekManagerScreen';
+import ProgramsListScreen from '../screens/coach/ProgramsListScreen';
+import ProgramEditorScreen from '../screens/coach/ProgramEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
 import SubscriptionExpiredScreen from '../screens/coach/SubscriptionExpiredScreen';
@@ -117,6 +129,8 @@ function ClientTabs() {
 export default function AppNavigator() {
   const { session, user, loading } = useAuth();
   const { locked, ready: lockReady, tryUnlock } = useBiometricLock(user?.id);
+  const [navReady, setNavReady] = React.useState(false);
+  const [initialState, setInitialState] = React.useState<any>(undefined);
 
   React.useEffect(() => {
     // app abierta desde una notificación tocada
@@ -130,7 +144,35 @@ export default function AppNavigator() {
     return () => sub.remove();
   }, [session]);
 
-  if (loading || (session && !lockReady)) return null;
+  React.useEffect(() => {
+    if (loading) return;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(NAV_STATE_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved.userId && saved.userId === user?.id) setInitialState(saved.state);
+        }
+      } catch {
+        // estado corrupto o no legible: se ignora y arranca de cero, no es fatal
+      } finally {
+        setNavReady(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  function persistNavState(state: any) {
+    if (!user?.id) return;
+    AsyncStorage.setItem(NAV_STATE_KEY, JSON.stringify({ userId: user.id, state })).catch(() => {});
+  }
+
+  React.useEffect(() => {
+    // logout: no dejar el árbol de navegación de la sesión anterior guardado
+    if (!loading && !session) AsyncStorage.removeItem(NAV_STATE_KEY).catch(() => {});
+  }, [loading, session]);
+
+  if (loading || !navReady || (session && !lockReady)) return null;
 
   // Face ID activado por el usuario: bloquea toda la app hasta verificar.
   // Los datos no se tocan — solo se pausa la vista hasta desbloquear.
@@ -140,7 +182,11 @@ export default function AppNavigator() {
   const subscriptionBlocked = user?.role === 'coach' && !!user.gymStatus && !['active', 'trialing'].includes(user.gymStatus);
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      initialState={session ? initialState : undefined}
+      onStateChange={persistNavState}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -157,6 +203,9 @@ export default function AppNavigator() {
             <Stack.Screen name="SessionDetail" component={SessionDetailScreen} />
             <Stack.Screen name="ClientBody" component={BodyProgressScreen} />
             <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
+            <Stack.Screen name="WeekManager" component={WeekManagerScreen} />
+            <Stack.Screen name="Programs" component={ProgramsListScreen} />
+            <Stack.Screen name="ProgramEditor" component={ProgramEditorScreen} />
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
             <Stack.Screen name="Calculators" component={CalculatorsScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />

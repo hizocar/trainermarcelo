@@ -27,7 +27,7 @@ const MUSCLE_GROUPS = [
   'Gastrocnemios', 'Core',
 ];
 
-type RouteParams = { client: User };
+type RouteParams = { client: User; planWeekId: string; weekLabel?: string };
 
 interface DayWithExercises extends TrainingDay {
   exercises: Exercise[];
@@ -36,7 +36,7 @@ interface DayWithExercises extends TrainingDay {
 export default function PlanEditorScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const { client } = route.params as RouteParams;
+  const { client, planWeekId, weekLabel } = route.params as RouteParams;
   const { user } = useAuth();
 
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
@@ -113,7 +113,7 @@ export default function PlanEditorScreen() {
     setSaving(true);
     const { data: newDay, error } = await supabase
       .from('training_days')
-      .insert({ plan_id: plan.id, day_number: days.length + 1, name: newDayName.trim() || tpl.name, week_day: newDayWeekDay })
+      .insert({ plan_id: plan.id, plan_week_id: planWeekId, day_number: days.length + 1, name: newDayName.trim() || tpl.name, week_day: newDayWeekDay })
       .select().single();
     if (error || !newDay) { setSaving(false); showAlert('Error', error?.message ?? ''); return; }
 
@@ -151,7 +151,7 @@ export default function PlanEditorScreen() {
 
     const { data: daysData } = await supabase
       .from('training_days').select('*')
-      .eq('plan_id', currentPlan.id).eq('archived', false).order('week_day');
+      .eq('plan_week_id', planWeekId).eq('archived', false).order('week_day');
 
     const daysWithEx: DayWithExercises[] = [];
     for (const d of (daysData ?? [])) {
@@ -170,7 +170,7 @@ export default function PlanEditorScreen() {
     const dayNumber = days.length + 1;
     const { data, error } = await supabase
       .from('training_days')
-      .insert({ plan_id: plan.id, day_number: dayNumber, name: newDayName.trim(), week_day: newDayWeekDay })
+      .insert({ plan_id: plan.id, plan_week_id: planWeekId, day_number: dayNumber, name: newDayName.trim(), week_day: newDayWeekDay })
       .select().single();
     if (!error && data) {
       setDays(prev => [...prev, { ...data, exercises: [] }]);
@@ -473,7 +473,7 @@ export default function PlanEditorScreen() {
           <Text style={styles.backText}>← ATRÁS</Text>
         </TouchableOpacity>
         <View>
-          <Text style={styles.headerLabel}>PLAN DE</Text>
+          <Text style={styles.headerLabel}>{weekLabel ? weekLabel.toUpperCase() : 'PLAN DE'}</Text>
           <Text style={styles.headerName}>{client.name.toUpperCase()}</Text>
         </View>
         <TouchableOpacity style={styles.addDayBtn} onPress={() => setShowDayModal(true)}>

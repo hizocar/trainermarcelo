@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { User, TrainingDay, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { unreadCount } from '../../lib/chat';
-import { fetchFullPlan, PlanDay } from '../../lib/plan';
+import { fetchFullPlan, fetchLogs, PlanDay } from '../../lib/plan';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import MuscleMap from '../../components/common/MuscleMap';
@@ -32,14 +32,32 @@ export default function ClientDetailScreen() {
   const [loading, setLoading] = useState(true);
   const currentWeek = getCurrentWeek();
   const [unread, setUnread] = useState(0);
+  // progreso EN VIVO de la semana actual — antes solo se veía la estructura
+  // del plan y había que esperar a que la semana cerrara para ver los checks
+  const [doneExIds, setDoneExIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchPlan();
   }, []);
 
+  // se refresca cada vez que el coach vuelve a esta pantalla (ej: después de
+  // chatear o revisar otra sección) para que los checks de hoy se vean sin
+  // recargar la app a mano
   useFocusEffect(React.useCallback(() => {
     if (user) unreadCount(user.id, client.id, user.id).then(setUnread);
+    refreshWeekProgress();
   }, [user?.id, client.id]));
+
+  async function refreshWeekProgress() {
+    const plan = await fetchFullPlan(client.id);
+    if (!plan) return;
+    const logs = await fetchLogs(plan.seriesIds, currentWeek);
+    const loggedSeries = new Set(logs.map(l => l.series_id));
+    const doneEx = new Set(
+      Object.entries(plan.seriesToExercise).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
+    );
+    setDoneExIds(doneEx);
+  }
 
   async function fetchPlan() {
     const plan = await fetchFullPlan(client.id);
@@ -93,10 +111,10 @@ export default function ClientDetailScreen() {
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={() => navigation.navigate('PlanEditor', { client })}
+              onPress={() => navigation.navigate('WeekManager', { client })}
               activeOpacity={0.8}
             >
-              <Text style={styles.actionBtnText}>✏ EDITAR PLAN</Text>
+              <Text style={styles.actionBtnText}>✏ EDITAR PLAN · SEMANAS</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionBtn}
@@ -126,9 +144,9 @@ export default function ClientDetailScreen() {
 
           {planDays.length > 0 && (
             <Card style={styles.weekCard}>
-              <Text style={styles.volumeTitle}>SEMANA PLANIFICADA</Text>
+              <Text style={styles.volumeTitle}>SEMANA {currentWeek} · EN VIVO</Text>
               <Text style={styles.volumeSub}>
-                Cada columna es un día · desliza para ver todos los ejercicios de la semana
+                Cada columna es un día · ✓ verde = ya lo registró esta semana
               </Text>
               <ScrollView
                 horizontal
@@ -137,6 +155,7 @@ export default function ClientDetailScreen() {
               >
                 {planDays.map(day => {
                   const totalDaySets = day.exercises.reduce((a, e) => a + e.exercise_series.length, 0);
+                  const doneCount = day.exercises.filter(e => doneExIds.has(e.id)).length;
                   return (
                     <TouchableOpacity
                       key={day.id}
@@ -145,25 +164,37 @@ export default function ClientDetailScreen() {
                       onPress={() => navigation.navigate('DayExercises', { day, client })}
                     >
                       <View style={styles.dayColHeader}>
-                        {day.week_day != null && (
-                          <Text style={styles.dayColWeekday}>{WEEKDAYS[day.week_day] ?? ''}</Text>
-                        )}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          {day.week_day != null && (
+                            <Text style={styles.dayColWeekday}>{WEEKDAYS[day.week_day] ?? ''}</Text>
+                          )}
+                          {day.exercises.length > 0 && (
+                            <Text style={[styles.dayColProgress, doneCount >= day.exercises.length && styles.dayColProgressDone]}>
+                              {doneCount}/{day.exercises.length}
+                            </Text>
+                          )}
+                        </View>
                         <Text style={styles.dayColName} numberOfLines={2}>{day.name.toUpperCase()}</Text>
                         <Text style={styles.dayColMeta}>{day.exercises.length} ej · {totalDaySets} series</Text>
                       </View>
-                      {day.exercises.map(e => (
-                        <View key={e.id} style={styles.exItem}>
-                          <View style={styles.exSetsBadge}>
-                            <Text style={styles.exSetsBadgeText}>{e.exercise_series.length}</Text>
+                      {day.exercises.map(e => {
+                        const done = doneExIds.has(e.id);
+                        return (
+                          <View key={e.id} style={styles.exItem}>
+                            <View style={[styles.exSetsBadge, done && styles.exSetsBadgeDone]}>
+                              {done
+                                ? <Ionicons name="checkmark" size={11} color={colors.background} />
+                                : <Text style={styles.exSetsBadgeText}>{e.exercise_series.length}</Text>}
+                            </View>
+                            <View style={styles.exItemBody}>
+                              <Text style={styles.exItemName} numberOfLines={2}>{e.name}</Text>
+                              {!!e.muscle_group && (
+                                <Text style={styles.exItemGroup} numberOfLines={1}>{e.muscle_group}</Text>
+                              )}
+                            </View>
                           </View>
-                          <View style={styles.exItemBody}>
-                            <Text style={styles.exItemName} numberOfLines={2}>{e.name}</Text>
-                            {!!e.muscle_group && (
-                              <Text style={styles.exItemGroup} numberOfLines={1}>{e.muscle_group}</Text>
-                            )}
-                          </View>
-                        </View>
-                      ))}
+                        );
+                      })}
                       {day.exercises.length === 0 && (
                         <Text style={styles.exItemGroup}>Sin ejercicios</Text>
                       )}
@@ -319,6 +350,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   dayColWeekday: { ...typography.label, fontSize: 9, letterSpacing: 2, color: colors.accent },
+  dayColProgress: { ...typography.monoSm, fontSize: 10, color: colors.textMuted },
+  dayColProgressDone: { color: colors.success, fontWeight: '800' },
   dayColName: { ...typography.h3, fontSize: 13, marginTop: 1 },
   dayColMeta: { ...typography.monoSm, fontSize: 9.5, marginTop: 2 },
   exItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingVertical: 3 },
@@ -327,6 +360,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
+  exSetsBadgeDone: { backgroundColor: colors.success },
   exSetsBadgeText: { fontFamily: fonts.mono, fontSize: 10, color: colors.accent },
   exItemBody: { flex: 1 },
   exItemName: { ...typography.caption, fontSize: 11, color: colors.textPrimary, fontWeight: '600' },

@@ -66,6 +66,9 @@ export default function ClientListScreen() {
                 <Ionicons name="business-outline" size={18} color={colors.accent} />
               </TouchableOpacity>
             )}
+            <TouchableOpacity onPress={() => navigation.navigate('Programs')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="clipboard-outline" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="calculator-outline" size={18} color={colors.textMuted} />
             </TouchableOpacity>

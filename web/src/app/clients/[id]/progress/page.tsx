@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import TrendChart from '@/components/TrendChart';
 import type { AppUser } from '@/lib/types';
+import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
+import { getCurrentWeek } from '@/lib/weeks';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,19 +27,31 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
     .from('workout_plans')
     .select(`
       id,
-      training_days ( id, name, day_number, archived,
+      training_days ( id, name, day_number, archived, plan_week_id,
         exercises ( id, muscle_group, archived, exercise_series ( id ) )
       )
     `)
     .eq('client_id', id)
     .maybeSingle();
 
-  const days = ((plan as any)?.training_days ?? []).filter((d: any) => !d.archived);
-  const exercises = days.flatMap((d: any) => (d.exercises ?? []).filter((e: any) => !e.archived));
+  const { data: weeksData } = plan
+    ? await supabase.from('plan_weeks').select('*').eq('plan_id', (plan as any).id).eq('archived', false)
+    : { data: null };
+  const activeWeek = resolveActiveWeek((weeksData ?? []) as PlanWeek[], getCurrentWeek());
+
+  const allDays = ((plan as any)?.training_days ?? []).filter((d: any) => !d.archived);
+  const allExercises = allDays.flatMap((d: any) => (d.exercises ?? []).filter((e: any) => !e.archived));
+
+  // el volumen por semana mira el historial COMPLETO (todas las semanas
+  // alguna vez planificadas); "series por grupo" en cambio es una foto de
+  // la semana activa ahora mismo — mezclar semanas distintas ahí inflaría
+  // el conteo (ej: 3 semanas duplicadas = 3x las series reales)
+  const days = activeWeek ? allDays.filter((d: any) => d.plan_week_id === activeWeek.id) : [];
+  const activeExercises = days.flatMap((d: any) => (d.exercises ?? []).filter((e: any) => !e.archived));
 
   // series por grupo muscular — misma cuenta que el app
   const groupCounts = new Map<string, number>();
-  exercises.forEach((e: any) => {
+  activeExercises.forEach((e: any) => {
     const g = (e.muscle_group ?? '').trim() || 'Sin grupo';
     groupCounts.set(g, (groupCounts.get(g) ?? 0) + (e.exercise_series?.length ?? 0));
   });
@@ -48,7 +62,7 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
   const totalSets = groups.reduce((a, [, c]) => a + c, 0);
 
   // carga total por semana — a partir de los logs reales del cliente
-  const seriesIds = exercises.flatMap((e: any) => (e.exercise_series ?? []).map((s: any) => s.id));
+  const seriesIds = allExercises.flatMap((e: any) => (e.exercise_series ?? []).map((s: any) => s.id));
   let weeklyVolume: { week: number; volume: number }[] = [];
   if (seriesIds.length > 0) {
     const { data: logs } = await supabase

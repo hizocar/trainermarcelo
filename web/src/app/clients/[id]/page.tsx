@@ -2,14 +2,20 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase-server';
 import type { AppUser, PlanDay } from '@/lib/types';
+import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
+import { getCurrentWeek } from '@/lib/weeks';
 import PlanEditor from './PlanEditor';
+import WeekManager from './WeekManager';
 import AssignToClients from './AssignToClients';
 import Logo from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ClientPlanPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ClientPlanPage({
+  params, searchParams,
+}: { params: Promise<{ id: string }>; searchParams: Promise<{ weekId?: string }> }) {
   const { id } = await params;
+  const { weekId: requestedWeekId } = await searchParams;
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -35,24 +41,38 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
     .neq('id', id)
     .order('name');
 
-  const { data: plan } = await supabase
-    .from('workout_plans')
-    .select(`
-      id,
-      training_days (
-        id, plan_id, day_number, name, week_day, archived,
-        exercises (
-          id, day_id, name, name_en, library_id, muscle_group, reps_objective, unit,
-          ref_weight, order_index, rest_seconds, target_rir, tempo, notes, archived,
-          exercise_series ( id, exercise_id, series_number )
-        )
-      )
-    `)
-    .eq('client_id', id)
-    .maybeSingle();
+  const { data: plan } = await supabase.from('workout_plans').select('id').eq('client_id', id).maybeSingle();
+
+  const { data: weeksData } = plan
+    ? await supabase.from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false).order('week_number')
+    : { data: null };
+  const weeks = (weeksData ?? []) as PlanWeek[];
+
+  // semana a editar: la que el coach eligió en el selector, o si no eligió
+  // nada, la que esté activa para la semana calendario de hoy — si esa
+  // tampoco existe, la más reciente que sí tenga.
+  const selectedWeek: PlanWeek | null =
+    (requestedWeekId && weeks.find(w => w.id === requestedWeekId)) ||
+    resolveActiveWeek(weeks, getCurrentWeek()) ||
+    weeks[weeks.length - 1] ||
+    null;
+
+  const { data: daysData } = selectedWeek
+    ? await supabase
+        .from('training_days')
+        .select(`
+          id, plan_id, day_number, name, week_day, archived,
+          exercises (
+            id, day_id, name, name_en, library_id, muscle_group, reps_objective, unit,
+            ref_weight, order_index, rest_seconds, target_rir, tempo, notes, archived,
+            exercise_series ( id, exercise_id, series_number )
+          )
+        `)
+        .eq('plan_week_id', selectedWeek.id)
+    : { data: null };
 
   // archivados fuera del editor: siguen existiendo solo como historial del cliente
-  const days: PlanDay[] = ((plan as any)?.training_days ?? [])
+  const days: PlanDay[] = (daysData ?? [])
     .filter((d: any) => !d.archived)
     .map((d: any) => ({
       ...d,
@@ -104,7 +124,16 @@ export default async function ClientPlanPage({ params }: { params: Promise<{ id:
             Este cliente aún no tiene un plan. Créalo desde la app y luego edítalo aquí.
           </p>
         ) : (
-          <PlanEditor planId={(plan as any).id} initialDays={days} />
+          <>
+            <WeekManager planId={plan.id} weeks={weeks} selectedWeekId={selectedWeek?.id ?? null} clientId={id} />
+            {selectedWeek ? (
+              <PlanEditor key={selectedWeek.id} planId={plan.id} planWeekId={selectedWeek.id} initialDays={days} />
+            ) : (
+              <p className="muted" style={{ marginTop: 30 }}>
+                Todavía no hay ninguna semana planificada. Crea la primera arriba en &quot;Gestión de semanas&quot;.
+              </p>
+            )}
+          </>
         )}
       </main>
     </>

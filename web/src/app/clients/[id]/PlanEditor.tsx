@@ -41,7 +41,17 @@ interface EditExercise {
   ref_weight: string;
   rest_seconds: string;
   target_rir: string;
+  superseries_group: string;
   series: EditSeries[];
+}
+
+// Colores estables para biseries/triseries: mismo grupo → mismo color,
+// tanto en la pizarra como en la app del cliente.
+const GROUP_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#22c55e', '#ef4444'];
+function groupColor(group: string) {
+  let h = 0;
+  for (let i = 0; i < group.length; i++) h = (h * 31 + group.charCodeAt(i)) >>> 0;
+  return GROUP_COLORS[h % GROUP_COLORS.length];
 }
 interface EditDay {
   id: string;
@@ -66,6 +76,7 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       ref_weight: e.ref_weight != null ? String(e.ref_weight) : '',
       rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
       target_rir: e.target_rir ?? '',
+      superseries_group: (e as any).superseries_group ?? '',
       series: (e.exercise_series ?? []).map((s) => ({ id: s.id, series_number: s.series_number })),
     })),
   }));
@@ -121,7 +132,7 @@ function LibrarySearch({
   );
 }
 
-export default function PlanEditor({ planId, initialDays }: { planId: string; initialDays: PlanDay[] }) {
+export default function PlanEditor({ planId, planWeekId, initialDays }: { planId: string; planWeekId: string; initialDays: PlanDay[] }) {
   const supabase = createClient();
   const [days, setDays] = useState<EditDay[]>(() => toEditModel(initialDays));
   const [archDays, setArchDays] = useState<string[]>([]);
@@ -157,7 +168,12 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
 
   function addDay() {
     mutate((d) => {
-      d.push({ id: tmpId(), name: 'Nuevo día', week_day: null, exercises: [] });
+      // Sugerencia: el próximo día de semana libre (Lun..Dom) para que el
+      // split quede distribuido automáticamente en vez de partir sin fecha.
+      const used = new Set(d.map((x) => x.week_day).filter((v) => v != null));
+      const order = [1, 2, 3, 4, 5, 6, 0];
+      const suggested = order.find((v) => !used.has(v)) ?? null;
+      d.push({ id: tmpId(), name: 'Nuevo día', week_day: suggested, exercises: [] });
       return d;
     });
   }
@@ -173,7 +189,7 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
     mutate((d) => {
       d[di].exercises.push({
         id: tmpId(), name: '', library_id: null, name_en: null, muscle_group: '',
-        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '',
+        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', superseries_group: '',
         series: [{ id: tmpId(), series_number: 1 }, { id: tmpId(), series_number: 2 }, { id: tmpId(), series_number: 3 }],
       });
       return d;
@@ -283,7 +299,7 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
         if (isTmp(dayId)) {
           const { data, error } = await supabase
             .from('training_days')
-            .insert({ plan_id: planId, day_number: dayNumber, name: day.name, week_day: day.week_day })
+            .insert({ plan_id: planId, plan_week_id: planWeekId, day_number: dayNumber, name: day.name, week_day: day.week_day })
             .select('id')
             .single();
           if (error) throw error;
@@ -307,6 +323,7 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
             ref_weight: ex.ref_weight.trim() === '' || isNaN(refNum) ? null : refNum,
             rest_seconds: isNaN(restNum) ? null : restNum,
             target_rir: ex.target_rir.trim() || null,
+            superseries_group: ex.superseries_group.trim() || null,
             order_index: ei,
           };
           let exId = ex.id;
@@ -389,8 +406,15 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
                   <span className="board-empty">Sin ejercicios</span>
                 ) : (
                   day.exercises.map((ex, ei) => (
-                    <div key={ex.id} className="board-ex">
-                      <span className="board-ex-name">{ex.name || '(sin nombre)'}</span>
+                    <div
+                      key={ex.id}
+                      className="board-ex"
+                      style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
+                    >
+                      <span className="board-ex-name">
+                        {ex.superseries_group.trim() && <span title={`Biserie ${ex.superseries_group}`}>🔗 </span>}
+                        {ex.name || '(sin nombre)'}
+                      </span>
                       <div className="board-ex-actions">
                         <button className="icon-btn" style={{ width: 24, height: 24, fontSize: 11 }}
                           onClick={() => moveExercise(di, ei, -1)} disabled={ei === 0}>↑</button>
@@ -442,6 +466,7 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
                   <th>Unidad</th>
                   <th>Descanso</th>
                   <th>RIR</th>
+                  <th style={{ minWidth: 110 }}>Biserie</th>
                   <th></th>
                 </tr>
               </thead>
@@ -496,12 +521,22 @@ export default function PlanEditor({ planId, initialDays }: { planId: string; in
                         onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
                     </td>
                     <td>
+                      <input
+                        className="ex-input"
+                        value={ex.superseries_group}
+                        onChange={(e) => updateEx(di, ei, { superseries_group: e.target.value })}
+                        placeholder="ej: A"
+                        title="Ejercicios con el mismo texto acá quedan encadenados como biserie/triserie y se ven agrupados y coloreados para el cliente."
+                        style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
+                      />
+                    </td>
+                    <td>
                       <button className="icon-btn" title="Quitar del plan (conserva historial)" onClick={() => removeExercise(di, ei)}>✕</button>
                     </td>
                   </tr>
                 ))}
                 {day.exercises.length === 0 && (
-                  <tr><td colSpan={9} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
+                  <tr><td colSpan={10} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
                 )}
               </tbody>
             </table>
