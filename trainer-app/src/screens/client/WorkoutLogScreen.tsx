@@ -175,6 +175,53 @@ export default function WorkoutLogScreen() {
     return isNaN(n) ? null : n;
   };
 
+  // Guardado automático: antes solo se guardaba al tocar "GUARDAR
+  // ENTRENAMIENTO" — si el cliente cambiaba de ejercicio dentro de una
+  // biserie/triserie antes de tocar ese botón, perdía todo lo tipeado acá.
+  // Ahora cada serie con peso+reps completos se guarda sola (con un
+  // pequeño debounce mientras escribe) y además se fuerza un guardado al
+  // salir de la pantalla, para no depender de que el debounce alcance a
+  // dispararse antes de la navegación.
+  const entriesRef = React.useRef(entries);
+  React.useEffect(() => { entriesRef.current = entries; }, [entries]);
+  const logDateRef = React.useRef(logDate);
+  React.useEffect(() => { logDateRef.current = logDate; }, [logDate]);
+
+  async function flushAutoSave() {
+    const list = entriesRef.current;
+    const toSave = list
+      .map((e, i) => ({ i, e, weightNum: toNum(e.weight), repsNum: toNum(e.reps) }))
+      .filter(({ e, weightNum, repsNum }) => !e.saved && weightNum != null && repsNum != null);
+    if (toSave.length === 0) return;
+
+    for (const { i, e, weightNum, repsNum } of toSave) {
+      const rirNum = e.rir === '' ? null : Math.min(9, Math.round(toNum(e.rir) ?? 0));
+      await saveLog({
+        series_id: e.series.id,
+        week_number: week,
+        weight: weightNum!,
+        reps: repsNum!,
+        rir: rirNum,
+        logged_at: logDateRef.current,
+        logged_by: user!.id,
+      });
+      setEntries(prev => prev.map((x, xi) => xi === i ? { ...x, saved: true } : x));
+    }
+  }
+
+  React.useEffect(() => {
+    const timer = setTimeout(flushAutoSave, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries]);
+
+  // último recurso: si el cliente navega antes de que el debounce dispare
+  React.useEffect(() => {
+    const sub = navigation.addListener('beforeRemove', () => { flushAutoSave(); });
+    return () => { sub(); flushAutoSave(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation]);
+
   // autoprogresión (lógica pura, con tests en lib/progress)
   const suggestion = React.useMemo(() => {
     if (entries.length === 0 || entries.some(e => e.saved)) return null;

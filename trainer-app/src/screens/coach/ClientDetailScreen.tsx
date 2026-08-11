@@ -11,6 +11,7 @@ import { User, TrainingDay, SessionNote } from '../../types';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import { unreadCount } from '../../lib/chat';
 import { fetchFullPlan, fetchLogs, PlanDay } from '../../lib/plan';
+import { fetchCardioLogs, CardioLog } from '../../lib/cardio';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import MuscleMap from '../../components/common/MuscleMap';
@@ -35,9 +36,11 @@ export default function ClientDetailScreen() {
   // progreso EN VIVO de la semana actual — antes solo se veía la estructura
   // del plan y había que esperar a que la semana cerrara para ver los checks
   const [doneExIds, setDoneExIds] = useState<Set<string>>(new Set());
+  const [cardioLogs, setCardioLogs] = useState<CardioLog[]>([]);
 
   useEffect(() => {
     fetchPlan();
+    fetchCardioLogs(client.id, 7).then(setCardioLogs);
   }, []);
 
   // se refresca cada vez que el coach vuelve a esta pantalla (ej: después de
@@ -222,6 +225,21 @@ export default function ClientDetailScreen() {
                     <View style={[styles.volBarFill, { width: `${(r.sets / maxSets) * 100}%` }]} />
                   </View>
                   <Text style={styles.volCount}>{r.sets}</Text>
+                </View>
+              ))}
+            </Card>
+          )}
+
+          {cardioLogs.length > 0 && (
+            <Card style={styles.volumeCard}>
+              <Text style={styles.volumeTitle}>CARDIO · ÚLTIMOS 7 DÍAS</Text>
+              <Text style={styles.volumeSub}>
+                {cardioLogs.length} sesión{cardioLogs.length === 1 ? '' : 'es'} · {cardioLogs.reduce((a, c) => a + c.duration_minutes, 0)} min en total
+              </Text>
+              {cardioLogs.map(c => (
+                <View key={c.id} style={styles.volRow}>
+                  <Text style={styles.volName} numberOfLines={1}>{c.type.toUpperCase()}</Text>
+                  <Text style={styles.volCount}>{c.duration_minutes} min</Text>
                 </View>
               ))}
             </Card>

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Image, TextInput,
+  StatusBar, ActivityIndicator, Image, TextInput, Modal,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,8 +13,9 @@ import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
-import { showAlert } from '../../lib/alert';
+import { showAlert, showConfirm } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
+import { CARDIO_TYPES, CardioLog, fetchCardioLogs, addCardioLog, deleteCardioLog } from '../../lib/cardio';
 
 // Colores estables para biseries/triseries — el mismo texto de grupo siempre
 // se ve del mismo color, así el cliente identifica de un vistazo qué
@@ -50,6 +51,11 @@ export default function TodayScreen() {
   const [noPlanForWeek, setNoPlanForWeek] = useState(false);
   const [noPlanAtAll, setNoPlanAtAll] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
+  const [cardioLogs, setCardioLogs] = useState<CardioLog[]>([]);
+  const [showCardioModal, setShowCardioModal] = useState(false);
+  const [cardioType, setCardioType] = useState(CARDIO_TYPES[0]);
+  const [cardioMinutes, setCardioMinutes] = useState('');
+  const [cardioSaving, setCardioSaving] = useState(false);
 
   const todayWeekDay = new Date().getDay(); // 0=Dom...6=Sáb
   const currentWeek = getCurrentWeek();
@@ -58,6 +64,34 @@ export default function TodayScreen() {
   // cada semana es un plan independiente: hay que volver a pedirlo al
   // cambiar de semana, no solo recalcular los checks localmente
   useFocusEffect(useCallback(() => { if (user?.id) fetchWeek(selectedWeek); }, [user?.id, selectedWeek]));
+  useFocusEffect(useCallback(() => { if (user?.id) loadCardio(); }, [user?.id]));
+
+  async function loadCardio() {
+    if (!user?.id) return;
+    setCardioLogs(await fetchCardioLogs(user.id, 7));
+  }
+
+  async function saveCardio() {
+    if (!user?.id) return;
+    const minutes = parseInt(cardioMinutes, 10);
+    if (!minutes || minutes <= 0) { showAlert('Falta la duración', 'Ingresa cuántos minutos hiciste.'); return; }
+    setCardioSaving(true);
+    const { error } = await addCardioLog({
+      user_id: user.id, type: cardioType, duration_minutes: minutes, logged_at: new Date().toISOString(),
+    });
+    setCardioSaving(false);
+    if (error) { showAlert('No se pudo guardar', error.message); return; }
+    setCardioMinutes('');
+    setShowCardioModal(false);
+    loadCardio();
+  }
+
+  function removeCardio(log: CardioLog) {
+    showConfirm('Eliminar registro', `¿Borrar "${log.type}" (${log.duration_minutes} min)?`, async () => {
+      await deleteCardioLog(log.id);
+      loadCardio();
+    }, 'Eliminar');
+  }
 
   async function fetchWeek(week: number) {
     if (!user?.id) return;
@@ -296,6 +330,38 @@ export default function TodayScreen() {
           >
             <SyncBanner />
 
+            <Card style={styles.cardioCard}>
+              <View style={styles.cardioHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardioTitle}>CARDIO · ÚLTIMOS 7 DÍAS</Text>
+                  <Text style={styles.cardioSub}>
+                    {cardioLogs.length === 0
+                      ? 'Sin registros todavía'
+                      : `${cardioLogs.length} sesión${cardioLogs.length === 1 ? '' : 'es'} · ${cardioLogs.reduce((a, c) => a + c.duration_minutes, 0)} min`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.cardioAddBtn}
+                  onPress={() => { setCardioType(CARDIO_TYPES[0]); setCardioMinutes(''); setShowCardioModal(true); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={16} color={colors.background} />
+                  <Text style={styles.cardioAddBtnText}>CARDIO</Text>
+                </TouchableOpacity>
+              </View>
+              {cardioLogs.length > 0 && (
+                <View style={styles.cardioList}>
+                  {cardioLogs.map(c => (
+                    <TouchableOpacity key={c.id} style={styles.cardioRow} onLongPress={() => removeCardio(c)} activeOpacity={0.7}>
+                      <Ionicons name="walk-outline" size={14} color={colors.accent} />
+                      <Text style={styles.cardioRowText}>{c.type} · {c.duration_minutes} min</Text>
+                      <Text style={styles.cardioRowDate}>{formatShortDate(c.logged_at)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </Card>
+
             {weekComplete && !viewingPastWeek && (
               <Card highlight style={styles.doneCard}>
                 <View style={styles.doneHeader}>
@@ -421,6 +487,46 @@ export default function TodayScreen() {
           </ScrollView>
         </>
       )}
+
+      <Modal visible={showCardioModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>REGISTRAR CARDIO</Text>
+            <Text style={styles.inputLabel}>TIPO</Text>
+            <View style={styles.cardioTypeRow}>
+              {CARDIO_TYPES.map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.cardioTypeChip, cardioType === t && styles.cardioTypeChipActive]}
+                  onPress={() => setCardioType(t)}
+                >
+                  <Text style={[styles.cardioTypeChipText, cardioType === t && styles.cardioTypeChipTextActive]}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.inputLabel}>MINUTOS</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={cardioMinutes}
+              onChangeText={(v) => setCardioMinutes(v.replace(/[^0-9]/g, ''))}
+              placeholder="ej: 30"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowCardioModal(false)}>
+                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={saveCardio} disabled={cardioSaving}>
+                {cardioSaving
+                  ? <ActivityIndicator color={colors.background} size="small" />
+                  : <Text style={styles.modalConfirmBtnText}>GUARDAR</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -546,6 +652,44 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3,
   },
   superGroupTagText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.background },
+  cardioCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  cardioHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardioTitle: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
+  cardioSub: { ...typography.caption, marginTop: 2 },
+  cardioAddBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.accent, borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 2, paddingVertical: 7,
+  },
+  cardioAddBtnText: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: colors.background },
+  cardioList: { gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
+  cardioRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  cardioRowText: { ...typography.caption, flex: 1, color: colors.textPrimary },
+  cardioRowDate: { ...typography.caption, fontSize: 10 },
+  cardioTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  cardioTypeChip: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
+  },
+  cardioTypeChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  cardioTypeChipText: { ...typography.caption, color: colors.textMuted, fontWeight: '700' },
+  cardioTypeChipTextActive: { color: colors.background },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+  modalBox: {
+    backgroundColor: colors.surface, borderTopLeftRadius: radius.lg * 2, borderTopRightRadius: radius.lg * 2,
+    padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxl,
+  },
+  modalTitle: { ...typography.h2, marginBottom: spacing.sm },
+  inputLabel: { ...typography.label, letterSpacing: 2, marginBottom: -spacing.sm },
+  modalInput: {
+    backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.textPrimary, fontSize: 15,
+  },
+  modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  modalCancelBtn: { flex: 1, paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  modalCancelBtnText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
+  modalConfirmBtn: { flex: 1, paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md, backgroundColor: colors.accent },
+  modalConfirmBtnText: { color: colors.background, fontWeight: '900', fontSize: 13, letterSpacing: 2 },
   exerciseCard: { },
   exerciseCardDone: { borderColor: colors.accent + '66' },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },

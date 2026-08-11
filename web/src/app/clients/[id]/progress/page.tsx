@@ -79,6 +79,13 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
       .sort((a, b) => a.week - b.week);
   }
 
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  const { data: cardioLogs } = await supabase
+    .from('cardio_logs').select('id, type, duration_minutes, logged_at')
+    .eq('user_id', id).gte('logged_at', since).order('logged_at', { ascending: false });
+  const cardio = cardioLogs ?? [];
+  const cardioMinutes = cardio.reduce((a, c) => a + c.duration_minutes, 0);
+
   return (
     <>
       <header className="app-header">
@@ -135,6 +142,24 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
             </div>
           )}
         </div>
+        {cardio.length > 0 && (
+          <div className="editor-day" style={{ marginTop: 20 }}>
+            <h3 style={{ marginBottom: 4 }}>Cardio · últimos 7 días</h3>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
+              {cardio.length} sesión{cardio.length === 1 ? '' : 'es'} · {cardioMinutes} min en total — registro libre del cliente.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {cardio.map((c) => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span>{c.type}</span>
+                  <span className="muted" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {c.duration_minutes} min · {new Date(c.logged_at).toLocaleDateString('es-CL')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </>
   );
