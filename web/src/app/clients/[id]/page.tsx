@@ -97,8 +97,11 @@ export default async function ClientPlanPage({
             <Logo />
           </Link>
           <div style={{ display: 'flex', gap: 10 }}>
+            <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+              SEMANA A SEMANA
+            </Link>
             <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              PROGRESO
+              EVOLUCIÓN
             </Link>
             <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
               ← CLIENTES

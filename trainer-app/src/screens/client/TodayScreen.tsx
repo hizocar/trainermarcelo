@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, Image, TextInput, Modal,
+  KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,9 @@ function groupColor(group: string) {
   for (let i = 0; i < group.length; i++) h = (h * 31 + group.charCodeAt(i)) >>> 0;
   return GROUP_COLORS[h % GROUP_COLORS.length];
 }
+
+// atajos para no tener que abrir el teclado en el caso común
+const CARDIO_QUICK_MINUTES = [15, 20, 30, 45, 60];
 
 const PHASE_INFO: Record<string, { label: string; color: string }> = {
   acumulacion: { label: 'ACUMULACIÓN', color: colors.accent },
@@ -488,44 +492,64 @@ export default function TodayScreen() {
         </>
       )}
 
-      <Modal visible={showCardioModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>REGISTRAR CARDIO</Text>
-            <Text style={styles.inputLabel}>TIPO</Text>
-            <View style={styles.cardioTypeRow}>
-              {CARDIO_TYPES.map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.cardioTypeChip, cardioType === t && styles.cardioTypeChipActive]}
-                  onPress={() => setCardioType(t)}
-                >
-                  <Text style={[styles.cardioTypeChipText, cardioType === t && styles.cardioTypeChipTextActive]}>{t}</Text>
+      {/* Centrado verticalmente + KeyboardAvoidingView: antes se abría pegado
+          abajo y el teclado numérico tapaba el campo de minutos. Además los
+          atajos de minutos evitan tener que abrir el teclado casi siempre. */}
+      <Modal visible={showCardioModal} transparent animationType="fade" onRequestClose={() => setShowCardioModal(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>REGISTRAR CARDIO</Text>
+              <Text style={styles.inputLabel}>TIPO</Text>
+              <View style={styles.cardioTypeRow}>
+                {CARDIO_TYPES.map(t => (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.cardioTypeChip, cardioType === t && styles.cardioTypeChipActive]}
+                    onPress={() => setCardioType(t)}
+                  >
+                    <Text style={[styles.cardioTypeChipText, cardioType === t && styles.cardioTypeChipTextActive]}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.inputLabel}>MINUTOS</Text>
+              <View style={styles.cardioTypeRow}>
+                {CARDIO_QUICK_MINUTES.map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.cardioTypeChip, cardioMinutes === String(m) && styles.cardioTypeChipActive]}
+                    onPress={() => { setCardioMinutes(String(m)); Keyboard.dismiss(); }}
+                  >
+                    <Text style={[styles.cardioTypeChipText, cardioMinutes === String(m) && styles.cardioTypeChipTextActive]}>{m}′</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.modalInput}
+                value={cardioMinutes}
+                onChangeText={(v) => setCardioMinutes(v.replace(/[^0-9]/g, ''))}
+                placeholder="u otra cantidad de minutos"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowCardioModal(false)}>
+                  <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
                 </TouchableOpacity>
-              ))}
+                <TouchableOpacity style={styles.modalConfirmBtn} onPress={saveCardio} disabled={cardioSaving}>
+                  {cardioSaving
+                    ? <ActivityIndicator color={colors.background} size="small" />
+                    : <Text style={styles.modalConfirmBtnText}>GUARDAR</Text>}
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.inputLabel}>MINUTOS</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={cardioMinutes}
-              onChangeText={(v) => setCardioMinutes(v.replace(/[^0-9]/g, ''))}
-              placeholder="ej: 30"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowCardioModal(false)}>
-                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={saveCardio} disabled={cardioSaving}>
-                {cardioSaving
-                  ? <ActivityIndicator color={colors.background} size="small" />
-                  : <Text style={styles.modalConfirmBtnText}>GUARDAR</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -674,10 +698,14 @@ const styles = StyleSheet.create({
   cardioTypeChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   cardioTypeChipText: { ...typography.caption, color: colors.textMuted, fontWeight: '700' },
   cardioTypeChipTextActive: { color: colors.background },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center', paddingHorizontal: spacing.lg,
+  },
   modalBox: {
-    backgroundColor: colors.surface, borderTopLeftRadius: radius.lg * 2, borderTopRightRadius: radius.lg * 2,
-    padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxl,
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border,
+    padding: spacing.xl, gap: spacing.md,
   },
   modalTitle: { ...typography.h2, marginBottom: spacing.sm },
   inputLabel: { ...typography.label, letterSpacing: 2, marginBottom: -spacing.sm },

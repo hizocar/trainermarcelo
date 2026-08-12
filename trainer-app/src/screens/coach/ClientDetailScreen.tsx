@@ -130,11 +130,18 @@ export default function ClientDetailScreen() {
               <Text style={styles.actionBtnText}>💬 CHATEAR{unread > 0 ? `  ·  ${unread}` : ''}</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => navigation.navigate('ClientWeek', { client })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.actionBtnText}>📅 PROGRESO SEMANA A SEMANA</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnSecondary]}
               onPress={() => navigation.navigate('ClientProgress', { client })}
               activeOpacity={0.8}
             >
-              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>📈 VER PROGRESO</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>📈 EVOLUCIÓN POR EJERCICIO</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnSecondary]}

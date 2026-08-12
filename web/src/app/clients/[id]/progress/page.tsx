@@ -93,9 +93,14 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
           <Link href="/dashboard" className="brand">
             <Logo />
           </Link>
-          <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            ← PLAN
-          </Link>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+              SEMANA A SEMANA
+            </Link>
+            <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+              ← PLAN
+            </Link>
+          </div>
         </div>
       </header>
 
