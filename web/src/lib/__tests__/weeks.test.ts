@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   weekNumberForDate, monthGrid, calendarWeekNumberForDate, santiagoDayKey,
-  weekDates, localDateKey, offScheduleDayKeys,
+  weekDates, localDateKey, offScheduleDayKeys, santiagoWeekDay,
 } from '../weeks';
 
 // El epoch del programa es el lunes 15 de junio de 2026 (semana 1).
@@ -136,5 +136,17 @@ describe('offScheduleDayKeys', () => {
   it('un registro en un día fuera de la semana de programa no cuenta', () => {
     const doneByDay = new Map([['2026-08-17', new Set(['ex1'])]]); // lunes de la semana 10
     expect(offScheduleDayKeys(['ex1'], weekKeys, '2026-08-10', doneByDay)).toEqual([]);
+  });
+});
+
+describe('santiagoWeekDay', () => {
+  it('un instante UTC de madrugada corresponde al día anterior en Chile', () => {
+    // 2026-08-13T02:00:00Z = 2026-08-12 22:00 en Santiago (miércoles)
+    expect(santiagoWeekDay(new Date('2026-08-13T02:00:00Z'))).toBe(3);
+  });
+
+  it('un instante UTC de mediodía es el mismo día en Chile', () => {
+    // 2026-08-13T15:00:00Z = 2026-08-13 11:00 en Santiago (jueves)
+    expect(santiagoWeekDay(new Date('2026-08-13T15:00:00Z'))).toBe(4);
   });
 });

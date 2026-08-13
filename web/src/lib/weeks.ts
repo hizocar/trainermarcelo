@@ -127,3 +127,13 @@ export function monthGrid(year: number, month: number): Date[][] {
   }
   return rows;
 }
+
+/**
+ * Día de la semana (0=Dom … 6=Sáb) en Chile continental. El servidor de
+ * Vercel corre en UTC, así que `new Date().getDay()` daría el día equivocado
+ * durante las últimas horas de cada noche chilena.
+ */
+export function santiagoWeekDay(instant: Date = new Date()): number {
+  const [y, m, d] = santiagoDayKey(instant).split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
