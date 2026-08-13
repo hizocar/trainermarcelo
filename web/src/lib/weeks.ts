@@ -31,6 +31,32 @@ export function weekNumberForDate(date: Date): number {
 }
 
 /**
+ * A qué semana del programa pertenece una fecha, para el calendario del
+ * coach. A diferencia de `weekNumberForDate`, NO achica las fechas
+ * anteriores al epoch a la semana 1: devuelve null, porque antes del epoch
+ * el programa simplemente no existía (no hay que fabricar semana 1 sobre
+ * meses de historia previos al alta del alumno). No se usa fuera del
+ * calendario para no romper a los llamadores que sí dependen del clamp.
+ */
+export function calendarWeekNumberForDate(date: Date): number | null {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const diff = Math.floor((d.getTime() - TRAINING_EPOCH.getTime()) / (7 * 86400000));
+  return diff < 0 ? null : diff + 1;
+}
+
+/**
+ * Clave "YYYY-MM-DD" de un instante real (timestamp de Supabase) en la zona
+ * horaria de Chile continental, sin importar en qué zona corre el servidor
+ * (Vercel corre en UTC). Se usa para decidir a qué día del calendario
+ * pertenece un registro (cardio, workout_logs), y para saber cuál es "hoy"
+ * desde el punto de vista del alumno.
+ */
+export function santiagoDayKey(instant: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(instant);
+}
+
+/**
  * Filas de 7 días (lunes→domingo) que cubren el mes completo. `month` es
  * 0-indexado igual que en Date. Incluye días del mes anterior/siguiente
  * para completar la primera y la última fila.

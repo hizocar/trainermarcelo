@@ -4,17 +4,29 @@ import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { weekNumberForDate, monthGrid } from '@/lib/weeks';
+import { calendarWeekNumberForDate, monthGrid, santiagoDayKey } from '@/lib/weeks';
 
 export const dynamic = 'force-dynamic';
 
 // Calendario mensual de UN alumno: qué entrenamiento tocaba cada día según el
 // plan, y si lo cumplió. Solo lectura — editar se sigue haciendo en
 // "Gestión de semanas" dentro del plan.
+//
+// Los alumnos entrenan en Chile pero el servidor (Vercel) corre en UTC, así
+// que "qué día es" para armar el calendario y agrupar cardio/registros se
+// calcula SIEMPRE en hora de Santiago (ver santiagoDayKey en lib/weeks.ts) —
+// nunca con getDate()/toDateString() sobre un timestamp real.
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const CABECERA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
+
+/** Clave "YYYY-MM-DD" de una celda de la grilla, a partir de sus propios
+ * componentes de fecha (no es un instante real, no hay zona horaria que
+ * convertir — son las mismas etiquetas que ya dibuja el calendario). */
+function cellKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export default async function ClientCalendarPage({
   params, searchParams,
@@ -33,11 +45,23 @@ export default async function ClientCalendarPage({
     .from('users').select('id, name, coach_id').eq('id', id).maybeSingle();
   if (!client || (client as AppUser).coach_id !== user.id) notFound();
 
-  // mes a mostrar: ?m=YYYY-MM, por defecto el mes actual
-  const hoy = new Date();
+  // "hoy" según el alumno (Chile), no según el servidor (UTC)
+  const hoyKey = santiagoDayKey(new Date());
+  const [hoyYear, hoyMonth] = hoyKey.split('-').map(Number);
+
+  // mes a mostrar: ?m=YYYY-MM, por defecto el mes actual. Un mes fuera de
+  // 1-12 (o cualquier otro formato inválido) cae al mes actual en vez de
+  // romper la página.
   const match = /^(\d{4})-(\d{2})$/.exec(m ?? '');
-  const year = match ? Number(match[1]) : hoy.getFullYear();
-  const month = match ? Number(match[2]) - 1 : hoy.getMonth();
+  let year = hoyYear;
+  let month = hoyMonth - 1;
+  if (match) {
+    const mm = Number(match[2]);
+    if (mm >= 1 && mm <= 12) {
+      year = Number(match[1]);
+      month = mm - 1;
+    }
+  }
   const grid = monthGrid(year, month);
 
   const prevDate = new Date(year, month - 1, 1);
@@ -52,14 +76,28 @@ export default async function ClientCalendarPage({
     : { data: null };
   const planWeeks = (weeksData ?? []) as PlanWeek[];
 
-  const { data: daysData } = plan
+  // semana de programa (o null si es antes del epoch) de cada día visible,
+  // y qué plan_week corresponde a cada una — se resuelve ANTES de pedir los
+  // días de entrenamiento para no traer más que las semanas que se ven acá.
+  const weekNumByCell = new Map<string, number | null>();
+  grid.flat().forEach((d) => weekNumByCell.set(cellKey(d), calendarWeekNumberForDate(d)));
+  const weekNumbers = Array.from(new Set(
+    Array.from(weekNumByCell.values()).filter((w): w is number => w != null),
+  ));
+  const activeWeekByWeekNum = new Map<number, PlanWeek | null>();
+  weekNumbers.forEach((w) => activeWeekByWeekNum.set(w, resolveActiveWeek(planWeeks, w)));
+  const visiblePlanWeekIds = Array.from(new Set(
+    Array.from(activeWeekByWeekNum.values()).filter((w): w is PlanWeek => w != null).map((w) => w.id),
+  ));
+
+  const { data: daysData } = visiblePlanWeekIds.length
     ? await supabase
         .from('training_days')
         .select(`
           id, name, week_day, archived, plan_week_id,
           exercises ( id, name, archived, exercise_series ( id ) )
         `)
-        .eq('plan_id', plan.id)
+        .in('plan_week_id', visiblePlanWeekIds)
     : { data: null };
 
   const trainingDays = (daysData ?? [])
@@ -69,38 +107,49 @@ export default async function ClientCalendarPage({
       exercises: (d.exercises ?? []).filter((e: any) => !e.archived),
     }));
 
-  // logs de todas las semanas que toca este mes, en una sola consulta
-  const weekNumbers = Array.from(new Set(grid.flat().map((d) => weekNumberForDate(d))));
+  // si el plan tiene días planificados en OTRAS semanas (fuera del mes que se
+  // está mirando), igual hay que dibujar la grilla — solo viene vacía este
+  // mes. Consulta liviana (1 fila), independiente de la de arriba para no
+  // reintroducir el problema de la lista sin límite (finding I4).
+  const { data: anyDay } = plan
+    ? await supabase.from('training_days').select('id').eq('plan_id', plan.id).limit(1).maybeSingle()
+    : { data: null };
+
   const allSeriesIds = trainingDays.flatMap((d: any) =>
     d.exercises.flatMap((e: any) => (e.exercise_series ?? []).map((s: any) => s.id)));
 
-  const { data: logs } = allSeriesIds.length
+  const { data: logs, error: logsError } = allSeriesIds.length
     ? await supabase
         .from('workout_logs')
-        .select('series_id, week_number')
+        .select('series_id, week_number, logged_at')
         .in('series_id', allSeriesIds)
         .in('week_number', weekNumbers)
-    : { data: null };
+    : { data: null, error: null };
+  if (logsError) console.error('calendar: error cargando workout_logs', logsError);
 
   // series_id -> exercise_id, para contar ejercicios completados (no series)
   const exBySeries = new Map<string, string>();
   trainingDays.forEach((d: any) => d.exercises.forEach((e: any) =>
     (e.exercise_series ?? []).forEach((s: any) => exBySeries.set(s.id, e.id))));
 
-  // "semana N" -> set de exercise_id con al menos un registro
-  const doneByWeek = new Map<number, Set<string>>();
+  // "día real en que se entrenó" (no el día planificado) -> set de
+  // exercise_id con al menos un registro ese día, en hora de Chile.
+  const doneByDay = new Map<string, Set<string>>();
   (logs ?? []).forEach((l: any) => {
     const exId = exBySeries.get(l.series_id);
-    if (!exId) return;
-    const set = doneByWeek.get(l.week_number) ?? new Set<string>();
+    if (!exId || !l.logged_at) return;
+    const k = santiagoDayKey(new Date(l.logged_at));
+    const set = doneByDay.get(k) ?? new Set<string>();
     set.add(exId);
-    doneByWeek.set(l.week_number, set);
+    doneByDay.set(k, set);
   });
 
-  // cardio del rango visible
-  const desde = grid[0][0];
+  // cardio del rango visible, con un día de margen a cada lado para no
+  // perder sesiones cercanas al borde del mes por el desfase horario
+  const desde = new Date(grid[0][0]);
+  desde.setDate(desde.getDate() - 1);
   const hasta = new Date(grid[grid.length - 1][6]);
-  hasta.setDate(hasta.getDate() + 1);
+  hasta.setDate(hasta.getDate() + 2);
   const { data: cardio } = await supabase
     .from('cardio_logs')
     .select('id, type, duration_minutes, logged_at')
@@ -110,11 +159,13 @@ export default async function ClientCalendarPage({
 
   const cardioByDay = new Map<string, number>();
   (cardio ?? []).forEach((c: any) => {
-    const k = new Date(c.logged_at).toDateString();
+    const k = santiagoDayKey(new Date(c.logged_at));
     cardioByDay.set(k, (cardioByDay.get(k) ?? 0) + c.duration_minutes);
   });
 
-  const esHoy = (d: Date) => d.toDateString() === hoy.toDateString();
+  const esHoy = (d: Date) => cellKey(d) === hoyKey;
+  const esFuturo = (d: Date) => cellKey(d) > hoyKey;
+  const esPasado = (d: Date) => cellKey(d) < hoyKey;
   const esDelMes = (d: Date) => d.getMonth() === month;
 
   return (
@@ -148,7 +199,14 @@ export default async function ClientCalendarPage({
           <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '8px 14px' }}>HOY</Link>
         </div>
 
-        {!plan || trainingDays.length === 0 ? (
+        {logsError && (
+          <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: 13 }}>
+            No se pudieron cargar los registros de entrenamiento de este mes. Por eso ningún día se
+            marca como no registrado por ahora — recarga la página para reintentar.
+          </p>
+        )}
+
+        {!plan || !anyDay ? (
           <p className="muted" style={{ marginTop: 30 }}>
             Este alumno todavía no tiene días de entrenamiento planificados.
           </p>
@@ -166,23 +224,26 @@ export default async function ClientCalendarPage({
               {grid.map((row, ri) => (
                 <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
                   {row.map((date) => {
-                    const weekNum = weekNumberForDate(date);
-                    const activeWeek = resolveActiveWeek(planWeeks, weekNum);
+                    const key = cellKey(date);
+                    const weekNum = weekNumByCell.get(key) ?? null;
+                    const activeWeek = weekNum != null ? (activeWeekByWeekNum.get(weekNum) ?? null) : null;
                     const delDia = activeWeek
                       ? trainingDays.filter((d: any) =>
                           d.plan_week_id === activeWeek.id && d.week_day === date.getDay())
                       : [];
-                    const done = doneByWeek.get(weekNum) ?? new Set<string>();
-                    const cardioMin = cardioByDay.get(date.toDateString()) ?? 0;
-                    const futuro = date.getTime() > hoy.getTime() && !esHoy(date);
+                    const done = doneByDay.get(key) ?? new Set<string>();
+                    const cardioMin = cardioByDay.get(key) ?? 0;
+                    const futuro = esFuturo(date);
+                    const hoyCelda = esHoy(date);
+                    const pasado = esPasado(date);
 
                     return (
                       <div
-                        key={date.toISOString()}
+                        key={key}
                         style={{
                           minHeight: 96,
                           borderRadius: 8,
-                          border: `1px solid ${esHoy(date) ? 'var(--accent)' : 'var(--border)'}`,
+                          border: `1px solid ${hoyCelda ? 'var(--accent)' : 'var(--border)'}`,
                           background: esDelMes(date) ? 'var(--surface)' : 'transparent',
                           opacity: esDelMes(date) ? 1 : 0.4,
                           padding: 6,
@@ -194,8 +255,8 @@ export default async function ClientCalendarPage({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <span style={{
                             fontSize: 12,
-                            fontWeight: esHoy(date) ? 900 : 600,
-                            color: esHoy(date) ? 'var(--accent)' : 'var(--text-secondary)',
+                            fontWeight: hoyCelda ? 900 : 600,
+                            color: hoyCelda ? 'var(--accent)' : 'var(--text-secondary)',
                           }}>
                             {date.getDate()}
                           </span>
@@ -208,8 +269,11 @@ export default async function ClientCalendarPage({
                           const hechos = d.exercises.filter((e: any) => done.has(e.id)).length;
                           const total = d.exercises.length;
                           const completo = total > 0 && hechos >= total;
-                          const parcial = hechos > 0 && !completo;
-                          const perdido = hechos === 0 && !futuro;
+                          const parcial = total > 0 && hechos > 0 && !completo;
+                          // solo cuenta como no registrado un día que ya pasó — hoy todavía
+                          // está pendiente, no perdido, y un día sin ejercicios vigentes
+                          // (todos archivados) tampoco tiene nada que mostrar
+                          const perdido = total > 0 && !logsError && hechos === 0 && pasado;
                           return (
                             <Link
                               key={d.id}
@@ -219,21 +283,25 @@ export default async function ClientCalendarPage({
                                 display: 'block', textDecoration: 'none',
                                 borderRadius: 5, padding: '3px 5px',
                                 background: completo ? 'var(--accent)' : 'transparent',
-                                border: `1px solid ${completo ? 'var(--accent)' : perdido ? 'var(--danger)' : 'var(--border)'}`,
+                                border: perdido
+                                  ? '2px dashed var(--text-secondary)'
+                                  : `1px solid ${completo ? 'var(--accent)' : 'var(--border)'}`,
                                 color: completo ? 'var(--bg)' : 'var(--text)',
                               }}
                             >
                               <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.25 }}>
                                 {d.name}
                               </div>
-                              <div style={{
-                                fontSize: 9,
-                                fontFamily: 'var(--font-mono)',
-                                opacity: 0.85,
-                                color: completo ? 'var(--bg)' : parcial ? 'var(--accent)' : undefined,
-                              }}>
-                                {futuro && hechos === 0 ? 'pendiente' : `${hechos}/${total}`}
-                              </div>
+                              {total > 0 && (
+                                <div style={{
+                                  fontSize: 9,
+                                  fontFamily: 'var(--font-mono)',
+                                  opacity: 0.85,
+                                  color: completo ? 'var(--bg)' : parcial ? 'var(--accent)' : undefined,
+                                }}>
+                                  {(futuro || hoyCelda) && hechos === 0 ? 'pendiente' : `${hechos}/${total}`}
+                                </div>
+                              )}
                             </Link>
                           );
                         })}
@@ -254,7 +322,7 @@ export default async function ClientCalendarPage({
 
         <div style={{ display: 'flex', gap: 16, marginTop: 16, flexWrap: 'wrap' }} className="muted">
           <span style={{ fontSize: 11 }}>■ relleno = día completo</span>
-          <span style={{ fontSize: 11 }}>□ borde rojo = día planificado que no registró</span>
+          <span style={{ fontSize: 11 }}>▭ borde punteado = día planificado que no registró</span>
           <span style={{ fontSize: 11 }}>⏱ = cardio registrado ese día</span>
           <span style={{ fontSize: 11 }}>Toca un día para ver el detalle de esa semana.</span>
         </div>

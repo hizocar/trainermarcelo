@@ -109,6 +109,7 @@ export default async function ClientWeekPage({
         <div className="container inner">
           <Link href="/dashboard" className="brand"><Logo /></Link>
           <div style={{ display: 'flex', gap: 10 }}>
+            <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>CALENDARIO</Link>
             <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>EVOLUCIÓN</Link>
             <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>← PLAN</Link>
           </div>

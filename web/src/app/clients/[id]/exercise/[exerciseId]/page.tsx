@@ -44,6 +44,9 @@ export default async function ExerciseHistoryPage({
     .from('workout_plans').select('id').eq('client_id', id).maybeSingle();
   if (!plan) notFound();
 
+  // Sin filtro de `archived`: a diferencia del resto del repo, acá interesa
+  // a propósito — archivar una semana no debe borrar los números históricos
+  // de un ejercicio que ya se entrenó.
   const { data: allDays } = await supabase
     .from('training_days')
     .select('id, exercises ( id, name, library_id, exercise_series ( id, series_number ) )')
@@ -58,9 +61,16 @@ export default async function ExerciseHistoryPage({
   // coach no tiene por qué verlo acá
   if (!siblings.some((e: any) => e.id === ref.id)) notFound();
 
+  // sessionKeyBySeries: id de la fila de `exercises` de origen de cada serie.
+  // Si el ejercicio está programado dos veces en la misma semana (ej. lunes
+  // y jueves), cada fila es una sesión distinta y no hay que mezclarlas.
   const seriesNumber: Record<string, number> = {};
+  const sessionKeyBySeries: Record<string, string> = {};
   siblings.forEach((e: any) =>
-    (e.exercise_series ?? []).forEach((s: any) => { seriesNumber[s.id] = s.series_number; }));
+    (e.exercise_series ?? []).forEach((s: any) => {
+      seriesNumber[s.id] = s.series_number;
+      sessionKeyBySeries[s.id] = e.id;
+    }));
   const seriesIds = Object.keys(seriesNumber);
 
   const { data: logs } = seriesIds.length
@@ -70,7 +80,7 @@ export default async function ExerciseHistoryPage({
         .in('series_id', seriesIds)
     : { data: null };
 
-  const history = groupHistoryByWeek((logs ?? []) as LogRow[], seriesNumber);
+  const history = groupHistoryByWeek((logs ?? []) as LogRow[], seriesNumber, sessionKeyBySeries);
   const pr = personalRecord(history);
   const prE1rm = pr ? oneRepMax(pr.weight, pr.reps) : null;
 
@@ -141,25 +151,39 @@ export default async function ExerciseHistoryPage({
                 <div key={w.week} style={{ borderTop: '1px solid var(--border)', padding: '12px 0' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     <strong style={{ fontSize: 13 }}>SEMANA {w.week}</strong>
-                    {w.date && <span className="muted" style={{ fontSize: 12 }}>{formatShortDate(w.date)}</span>}
                     <span className="muted" style={{ fontSize: 12, marginLeft: 'auto', fontFamily: 'var(--font-mono)' }}>
                       {Math.round(w.volume).toLocaleString('es-CL')} {ref.unit} totales
                     </span>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                    {w.sets.map((s, i) => (
-                      <span key={i} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        background: 'var(--surface)', border: '1px solid var(--border)',
-                        borderRadius: 6, padding: '4px 9px',
-                      }}>
-                        <b style={{ fontSize: 10, color: 'var(--accent)' }}>S{s.series_number}</b>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                          {s.weight}{ref.unit} × {s.reps}{s.rir != null ? ` · RIR ${s.rir}` : ''}
+
+                  {w.sessions.map((session, si) => (
+                    <div key={session.key + si} style={{ marginTop: si === 0 ? 10 : 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                        {session.date && (
+                          <span className="muted" style={{ fontSize: 12, fontWeight: 700 }}>
+                            {formatShortDate(session.date)}
+                          </span>
+                        )}
+                        <span className="muted" style={{ fontSize: 11, marginLeft: 'auto', fontFamily: 'var(--font-mono)' }}>
+                          {Math.round(session.volume).toLocaleString('es-CL')} {ref.unit}
                         </span>
-                      </span>
-                    ))}
-                  </div>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                        {session.sets.map((s, i) => (
+                          <span key={i} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            background: 'var(--surface)', border: '1px solid var(--border)',
+                            borderRadius: 6, padding: '4px 9px',
+                          }}>
+                            <b style={{ fontSize: 10, color: 'var(--accent)' }}>S{s.series_number}</b>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                              {s.weight}{ref.unit} × {s.reps}{s.rir != null ? ` · RIR ${s.rir}` : ''}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

@@ -22,10 +22,23 @@ export interface HistorySet {
   rir: number | null;
 }
 
+/**
+ * Una sesión = una fila de `exercises` de origen (una vez programada en un
+ * día de la semana concreto). Si el mismo ejercicio está programado dos
+ * veces en la semana (ej. Press banca lunes y jueves), cada una es su
+ * propia sesión, con su propia fecha, sets y volumen — no se mezclan.
+ */
+export interface HistorySession {
+  key: string;
+  date: string | null;
+  sets: HistorySet[];
+  volume: number;
+}
+
 export interface HistoryWeek {
   week: number;
   date: string | null;
-  sets: HistorySet[];
+  sessions: HistorySession[];
   volume: number;
 }
 
@@ -55,33 +68,51 @@ export function oneRepMax(weight: number, reps: number): number | null {
   return Math.round(score(weight, reps) * 10) / 10;
 }
 
-/** Agrupa los logs por semana, de la más reciente a la más antigua. */
+/**
+ * Agrupa los logs por semana (más reciente primero) y, dentro de cada
+ * semana, por sesión (más antigua primero). `sessionKeyBySeries` identifica
+ * a qué fila de `exercises` de origen pertenece cada serie — normalmente el
+ * id de esa fila — para no mezclar dos sesiones del mismo ejercicio dentro
+ * de la misma semana (ej. Press banca lunes y jueves).
+ */
 export function groupHistoryByWeek(
   logs: LogRow[],
   seriesNumber: Record<string, number>,
+  sessionKeyBySeries: Record<string, string>,
 ): HistoryWeek[] {
-  const byWeek = new Map<number, HistoryWeek>();
+  const byWeek = new Map<number, Map<string, HistorySession>>();
 
   logs.forEach((l) => {
     const num = seriesNumber[l.series_id];
     if (num == null) return; // log de una serie que ya no existe en el plan
 
-    const entry = byWeek.get(l.week_number) ?? { week: l.week_number, date: null, sets: [], volume: 0 };
-    entry.sets.push({ series_number: num, weight: l.weight, reps: l.reps, rir: l.rir });
-    entry.volume += l.weight * l.reps;
-    if (l.logged_at && (!entry.date || l.logged_at < entry.date)) entry.date = l.logged_at;
-    byWeek.set(l.week_number, entry);
+    const sessionKey = sessionKeyBySeries[l.series_id] ?? 'default';
+    const weekSessions = byWeek.get(l.week_number) ?? new Map<string, HistorySession>();
+    const session = weekSessions.get(sessionKey) ?? { key: sessionKey, date: null, sets: [], volume: 0 };
+    session.sets.push({ series_number: num, weight: l.weight, reps: l.reps, rir: l.rir });
+    session.volume += l.weight * l.reps;
+    if (l.logged_at && (!session.date || l.logged_at < session.date)) session.date = l.logged_at;
+    weekSessions.set(sessionKey, session);
+    byWeek.set(l.week_number, weekSessions);
   });
 
-  const weeks = Array.from(byWeek.values());
-  weeks.forEach((w) => w.sets.sort((a, b) => a.series_number - b.series_number));
+  const weeks: HistoryWeek[] = Array.from(byWeek.entries()).map(([week, weekSessions]) => {
+    const sessions = Array.from(weekSessions.values());
+    sessions.forEach((s) => s.sets.sort((a, b) => a.series_number - b.series_number));
+    sessions.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+    const volume = sessions.reduce((sum, s) => sum + s.volume, 0);
+    const date = sessions.reduce<string | null>(
+      (earliest, s) => (s.date && (!earliest || s.date < earliest) ? s.date : earliest), null);
+    return { week, date, sessions, volume };
+  });
+
   return weeks.sort((a, b) => b.week - a.week);
 }
 
 /** La mejor serie de todo el historial, por fuerza estimada (no por peso bruto). */
 export function personalRecord(weeks: HistoryWeek[]): PR | null {
   const todas: PR[] = weeks.flatMap((w) =>
-    w.sets.map((s) => ({ weight: s.weight, reps: s.reps, week: w.week })));
+    w.sessions.flatMap((s) => s.sets.map((set) => ({ weight: set.weight, reps: set.reps, week: w.week }))));
   if (todas.length === 0) return null;
   return todas.reduce((best, cur) =>
     score(cur.weight, cur.reps) > score(best.weight, best.reps) ? cur : best);

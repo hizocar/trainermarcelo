@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekNumberForDate, monthGrid } from '../weeks';
+import { weekNumberForDate, monthGrid, calendarWeekNumberForDate, santiagoDayKey } from '../weeks';
 
 // El epoch del programa es el lunes 15 de junio de 2026 (semana 1).
 describe('weekNumberForDate', () => {
@@ -45,5 +45,38 @@ describe('monthGrid', () => {
 
   it('todas las filas empiezan en lunes', () => {
     monthGrid(2026, 7).forEach((row) => expect(row[0].getDay()).toBe(1));
+  });
+});
+
+describe('calendarWeekNumberForDate', () => {
+  it('el propio día del epoch es la semana 1', () => {
+    expect(calendarWeekNumberForDate(new Date('2026-06-15T10:00:00'))).toBe(1);
+  });
+
+  it('el 12 de agosto de 2026 es la semana 9', () => {
+    expect(calendarWeekNumberForDate(new Date('2026-08-12T10:00:00'))).toBe(9);
+  });
+
+  it('devuelve null para fechas anteriores al epoch, en vez de achicarlas a la semana 1', () => {
+    expect(calendarWeekNumberForDate(new Date('2026-05-01T10:00:00'))).toBeNull();
+    expect(calendarWeekNumberForDate(new Date('2026-01-01T10:00:00'))).toBeNull();
+  });
+
+  it('el día justo antes del epoch es null', () => {
+    expect(calendarWeekNumberForDate(new Date('2026-06-14T23:00:00'))).toBeNull();
+  });
+});
+
+describe('santiagoDayKey', () => {
+  it('una hora de madrugada UTC todavía es el día anterior en Chile', () => {
+    expect(santiagoDayKey(new Date('2026-08-13T02:00:00Z'))).toBe('2026-08-12');
+  });
+
+  it('al mediodía UTC ya es el mismo día en Chile', () => {
+    expect(santiagoDayKey(new Date('2026-08-13T12:00:00Z'))).toBe('2026-08-13');
+  });
+
+  it('formatea como YYYY-MM-DD', () => {
+    expect(santiagoDayKey(new Date('2026-01-05T18:00:00Z'))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
