@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase-server';
 import { signOut } from '../actions';
 import Logo from '@/components/Logo';
-import type { AppUser } from '@/lib/types';
+import { loadCoachDashboard, type CoachDashboardRow } from '@/lib/coachDashboard';
+import { santiagoDayKey } from '@/lib/weeks';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,14 +21,27 @@ export default async function DashboardPage() {
 
   if (me?.role !== 'coach') redirect('/login');
 
-  const { data: clients } = await supabase
-    .from('users')
-    .select('id, name, email, avatar_url')
-    .eq('role', 'client')
-    .eq('coach_id', user.id)
-    .order('name');
+  const list: CoachDashboardRow[] = await loadCoachDashboard(supabase, user.id);
+  const atencion = list.filter((c) => c.status.needsAttention);
+  const alDia = list.filter((c) => !c.status.needsAttention);
 
-  const list = (clients ?? []) as AppUser[];
+  const hoyKey = santiagoDayKey(new Date());
+  const ayerKey = santiagoDayKey(new Date(Date.now() - 86400000));
+
+  function ultimaVez(row: CoachDashboardRow): string {
+    if (!row.lastTrainedKey) return 'sin registros en 2 semanas';
+    if (row.lastTrainedKey === hoyKey) return 'entrenó hoy';
+    if (row.lastTrainedKey === ayerKey) return 'entrenó ayer';
+    const dias = Math.round(
+      (new Date(hoyKey).getTime() - new Date(row.lastTrainedKey).getTime()) / 86400000,
+    );
+    return `hace ${dias} días`;
+  }
+
+  function detalle(row: CoachDashboardRow): string {
+    if (row.status.total === 0) return 'sin plan asignado';
+    return `${row.status.done} de ${row.status.total} días · ${ultimaVez(row)}`;
+  }
 
   return (
     <>
@@ -60,19 +74,50 @@ export default async function DashboardPage() {
         </p>
 
         {list.length === 0 ? (
-          <p style={{ marginTop: 40 }} className="muted">
-            Aún no tienes clientes asignados. Invítalos desde la app.
+          <p className="muted" style={{ marginTop: 30 }}>
+            Todavía no tienes alumnos. Invita al primero con “+ Cliente”.
           </p>
         ) : (
-          <div className="client-grid">
-            {list.map((c) => (
-              <Link key={c.id} href={`/clients/${c.id}`} className="client-card">
-                <div className="avatar">{(c.name?.[0] ?? '?').toUpperCase()}</div>
-                <h3>{c.name}</h3>
-                <small>{c.email}</small>
-              </Link>
-            ))}
-          </div>
+          <>
+            {atencion.length > 0 && (
+              <>
+                <span className="label" style={{ color: 'var(--warning)', letterSpacing: 2 }}>
+                  Necesitan atención
+                </span>
+                <div className="client-grid" style={{ marginTop: 12, marginBottom: 28 }}>
+                  {atencion.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/clients/${c.id}`}
+                      className="client-card"
+                      style={{ borderColor: 'var(--warning)' }}
+                    >
+                      <div className="avatar">{(c.name?.[0] ?? '?').toUpperCase()}</div>
+                      <h3>{c.name}</h3>
+                      <small style={{ color: 'var(--warning)' }}>{detalle(c)}</small>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {alDia.length > 0 && (
+              <>
+                <span className="label muted" style={{ letterSpacing: 2 }}>
+                  {atencion.length > 0 ? 'Al día' : 'Mis alumnos'}
+                </span>
+                <div className="client-grid" style={{ marginTop: 12 }}>
+                  {alDia.map((c) => (
+                    <Link key={c.id} href={`/clients/${c.id}`} className="client-card">
+                      <div className="avatar">{(c.name?.[0] ?? '?').toUpperCase()}</div>
+                      <h3>{c.name}</h3>
+                      <small>{detalle(c)}</small>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         )}
       </main>
     </>
