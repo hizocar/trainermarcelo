@@ -188,8 +188,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerIcons: {
+    flex: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
   },
   inviteBtn: {
@@ -208,9 +211,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
+    minWidth: 44,
+    height: 46,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
