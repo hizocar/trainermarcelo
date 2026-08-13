@@ -96,20 +96,9 @@ export default async function ClientPlanPage({
           <Link href="/dashboard" className="brand">
             <Logo />
           </Link>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              CALENDARIO
-            </Link>
-            <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              SEMANA A SEMANA
-            </Link>
-            <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              EVOLUCIÓN
-            </Link>
-            <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ← CLIENTES
-            </Link>
-          </div>
+          <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+            ← CLIENTES
+          </Link>
         </div>
       </header>
 
@@ -123,6 +112,30 @@ export default async function ClientPlanPage({
               otherClients={(otherClients ?? []) as { id: string; name: string; email: string }[]}
             />
           )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 22 }}>
+          <div>
+            <span className="label muted" style={{ letterSpacing: 2 }}>Cómo va</span>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
+                ESTA SEMANA
+              </Link>
+              <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
+                CALENDARIO
+              </Link>
+              <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
+                POR EJERCICIO
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <span className="label muted" style={{ letterSpacing: 2 }}>Qué va a hacer</span>
+            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+              Su plan y sus semanas se editan aquí abajo.
+            </p>
+          </div>
         </div>
 
         {!plan ? (

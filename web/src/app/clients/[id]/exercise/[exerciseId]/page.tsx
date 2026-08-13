@@ -100,7 +100,7 @@ export default async function ExerciseHistoryPage({
               CALENDARIO
             </Link>
             <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ← SEMANA A SEMANA
+              ← ESTA SEMANA
             </Link>
           </div>
         </div>
