@@ -25,12 +25,13 @@ export async function loadCoachDashboard(
   supabase: any,
   coachId: string,
 ): Promise<CoachDashboardRow[]> {
-  const { data: clients } = await supabase
+  const { data: clients, error: clientsError } = await supabase
     .from('users')
     .select('id, name, email, avatar_url')
     .eq('role', 'client')
     .eq('coach_id', coachId)
     .order('name');
+  if (clientsError) throw new Error(`No se pudieron cargar los alumnos: ${clientsError.message}`);
 
   const list = (clients ?? []) as { id: string; name: string; email: string; avatar_url: string | null }[];
   if (list.length === 0) return [];
@@ -40,16 +41,18 @@ export async function loadCoachDashboard(
   const todayWeekDay = santiagoWeekDay();
 
   // 1) planes de esos alumnos
-  const { data: plans } = await supabase
+  const { data: plans, error: plansError } = await supabase
     .from('workout_plans').select('id, client_id').in('client_id', clientIds);
+  if (plansError) throw new Error(`No se pudieron cargar los planes: ${plansError.message}`);
   const planByClient = new Map<string, string>();
   (plans ?? []).forEach((p: any) => planByClient.set(p.client_id, p.id));
   const planIds = Array.from(planByClient.values());
 
   // 2) semanas de esos planes -> la activa de cada uno
-  const { data: weeks } = planIds.length
+  const { data: weeks, error: weeksError } = planIds.length
     ? await supabase.from('plan_weeks').select('*').in('plan_id', planIds).eq('archived', false)
-    : { data: [] };
+    : { data: [], error: null };
+  if (weeksError) throw new Error(`No se pudieron cargar las semanas: ${weeksError.message}`);
   const weeksByPlan = new Map<string, PlanWeek[]>();
   ((weeks ?? []) as PlanWeek[]).forEach((w) => {
     weeksByPlan.set(w.plan_id, [...(weeksByPlan.get(w.plan_id) ?? []), w]);
@@ -62,12 +65,13 @@ export async function loadCoachDashboard(
 
   // 3) días de las semanas activas, con sus ejercicios y series
   const activeWeekIds = Array.from(activeWeekByPlan.values());
-  const { data: days } = activeWeekIds.length
+  const { data: days, error: daysError } = activeWeekIds.length
     ? await supabase
         .from('training_days')
         .select('id, plan_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
         .in('plan_week_id', activeWeekIds)
-    : { data: [] };
+    : { data: [], error: null };
+  if (daysError) throw new Error(`No se pudieron cargar los días de entrenamiento: ${daysError.message}`);
 
   // 4) registros de las 2 últimas semanas, acotados por ALUMNO (no por serie)
   const { data: logs, error: logsError } = await supabase
