@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { weekNumberForDate, monthGrid, calendarWeekNumberForDate, santiagoDayKey } from '../weeks';
+import {
+  weekNumberForDate, monthGrid, calendarWeekNumberForDate, santiagoDayKey,
+  weekDates, localDateKey, offScheduleDayKeys,
+} from '../weeks';
 
 // El epoch del programa es el lunes 15 de junio de 2026 (semana 1).
 describe('weekNumberForDate', () => {
@@ -78,5 +81,60 @@ describe('santiagoDayKey', () => {
 
   it('formatea como YYYY-MM-DD', () => {
     expect(santiagoDayKey(new Date('2026-01-05T18:00:00Z'))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('weekDates', () => {
+  it('devuelve 7 fechas de lunes a domingo para la semana 1 (el epoch)', () => {
+    const dates = weekDates(1);
+    expect(dates).toHaveLength(7);
+    expect(dates.map((d) => d.getDay())).toEqual([1, 2, 3, 4, 5, 6, 0]);
+    expect(localDateKey(dates[0])).toBe('2026-06-15');
+    expect(localDateKey(dates[6])).toBe('2026-06-21');
+  });
+
+  it('la semana 9 empieza el 10 de agosto de 2026', () => {
+    const dates = weekDates(9);
+    expect(localDateKey(dates[0])).toBe('2026-08-10');
+    expect(localDateKey(dates[6])).toBe('2026-08-16');
+  });
+});
+
+describe('localDateKey', () => {
+  it('formatea como YYYY-MM-DD a partir de los componentes locales', () => {
+    expect(localDateKey(new Date(2026, 7, 5))).toBe('2026-08-05');
+  });
+});
+
+describe('offScheduleDayKeys', () => {
+  const weekKeys = weekDates(9).map((d) => localDateKey(d)); // lun 10 ago .. dom 16 ago
+
+  it('sin ejercicios, no hay días fuera de lo planificado', () => {
+    const doneByDay = new Map([['2026-08-12', new Set(['ex1'])]]);
+    expect(offScheduleDayKeys([], weekKeys, '2026-08-10', doneByDay)).toEqual([]);
+  });
+
+  it('detecta el día en que se registró un ejercicio de la sesión, distinto del planificado', () => {
+    const doneByDay = new Map([['2026-08-12', new Set(['ex1', 'ex2'])]]);
+    expect(offScheduleDayKeys(['ex1'], weekKeys, '2026-08-10', doneByDay)).toEqual(['2026-08-12']);
+  });
+
+  it('el propio día planificado nunca cuenta como "fuera de lo planificado"', () => {
+    const doneByDay = new Map([['2026-08-10', new Set(['ex1'])]]);
+    expect(offScheduleDayKeys(['ex1'], weekKeys, '2026-08-10', doneByDay)).toEqual([]);
+  });
+
+  it('una sesión partida en dos días devuelve ambos, en orden de la semana', () => {
+    const doneByDay = new Map([
+      ['2026-08-13', new Set(['ex1'])],
+      ['2026-08-12', new Set(['ex2'])],
+    ]);
+    expect(offScheduleDayKeys(['ex1', 'ex2'], weekKeys, '2026-08-10', doneByDay))
+      .toEqual(['2026-08-12', '2026-08-13']);
+  });
+
+  it('un registro en un día fuera de la semana de programa no cuenta', () => {
+    const doneByDay = new Map([['2026-08-17', new Set(['ex1'])]]); // lunes de la semana 10
+    expect(offScheduleDayKeys(['ex1'], weekKeys, '2026-08-10', doneByDay)).toEqual([]);
   });
 });

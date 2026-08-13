@@ -4,7 +4,10 @@ import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { calendarWeekNumberForDate, monthGrid, santiagoDayKey } from '@/lib/weeks';
+import {
+  calendarWeekNumberForDate, monthGrid, santiagoDayKey,
+  weekDates, localDateKey, offScheduleDayKeys, WEEK_DAYS_SHORT,
+} from '@/lib/weeks';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,11 +24,13 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const CABECERA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
-/** Clave "YYYY-MM-DD" de una celda de la grilla, a partir de sus propios
- * componentes de fecha (no es un instante real, no hay zona horaria que
- * convertir — son las mismas etiquetas que ya dibuja el calendario). */
-function cellKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Clave "YYYY-MM-DD" de una celda de la grilla (misma función que usan las
+// demás fechas locales del calendario — ver localDateKey en lib/weeks.ts).
+const cellKey = localDateKey;
+
+/** "mié 12": día corto + número, para la nota "movido al ..." */
+function shortWeekday(d: Date): string {
+  return `${WEEK_DAYS_SHORT[d.getDay()].toLowerCase()} ${d.getDate()}`;
 }
 
 export default async function ClientCalendarPage({
@@ -227,11 +232,25 @@ export default async function ClientCalendarPage({
                     const key = cellKey(date);
                     const weekNum = weekNumByCell.get(key) ?? null;
                     const activeWeek = weekNum != null ? (activeWeekByWeekNum.get(weekNum) ?? null) : null;
-                    const delDia = activeWeek
-                      ? trainingDays.filter((d: any) =>
-                          d.plan_week_id === activeWeek.id && d.week_day === date.getDay())
+                    // todos los días planificados de la semana de programa de esta celda
+                    // (no solo los que caen hoy) — hace falta para detectar sesiones
+                    // hechas fuera de su día
+                    const allDaysThisWeek = activeWeek
+                      ? trainingDays.filter((d: any) => d.plan_week_id === activeWeek.id)
                       : [];
+                    const delDia = allDaysThisWeek.filter((d: any) => d.week_day === date.getDay());
                     const done = doneByDay.get(key) ?? new Set<string>();
+                    // sesiones de OTRO día de esta misma semana cuyos ejercicios se
+                    // registraron hoy — se dibujan como "hecho fuera de lo planificado"
+                    const offScheduleAqui = allDaysThisWeek.filter((d: any) =>
+                      d.week_day !== date.getDay() && d.exercises.some((e: any) => done.has(e.id)));
+                    // las 7 fechas de la semana de programa de esta celda, para saber si
+                    // un día planificado sin registro HOY se entrenó en otro día de la
+                    // misma semana ("movido") en vez de contarlo como perdido
+                    const weekDayPairs = weekNum != null
+                      ? weekDates(weekNum).map((d) => ({ key: cellKey(d), date: d }))
+                      : [];
+                    const weekDayKeysForWeek = weekDayPairs.map((p) => p.key);
                     const cardioMin = cardioByDay.get(key) ?? 0;
                     const futuro = esFuturo(date);
                     const hoyCelda = esHoy(date);
@@ -270,15 +289,32 @@ export default async function ClientCalendarPage({
                           const total = d.exercises.length;
                           const completo = total > 0 && hechos >= total;
                           const parcial = total > 0 && hechos > 0 && !completo;
-                          // solo cuenta como no registrado un día que ya pasó — hoy todavía
-                          // está pendiente, no perdido, y un día sin ejercicios vigentes
-                          // (todos archivados) tampoco tiene nada que mostrar
-                          const perdido = total > 0 && !logsError && hechos === 0 && pasado;
+                          // si no hay nada registrado ESTE día, antes de darlo por perdido
+                          // hay que revisar si se entrenó en otro día de la misma semana
+                          const movidoA = (total > 0 && hechos === 0)
+                            ? offScheduleDayKeys(
+                                d.exercises.map((e: any) => e.id),
+                                weekDayKeysForWeek,
+                                key,
+                                doneByDay,
+                              )[0]
+                            : undefined;
+                          const movidoFecha = movidoA
+                            ? weekDayPairs.find((p) => p.key === movidoA)?.date
+                            : undefined;
+                          const movido = movidoFecha != null;
+                          // solo cuenta como no registrado un día que ya pasó Y que tampoco
+                          // se movió a otro día de la semana — hoy todavía está pendiente,
+                          // no perdido, y un día sin ejercicios vigentes (todos archivados)
+                          // tampoco tiene nada que mostrar
+                          const perdido = total > 0 && !logsError && hechos === 0 && pasado && !movido;
                           return (
                             <Link
                               key={d.id}
                               href={`/clients/${id}/week?week=${weekNum}`}
-                              title={`${d.name} — ${hechos}/${total} ejercicios`}
+                              title={movido
+                                ? `${d.name} — se entrenó el ${shortWeekday(movidoFecha!)}`
+                                : `${d.name} — ${hechos}/${total} ejercicios`}
                               style={{
                                 display: 'block', textDecoration: 'none',
                                 borderRadius: 5, padding: '3px 5px',
@@ -297,11 +333,40 @@ export default async function ClientCalendarPage({
                                   fontSize: 9,
                                   fontFamily: 'var(--font-mono)',
                                   opacity: 0.85,
-                                  color: completo ? 'var(--bg)' : parcial ? 'var(--accent)' : undefined,
+                                  color: completo ? 'var(--bg)' : parcial ? 'var(--accent)' : movido ? 'var(--text-secondary)' : undefined,
                                 }}>
-                                  {(futuro || hoyCelda) && hechos === 0 ? 'pendiente' : `${hechos}/${total}`}
+                                  {movido
+                                    ? `movido al ${shortWeekday(movidoFecha!)}`
+                                    : (futuro || hoyCelda) && hechos === 0 ? 'pendiente' : `${hechos}/${total}`}
                                 </div>
                               )}
+                            </Link>
+                          );
+                        })}
+
+                        {offScheduleAqui.map((d: any) => {
+                          const hechosAqui = d.exercises.filter((e: any) => done.has(e.id)).length;
+                          const total = d.exercises.length;
+                          return (
+                            <Link
+                              key={`off-${d.id}`}
+                              href={`/clients/${id}/week?week=${weekNum}`}
+                              title={`${d.name} — hecho fuera de lo planificado (${hechosAqui}/${total} ejercicios)`}
+                              style={{
+                                display: 'block', textDecoration: 'none',
+                                borderRadius: 5, padding: '3px 5px',
+                                background: 'var(--accent)',
+                                border: '1px solid var(--accent)',
+                                color: 'var(--bg)',
+                                opacity: 0.7,
+                              }}
+                            >
+                              <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.25 }}>
+                                {d.name}
+                              </div>
+                              <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)' }}>
+                                ✓ fuera de lo planificado
+                              </div>
                             </Link>
                           );
                         })}
@@ -323,6 +388,8 @@ export default async function ClientCalendarPage({
         <div style={{ display: 'flex', gap: 16, marginTop: 16, flexWrap: 'wrap' }} className="muted">
           <span style={{ fontSize: 11 }}>■ relleno = día completo</span>
           <span style={{ fontSize: 11 }}>▭ borde punteado = día planificado que no registró</span>
+          <span style={{ fontSize: 11 }}>■ relleno tenue “✓ fuera de lo planificado” = se entrenó ese día, pero era otro el día planificado</span>
+          <span style={{ fontSize: 11 }}>“movido al …” = el día planificado se cumplió en otro día de la misma semana</span>
           <span style={{ fontSize: 11 }}>⏱ = cardio registrado ese día</span>
           <span style={{ fontSize: 11 }}>Toca un día para ver el detalle de esa semana.</span>
         </div>

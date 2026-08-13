@@ -46,6 +46,54 @@ export function calendarWeekNumberForDate(date: Date): number | null {
 }
 
 /**
+ * Las 7 fechas (lunes→domingo) de una semana de programa, como Date locales
+ * a medianoche. Mismo criterio que weekStartDate/monthGrid (el epoch cae un
+ * lunes, así que las semanas de programa coinciden exacto con las filas del
+ * calendario). Se usa para saber, dado un día planificado que no se cumplió
+ * el día que tocaba, si igual se entrenó en OTRO día de esa misma semana.
+ */
+export function weekDates(week: number): Date[] {
+  const start = weekStartDate(week);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+}
+
+/**
+ * Clave "YYYY-MM-DD" de una fecha local (mismos componentes que usa el
+ * calendario para sus celdas — no es un instante real, no hay zona horaria
+ * que convertir).
+ */
+export function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * De los ejercicios de un día planificado, en qué días de su semana de
+ * programa (weekDayKeys, lunes→domingo, clave "YYYY-MM-DD") hay al menos un
+ * registro — aparte del propio día planificado (plannedKey). Sirve para dos
+ * cosas: decidir si un día planificado sin registro ese día debe mostrarse
+ * como "movido" en vez de "perdido", y para saber en qué otros días dibujar
+ * el bloque "hecho fuera de lo planificado".
+ */
+export function offScheduleDayKeys(
+  exerciseIds: string[],
+  weekDayKeys: string[],
+  plannedKey: string,
+  doneByDay: Map<string, Set<string>>,
+): string[] {
+  if (exerciseIds.length === 0) return [];
+  return weekDayKeys.filter((key) => {
+    if (key === plannedKey) return false;
+    const done = doneByDay.get(key);
+    if (!done) return false;
+    return exerciseIds.some((id) => done.has(id));
+  });
+}
+
+/**
  * Clave "YYYY-MM-DD" de un instante real (timestamp de Supabase) en la zona
  * horaria de Chile continental, sin importar en qué zona corre el servidor
  * (Vercel corre en UTC). Se usa para decidir a qué día del calendario
