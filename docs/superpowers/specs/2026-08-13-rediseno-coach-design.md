@@ -103,7 +103,9 @@ Se agrega un único token de alerta ámbar (`#c9a227`), reservado exclusivamente
 - app: `colors.warning` en `trainer-app/src/theme`
 - web: `--warning` en `web/src/app/globals.css`
 
-Se corrige además `--danger`, hoy `#626b73` (un gris medio indistinguible del borde), que ya provocó una leyenda mentirosa en el calendario prometiendo un "borde rojo" inexistente.
+**`--danger` NO se toca.** Al escribir el plan se revisó `trainer-app/src/theme/index.ts` y el monocromo resultó ser una decisión documentada, no un descuido: *"Monocromo puro: 5 grises, sin matiz de color. La jerarquía se construye por brillo, no por tono — 'success' es más claro (vitalidad/progreso), 'danger' más oscuro (se apaga), en vez de verde/rojo."* Que `danger` sea gris es intencional. Lo que estuvo mal fue la leyenda del calendario que prometía un "borde rojo" inexistente, y eso ya se corrigió cambiando el texto, no el color.
+
+El ámbar entra como **la única excepción** al monocromo, y precisamente por ser la única tiene fuerza. En la app, el token existente `warning` (hoy `#949DA6`, un gris) pasa a `#c9a227`; en la web se agrega `--warning`. Ningún otro token cambia.
 
 No se adopta una paleta verde/ámbar/rojo: cuando todo tiene color nada destaca, y el par verde/rojo excluye a quien no los distingue —alrededor de 1 de cada 12 hombres, y la base de usuarios es mayoritariamente masculina.
 
