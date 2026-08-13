@@ -19,7 +19,10 @@ export const colors = {
   border: '#232732',
   borderLight: '#333844',
   danger: '#626B73',
-  warning: '#949DA6',
+  // Única excepción al monocromo: se reserva EXCLUSIVAMENTE para "esto
+  // requiere que hagas algo". Por ser el único color de la app, no se puede
+  // ignorar; si se empieza a usar para decorar, pierde todo su valor.
+  warning: '#C9A227',
   success: '#D8D9D7',
   info: '#949DA6',
   overlay: 'rgba(0, 3, 13, 0.78)',
