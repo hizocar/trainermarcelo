@@ -184,9 +184,22 @@ export default async function ClientWeekPage({
                     const sets = setsByEx.get(ex.id);
                     return (
                       <div key={ex.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
-                        <div style={{ fontSize: 13, fontWeight: sets ? 700 : 400, color: sets ? 'var(--text)' : 'var(--text-secondary)' }}>
+                        <Link
+                          href={`/clients/${id}/exercise/${ex.id}`}
+                          style={{
+                            fontSize: 13,
+                            fontWeight: sets ? 700 : 400,
+                            color: sets ? 'var(--text)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                          title={`Ver historial de ${ex.name}`}
+                        >
                           {ex.name}
-                        </div>
+                          <span className="muted" style={{ fontSize: 10 }}>›</span>
+                        </Link>
                         {sets ? (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                             {sets.map((s, i) => (
