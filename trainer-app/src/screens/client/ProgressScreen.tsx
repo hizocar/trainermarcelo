@@ -12,7 +12,7 @@ import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import TrendChart from '../../components/common/TrendChart';
 import { getCurrentWeek } from '../../lib/weeks';
-import { energyPerformance } from '../../lib/progress';
+import { energyPerformance, bestSet } from '../../lib/progress';
 import { resolveActiveWeek, PlanWeek } from '../../lib/plan';
 import HistoryScreen from './HistoryScreen';
 
@@ -182,6 +182,19 @@ export default function ProgressScreen() {
       if (!repByKey[key] || currentDayIds.has(ex.day_id)) repByKey[key] = ex;
     });
 
+    // La MEJOR MARCA se calcula aparte, sobre TODOS los registros: un récord
+    // vale aunque se haya conseguido en la semana en curso o en una semana
+    // donde el alumno no alcanzó a registrar todos sus días. Los puntos del
+    // gráfico y el % de mejora sí siguen usando solo semanas cerradas, que es
+    // donde una semana a medias distorsiona la comparación.
+    const allByKey: Record<string, LogRow[]> = {};
+    logs.forEach(l => {
+      const exId = seriesExMap[l.series_id];
+      const ex = exId ? exById[exId] : undefined;
+      if (!ex) return;
+      (allByKey[contKey(ex)] ??= []).push(l);
+    });
+
     return Object.keys(byKey).map(key => {
       const weeks = Object.keys(byKey[key]).map(Number).sort((a, b) => a - b);
       const points = weeks.map(w => ({
@@ -192,16 +205,11 @@ export default function ProgressScreen() {
       const prev = points.length > 1 ? points[points.length - 2] : null;
       const delta = prev ? ((last.score - prev.score) / prev.score) * 100 : null;
 
-      let best = { weight: 0, reps: 0, week: 0 };
-      weeks.forEach(w => byKey[key][w].forEach(l => {
-        if (score(l.weight, l.reps) > score(best.weight, best.reps)) {
-          best = { weight: l.weight, reps: l.reps, week: w };
-        }
-      }));
+      const best = bestSet(allByKey[key] ?? []) ?? { weight: 0, reps: 0, week: 0 };
 
       return { exercise: repByKey[key], points, delta, lastWeek: last.week, best };
     });
-  }, [closedLogs, exercises, seriesExMap, planDays]);
+  }, [closedLogs, logs, exercises, seriesExMap, planDays]);
 
   // agrupado por día del plan (Torso 1, Pierna, ...) en el orden del plan
   const toneOf = (d: number | null): 'up' | 'flat' | 'down' =>

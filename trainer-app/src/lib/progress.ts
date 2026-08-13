@@ -22,6 +22,26 @@ export function oneRepMax(weight: number, reps: number): number | null {
 }
 
 /**
+ * La mejor serie de un ejercicio, por fuerza estimada.
+ *
+ * Mira TODOS los registros a propósito — incluidas la semana en curso y las
+ * semanas incompletas. splitClosedWeeks descarta esas semanas para los
+ * gráficos y los % de mejora (ahí una semana a medias sí distorsiona la
+ * comparación), pero aplicarlo también acá escondía récords reales: a un
+ * alumno que hizo 77.1x12 en una semana donde solo registró 4 de sus 5 días
+ * se le seguía mostrando 68x10 de un mes antes como "mejor marca".
+ *
+ * Ante empate gana la más antigua: es la fecha en que se consiguió la marca.
+ */
+export function bestSet(logs: LogLite[]): { weight: number; reps: number; week: number } | null {
+  if (logs.length === 0) return null;
+  const ordenados = logs.slice().sort((a, b) => a.week_number - b.week_number);
+  const mejor = ordenados.reduce((best, cur) =>
+    score(cur.weight, cur.reps) > score(best.weight, best.reps) ? cur : best);
+  return { weight: mejor.weight, reps: mejor.reps, week: mejor.week_number };
+}
+
+/**
  * Semanas cerradas: excluye la semana calendario en curso y, si la última
  * semana con datos no cubre todos los días del plan, también la excluye
  * (una semana a medias distorsiona los gráficos y las comparaciones).

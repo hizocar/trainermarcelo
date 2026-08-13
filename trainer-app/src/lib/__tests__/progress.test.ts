@@ -1,6 +1,6 @@
 import {
   score, oneRepMax, splitClosedWeeks, toneOf, weeklyDelta,
-  repTopOf, suggestProgression, platesPerSide, energyPerformance,
+  repTopOf, suggestProgression, platesPerSide, energyPerformance, bestSet,
 } from '../progress';
 
 describe('score / oneRepMax', () => {
@@ -130,5 +130,37 @@ describe('energyPerformance', () => {
     const sessions = [{ date: '2026-07-08', volume: 1400 }];
     const moods = [{ logged_date: '2026-07-08', energy: 8 }];
     expect(energyPerformance(sessions, moods)).toBeNull();
+  });
+});
+
+describe('bestSet', () => {
+  const log = (week_number: number, weight: number, reps: number): any =>
+    ({ series_id: 's1', week_number, weight, reps });
+
+  it('devuelve null sin registros', () => {
+    expect(bestSet([])).toBeNull();
+  });
+
+  it('elige por fuerza estimada, no por peso bruto', () => {
+    // 100x5 (117) supera a 105x2 (112)
+    expect(bestSet([log(1, 105, 2), log(2, 100, 5)])).toEqual({ weight: 100, reps: 5, week: 2 });
+  });
+
+  it('NO descarta una semana incompleta: un récord es un récord', () => {
+    // caso real de Marcelo: 68x10 en S4-S7 (semanas completas) y 77.1x12 en
+    // S8, que quedó incompleta (4 de 5 días). La mejor es la de S8.
+    const logs = [
+      log(4, 68, 10), log(5, 68, 10), log(6, 68, 10), log(7, 68, 10),
+      log(8, 77.1, 12),
+    ];
+    expect(bestSet(logs)).toEqual({ weight: 77.1, reps: 12, week: 8 });
+  });
+
+  it('tampoco descarta la semana en curso', () => {
+    expect(bestSet([log(8, 68, 10), log(9, 90, 10)])).toEqual({ weight: 90, reps: 10, week: 9 });
+  });
+
+  it('ante empate se queda con la más antigua (la marca original)', () => {
+    expect(bestSet([log(3, 60, 10), log(7, 60, 10)])).toEqual({ weight: 60, reps: 10, week: 3 });
   });
 });
