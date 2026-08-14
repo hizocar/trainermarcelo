@@ -42,6 +42,7 @@ import DayExercisesScreen from '../screens/coach/DayExercisesScreen';
 import PlanEditorScreen from '../screens/coach/PlanEditorScreen';
 import WeekManagerScreen from '../screens/coach/WeekManagerScreen';
 import ClientWeekScreen from '../screens/coach/ClientWeekScreen';
+import ClientCalendarScreen from '../screens/coach/ClientCalendarScreen';
 import ProgramsListScreen from '../screens/coach/ProgramsListScreen';
 import ProgramEditorScreen from '../screens/coach/ProgramEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
@@ -206,6 +207,7 @@ export default function AppNavigator() {
             <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
             <Stack.Screen name="WeekManager" component={WeekManagerScreen} />
             <Stack.Screen name="ClientWeek" component={ClientWeekScreen} />
+            <Stack.Screen name="ClientCalendar" component={ClientCalendarScreen} />
             <Stack.Screen name="Programs" component={ProgramsListScreen} />
             <Stack.Screen name="ProgramEditor" component={ProgramEditorScreen} />
             <Stack.Screen name="InviteClient" component={InviteClientScreen} />
