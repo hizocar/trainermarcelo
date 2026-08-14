@@ -86,10 +86,18 @@ export default function ClientCalendarScreen() {
 
   async function loadInner(y: number, m: number) {
     const grid = monthGrid(y, m);
+    // Acumula si CUALQUIERA de las consultas de este mes falló. Antes solo
+    // el error de `workout_logs` prendía el aviso en pantalla; un fallo en
+    // `plan`, `days` o `anyDay` se tragaba en un console.error y el mes se
+    // dibujaba vacío — indistinguible de un alumno sin nada planificado.
+    let anyQueryError = false;
 
     const { data: plan, error: planError } = await supabase
       .from('workout_plans').select('id').eq('client_id', client.id).maybeSingle();
-    if (planError) console.error('calendario: error cargando el plan', planError);
+    if (planError) {
+      console.error('calendario: error cargando el plan', planError);
+      anyQueryError = true;
+    }
     setHasPlan(!!plan);
 
     const weeks = plan ? await fetchPlanWeeks(plan.id) : [];
@@ -118,7 +126,10 @@ export default function ClientCalendarScreen() {
           .select('id, name, week_day, archived, plan_week_id, exercises ( id, archived, exercise_series ( id ) )')
           .in('plan_week_id', visiblePlanWeekIds)
       : { data: [], error: null };
-    if (daysError) console.error('calendario: error cargando días de entrenamiento', daysError);
+    if (daysError) {
+      console.error('calendario: error cargando días de entrenamiento', daysError);
+      anyQueryError = true;
+    }
 
     const days: DayRow[] = (daysData ?? [])
       .filter((d: any) => !d.archived && !d.name.toLowerCase().includes('libre'))
@@ -143,7 +154,10 @@ export default function ClientCalendarScreen() {
     const { data: anyDay, error: anyDayError } = plan
       ? await supabase.from('training_days').select('id').eq('plan_id', plan.id).limit(1).maybeSingle()
       : { data: null, error: null };
-    if (anyDayError) console.error('calendario: error verificando días del plan', anyDayError);
+    if (anyDayError) {
+      console.error('calendario: error verificando días del plan', anyDayError);
+      anyQueryError = true;
+    }
     setHasAnyDay(!!anyDay);
 
     // registros de la semanas visibles, por alumno — nunca por lista de
@@ -157,8 +171,10 @@ export default function ClientCalendarScreen() {
           .eq('logged_by', client.id)
           .in('week_number', weekNumbers)
       : { data: [], error: null };
-    if (logsErr) console.error('calendario: error cargando registros de entrenamiento', logsErr);
-    setLogsError(!!logsErr);
+    if (logsErr) {
+      console.error('calendario: error cargando registros de entrenamiento', logsErr);
+      anyQueryError = true;
+    }
 
     // "día real en que se entrenó" -> set de exercise_id con al menos un registro ese día
     const done = new Map<string, Set<string>>();
@@ -183,7 +199,10 @@ export default function ClientCalendarScreen() {
       .eq('user_id', client.id)
       .gte('logged_at', desde.toISOString())
       .lt('logged_at', hasta.toISOString());
-    if (cardioError) console.error('calendario: error cargando cardio', cardioError);
+    if (cardioError) {
+      console.error('calendario: error cargando cardio', cardioError);
+      anyQueryError = true;
+    }
 
     const cardioMap = new Map<string, number>();
     (cardio ?? []).forEach((c: any) => {
@@ -191,6 +210,8 @@ export default function ClientCalendarScreen() {
       cardioMap.set(k, (cardioMap.get(k) ?? 0) + c.duration_minutes);
     });
     setCardioByDay(cardioMap);
+
+    setLogsError(anyQueryError);
   }
 
   const grid = monthGrid(year, month);

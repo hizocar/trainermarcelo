@@ -17,15 +17,28 @@ export default function ClientListScreen() {
   const navigation = useNavigation<any>();
   const [clients, setClients] = useState<CoachDashboardRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (user?.id) fetchClients();
   }, [user?.id]);
 
   async function fetchClients() {
-    const data = await loadCoachDashboard(user!.id);
-    setClients(data);
-    setLoading(false);
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const data = await loadCoachDashboard(user!.id);
+      setClients(data);
+    } catch (e) {
+      // Un fallo transitorio de red al abrir la app no puede dejar al coach
+      // mirando el spinner para siempre: se avisa en pantalla y se ofrece
+      // reintentar, en vez de forzarlo a matar la app.
+      console.error('lista de clientes: error cargando el panel del coach', e);
+      setClients([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleSignOut() {
@@ -49,8 +62,12 @@ export default function ClientListScreen() {
   }
 
   function detalle(row: CoachDashboardRow) {
-    if (row.status.total === 0) return 'sin plan asignado';
-    return `${row.status.done} de ${row.status.total} días · ${ultimaVez(row)}`;
+    let base: string;
+    if (!row.planExists) base = 'sin plan asignado';
+    else if (!row.activeWeekExists) base = 'sin semana planificada';
+    else if (row.status.total === 0) base = 'semana sin días';
+    else base = `${row.status.done} de ${row.status.total} días · ${ultimaVez(row)}`;
+    return row.unread > 0 ? `${base} · ${row.unread} sin leer` : base;
   }
 
   const atencion = clients.filter(c => c.status.needsAttention);
@@ -106,6 +123,15 @@ export default function ClientListScreen() {
 
       {loading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
+      ) : loadError ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>
+            No se pudo cargar el panel de clientes. Revisa tu conexión e intenta de nuevo.
+          </Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={fetchClients}>
+            <Text style={styles.retryBtnText}>REINTENTAR</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {clients.length === 0 && (
@@ -253,5 +279,29 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: spacing.xl,
+  },
+  errorBox: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.xl,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    color: colors.accent,
   },
 });

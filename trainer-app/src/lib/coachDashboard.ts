@@ -21,6 +21,12 @@ export interface CoachDashboardRow {
   status: ClientStatus;
   /** "YYYY-MM-DD" del último entrenamiento dentro de las 2 semanas miradas, o null */
   lastTrainedKey: string | null;
+  /** mensajes que este alumno le mandó al coach y el coach todavía no leyó */
+  unread: number;
+  /** ¿tiene una fila en workout_plans? (no implica que tenga semana activa) */
+  planExists: boolean;
+  /** ¿esa fila (si existe) tiene una plan_week activa esta semana de programa? */
+  activeWeekExists: boolean;
 }
 
 const dayKey = (d: Date) =>
@@ -80,6 +86,22 @@ export async function loadCoachDashboard(coachId: string): Promise<CoachDashboar
   // Un fallo acá NO puede disfrazarse de "nadie entrenó".
   if (logsError) throw new Error(`No se pudieron cargar los registros: ${logsError.message}`);
 
+  // 5) mensajes sin leer, acotados por ALUMNO igual que los registros (una
+  // sola consulta, no una por alumno) — "sin leer" es lo que el coach todavía
+  // no vio: llegó del alumno (sender_id != coachId) y no tiene read_at.
+  const { data: unreadRows, error: unreadError } = await supabase
+    .from('messages')
+    .select('client_id')
+    .eq('coach_id', coachId)
+    .in('client_id', clientIds)
+    .neq('sender_id', coachId)
+    .is('read_at', null);
+  if (unreadError) throw new Error(`No se pudieron cargar los mensajes: ${unreadError.message}`);
+  const unreadByClient = new Map<string, number>();
+  ((unreadRows ?? []) as any[]).forEach(r => {
+    unreadByClient.set(r.client_id, (unreadByClient.get(r.client_id) ?? 0) + 1);
+  });
+
   const dayBySeries = new Map<string, { planId: string; weekDay: number | null }>();
   const plannedByPlan = new Map<string, number[]>();
   ((days ?? []) as any[])
@@ -113,16 +135,20 @@ export async function loadCoachDashboard(coachId: string): Promise<CoachDashboar
 
   return list.map(c => {
     const planId = planByClient.get(c.id);
-    const hasPlan = !!planId && activeWeekByPlan.has(planId);
+    const planExists = !!planId;
+    const activeWeekExists = !!planId && activeWeekByPlan.has(planId);
     return {
       ...c,
       status: clientStatus({
-        hasPlan,
+        hasPlan: activeWeekExists,
         plannedWeekDays: planId ? plannedByPlan.get(planId) ?? [] : [],
         completedWeekDays: planId ? Array.from(completedByPlan.get(planId) ?? []) : [],
         todayWeekDay,
       }),
       lastTrainedKey: lastTrainedByClient.get(c.id) ?? null,
+      unread: unreadByClient.get(c.id) ?? 0,
+      planExists,
+      activeWeekExists,
     };
   });
 }

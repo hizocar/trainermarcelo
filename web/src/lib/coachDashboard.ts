@@ -1,6 +1,6 @@
 import { clientStatus, type ClientStatus } from './clientStatus';
 import { resolveActiveWeek, type PlanWeek } from './planWeeks';
-import { getCurrentWeek, santiagoWeekDay, santiagoDayKey } from './weeks';
+import { santiagoCurrentWeek, santiagoWeekDay, santiagoDayKey } from './weeks';
 
 // Datos de la lista de alumnos del coach, cargados EN BLOQUE.
 //
@@ -18,6 +18,10 @@ export interface CoachDashboardRow {
   status: ClientStatus;
   /** "YYYY-MM-DD" del último entrenamiento dentro de las 2 semanas miradas, o null */
   lastTrainedKey: string | null;
+  /** ¿tiene una fila en workout_plans? (no implica que tenga semana activa) */
+  planExists: boolean;
+  /** ¿esa fila (si existe) tiene una plan_week activa esta semana de programa? */
+  activeWeekExists: boolean;
 }
 
 export async function loadCoachDashboard(
@@ -37,7 +41,10 @@ export async function loadCoachDashboard(
   if (list.length === 0) return [];
 
   const clientIds = list.map((c) => c.id);
-  const currentWeek = getCurrentWeek();
+  // OJO: NO usar getCurrentWeek() acá (ver santiagoCurrentWeek en weeks.ts) —
+  // mide desde Date.now() en la zona del runtime (UTC en Vercel), y quedaría
+  // desincronizado de `todayWeekDay` cada domingo de noche en Chile.
+  const currentWeek = santiagoCurrentWeek();
   const todayWeekDay = santiagoWeekDay();
 
   // 1) planes de esos alumnos
@@ -120,16 +127,19 @@ export async function loadCoachDashboard(
 
   return list.map((c) => {
     const planId = planByClient.get(c.id);
-    const hasPlan = !!planId && activeWeekByPlan.has(planId);
+    const planExists = !!planId;
+    const activeWeekExists = !!planId && activeWeekByPlan.has(planId);
     return {
       ...c,
       status: clientStatus({
-        hasPlan,
+        hasPlan: activeWeekExists,
         plannedWeekDays: planId ? plannedByPlan.get(planId) ?? [] : [],
         completedWeekDays: planId ? Array.from(completedByPlan.get(planId) ?? []) : [],
         todayWeekDay,
       }),
       lastTrainedKey: lastTrainedByClient.get(c.id) ?? null,
+      planExists,
+      activeWeekExists,
     };
   });
 }

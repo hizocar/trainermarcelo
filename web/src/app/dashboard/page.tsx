@@ -39,7 +39,9 @@ export default async function DashboardPage() {
   }
 
   function detalle(row: CoachDashboardRow): string {
-    if (row.status.total === 0) return 'sin plan asignado';
+    if (!row.planExists) return 'sin plan asignado';
+    if (!row.activeWeekExists) return 'sin semana planificada';
+    if (row.status.total === 0) return 'semana sin días';
     return `${row.status.done} de ${row.status.total} días · ${ultimaVez(row)}`;
   }
 
