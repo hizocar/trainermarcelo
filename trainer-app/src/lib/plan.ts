@@ -84,7 +84,17 @@ export async function fetchFullPlan(clientId: string, calendarWeek: number = get
     .eq('client_id', clientId).maybeSingle();
   if (planErr || !planRow) return null;
 
-  const weeks = await fetchPlanWeeks(planRow.id);
+  // fetchPlanWeeks lanza si falla — acá se traga a propósito: ninguno de los
+  // llamadores de fetchFullPlan maneja errores (solo el `null` de "no hay
+  // plan"), y colgarlos con una excepción sin capturar es peor que degradar.
+  // Quien necesita ver el fallo de verdad (calendario, gestor de semanas)
+  // llama a fetchPlanWeeks directo, sin pasar por acá.
+  let weeks: PlanWeek[];
+  try {
+    weeks = await fetchPlanWeeks(planRow.id);
+  } catch {
+    return null;
+  }
   const activeWeek = resolveActiveWeek(weeks, calendarWeek);
 
   let days: PlanDay[] = [];
