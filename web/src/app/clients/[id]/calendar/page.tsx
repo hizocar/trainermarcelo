@@ -180,7 +180,7 @@ export default async function ClientCalendarPage({
           <Link href="/dashboard" className="brand"><Logo /></Link>
           <div style={{ display: 'flex', gap: 10 }}>
             <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              SEMANA A SEMANA
+              ESTA SEMANA
             </Link>
             <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
               ← PLAN

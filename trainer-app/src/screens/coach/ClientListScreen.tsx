@@ -1,42 +1,77 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { User } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import Avatar from '../../components/common/Avatar';
 import { showConfirm } from '../../lib/alert';
+import { loadCoachDashboard, CoachDashboardRow } from '../../lib/coachDashboard';
 
 export default function ClientListScreen() {
   const { user, signOut } = useAuth();
   const navigation = useNavigation<any>();
-  const [clients, setClients] = useState<User[]>([]);
+  const [clients, setClients] = useState<CoachDashboardRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (user?.id) fetchClients();
   }, [user?.id]);
 
   async function fetchClients() {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('role', 'client')
-      .eq('coach_id', user?.id)
-      .order('name');
-    setClients(data ?? []);
-    setLoading(false);
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const data = await loadCoachDashboard(user!.id);
+      setClients(data);
+    } catch (e) {
+      // Un fallo transitorio de red al abrir la app no puede dejar al coach
+      // mirando el spinner para siempre: se avisa en pantalla y se ofrece
+      // reintentar, en vez de forzarlo a matar la app.
+      console.error('lista de clientes: error cargando el panel del coach', e);
+      setClients([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleSignOut() {
     showConfirm('Cerrar sesión', '¿Seguro que quieres salir?', signOut, 'Salir');
   }
+
+  const hoy = new Date();
+  const dayKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const hoyKey = dayKey(hoy);
+  const ayerKey = dayKey(new Date(hoy.getTime() - 86400000));
+
+  function ultimaVez(row: CoachDashboardRow) {
+    if (!row.lastTrainedKey) return 'sin registros en 2 semanas';
+    if (row.lastTrainedKey === hoyKey) return 'entrenó hoy';
+    if (row.lastTrainedKey === ayerKey) return 'entrenó ayer';
+    const dias = Math.round(
+      (new Date(hoyKey).getTime() - new Date(row.lastTrainedKey).getTime()) / 86400000,
+    );
+    return `hace ${dias} días`;
+  }
+
+  function detalle(row: CoachDashboardRow) {
+    let base: string;
+    if (!row.planExists) base = 'sin plan asignado';
+    else if (!row.activeWeekExists) base = 'sin semana planificada';
+    else if (row.status.total === 0) base = 'semana sin días';
+    else base = `${row.status.done} de ${row.status.total} días · ${ultimaVez(row)}`;
+    return row.unread > 0 ? `${base} · ${row.unread} sin leer` : base;
+  }
+
+  const atencion = clients.filter(c => c.status.needsAttention);
+  const alDia = clients.filter(c => !c.status.needsAttention);
 
   return (
     <View style={styles.container}>
@@ -64,16 +99,20 @@ export default function ClientListScreen() {
             {user?.is_owner && (
               <TouchableOpacity onPress={() => navigation.navigate('Gym')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="business-outline" size={18} color={colors.accent} />
+                <Text style={styles.iconLabel}>GIMNASIO</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={() => navigation.navigate('Programs')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="clipboard-outline" size={18} color={colors.textMuted} />
+              <Text style={styles.iconLabel}>PROGRAMAS</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Calculators')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="calculator-outline" size={18} color={colors.textMuted} />
+              <Text style={styles.iconLabel}>CALCULAR</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+              <Text style={styles.iconLabel}>AJUSTES</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSignOut} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="log-out-outline" size={19} color={colors.textMuted} />
@@ -82,34 +121,65 @@ export default function ClientListScreen() {
         </View>
       </View>
 
-      <Text style={styles.sectionLabel}>CLIENTES</Text>
-
       {loading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
+      ) : loadError ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>
+            No se pudo cargar el panel de clientes. Revisa tu conexión e intenta de nuevo.
+          </Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={fetchClients}>
+            <Text style={styles.retryBtnText}>REINTENTAR</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <FlatList
-          data={clients}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {clients.length === 0 && (
             <Text style={styles.emptyText}>No hay clientes aún</Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ClientDetail', { client: item })}
-              activeOpacity={0.7}
-            >
-              <Card style={styles.clientCard}>
-                <Avatar name={item.name} imageUrl={item.avatar_url} size={52} accent />
-                <View style={styles.clientInfo}>
-                  <Text style={styles.clientName}>{item.name}</Text>
-                  <Text style={styles.clientSub}>Ver plan de entrenamiento →</Text>
-                </View>
-              </Card>
-            </TouchableOpacity>
           )}
-        />
+
+          {atencion.length > 0 && (
+            <>
+              <Text style={[styles.sectionLabel, { color: colors.warning }]}>NECESITAN ATENCIÓN</Text>
+              {atencion.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => navigation.navigate('ClientDetail', { client: item })}
+                  activeOpacity={0.7}
+                >
+                  <Card style={{ ...styles.clientCard, borderColor: colors.warning }}>
+                    <Avatar name={item.name} imageUrl={item.avatar_url} size={52} accent />
+                    <View style={styles.clientInfo}>
+                      <Text style={styles.clientName}>{item.name}</Text>
+                      <Text style={[styles.clientSub, { color: colors.warning }]}>{detalle(item)}</Text>
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+
+          {alDia.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>{atencion.length > 0 ? 'AL DÍA' : 'CLIENTES'}</Text>
+              {alDia.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => navigation.navigate('ClientDetail', { client: item })}
+                  activeOpacity={0.7}
+                >
+                  <Card style={styles.clientCard}>
+                    <Avatar name={item.name} imageUrl={item.avatar_url} size={52} accent />
+                    <View style={styles.clientInfo}>
+                      <Text style={styles.clientName}>{item.name}</Text>
+                      <Text style={styles.clientSub}>{detalle(item)}</Text>
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </ScrollView>
       )}
     </View>
   );
@@ -144,8 +214,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerIcons: {
+    flex: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
   },
   inviteBtn: {
@@ -164,15 +237,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
+    minWidth: 44,
+    height: 46,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconLabel: { fontSize: 7.5, fontWeight: '800', letterSpacing: 0.5, color: colors.textMuted, marginTop: 2 },
   sectionLabel: {
     ...typography.label,
     letterSpacing: 3,
@@ -204,5 +279,29 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: spacing.xl,
+  },
+  errorBox: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.xl,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    color: colors.accent,
   },
 });

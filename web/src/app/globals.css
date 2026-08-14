@@ -14,6 +14,8 @@
   --border: #232732;
   --border-light: #333844;
   --danger: #626b73;
+  /* Única excepción al monocromo: solo para "esto requiere que hagas algo". */
+  --warning: #c9a227;
   --success: #d8d9d7;
 }
 

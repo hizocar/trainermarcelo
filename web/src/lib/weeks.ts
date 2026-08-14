@@ -8,6 +8,22 @@ export function getCurrentWeek(): number {
   return Math.max(1, diff + 1);
 }
 
+/**
+ * Semana de programa "de hoy", medida con la fecha calendario de Chile en
+ * vez de con `Date.now()` en la zona del runtime (Vercel corre en UTC). A
+ * diferencia de `getCurrentWeek()` -fijo por paridad app/web, no tocar-,
+ * esta función arma la fecha de HOY en Santiago y la pasa por
+ * `weekNumberForDate`, para que la semana venga del mismo reloj que
+ * `santiagoWeekDay()`. Sin esto, cada domingo entre las 20:00 y las 24:00
+ * hora de Chile la semana de `getCurrentWeek()` ya había rodado a la
+ * siguiente en UTC (00:00 UTC del lunes) mientras `santiagoWeekDay()`
+ * todavía decía domingo, y el dashboard del coach marcaba a todos los
+ * alumnos como "necesitan atención" con "0 de N días".
+ */
+export function santiagoCurrentWeek(instant: Date = new Date()): number {
+  return weekNumberForDate(new Date(`${santiagoDayKey(instant)}T00:00:00`));
+}
+
 export const WEEK_DAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 /** Lunes en que empieza una semana del programa. */
@@ -126,4 +142,14 @@ export function monthGrid(year: number, month: number): Date[][] {
     rows.push(row);
   }
   return rows;
+}
+
+/**
+ * Día de la semana (0=Dom … 6=Sáb) en Chile continental. El servidor de
+ * Vercel corre en UTC, así que `new Date().getDay()` daría el día equivocado
+ * durante las últimas horas de cada noche chilena.
+ */
+export function santiagoWeekDay(instant: Date = new Date()): number {
+  const [y, m, d] = santiagoDayKey(instant).split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
 }

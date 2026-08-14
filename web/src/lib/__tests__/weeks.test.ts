@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   weekNumberForDate, monthGrid, calendarWeekNumberForDate, santiagoDayKey,
-  weekDates, localDateKey, offScheduleDayKeys,
+  weekDates, localDateKey, offScheduleDayKeys, santiagoWeekDay,
 } from '../weeks';
 
 // El epoch del programa es el lunes 15 de junio de 2026 (semana 1).
@@ -136,5 +136,63 @@ describe('offScheduleDayKeys', () => {
   it('un registro en un día fuera de la semana de programa no cuenta', () => {
     const doneByDay = new Map([['2026-08-17', new Set(['ex1'])]]); // lunes de la semana 10
     expect(offScheduleDayKeys(['ex1'], weekKeys, '2026-08-10', doneByDay)).toEqual([]);
+  });
+});
+
+describe('santiagoWeekDay', () => {
+  it('un instante UTC de madrugada corresponde al día anterior en Chile', () => {
+    // 2026-08-13T02:00:00Z = 2026-08-12 22:00 en Santiago (miércoles)
+    expect(santiagoWeekDay(new Date('2026-08-13T02:00:00Z'))).toBe(3);
+  });
+
+  it('un instante UTC de mediodía es el mismo día en Chile', () => {
+    // 2026-08-13T15:00:00Z = 2026-08-13 11:00 en Santiago (jueves)
+    expect(santiagoWeekDay(new Date('2026-08-13T15:00:00Z'))).toBe(4);
+  });
+});
+
+describe('santiagoCurrentWeek (hallazgo C1)', () => {
+  const originalTZ = process.env.TZ;
+
+  afterEach(() => {
+    process.env.TZ = originalTZ;
+    vi.useRealTimers();
+    vi.resetModules();
+  });
+
+  it('un domingo de noche en Chile, con el runtime en UTC (como Vercel), no adelanta la semana como getCurrentWeek() sí lo hace', async () => {
+    // 2026-08-17T02:00:00Z es lunes 02:00 en UTC, pero domingo 22:00 en
+    // Santiago (Chile está en UTC-4 en agosto, invierno, sin horario de
+    // verano). Es exactamente la ventana del hallazgo C1: domingo entre las
+    // 20:00 y las 24:00 hora de Chile.
+    process.env.TZ = 'UTC';
+    vi.resetModules();
+    const mod = await import('../weeks');
+    const instant = new Date('2026-08-17T02:00:00Z');
+
+    // El calendario de Chile todavía dice domingo.
+    expect(mod.santiagoWeekDay(instant)).toBe(0);
+
+    // getCurrentWeek() mide desde Date.now() en la zona del runtime. Con el
+    // runtime en UTC, a esa hora ya es lunes -> ya reporta la semana 10,
+    // una semana adelantada respecto de lo que dice el calendario chileno.
+    vi.useFakeTimers();
+    vi.setSystemTime(instant);
+    expect(mod.getCurrentWeek()).toBe(10);
+
+    // santiagoCurrentWeek, en cambio, deriva la semana de la fecha
+    // calendario de Chile (todavía domingo 16 de agosto) -> semana 9,
+    // coherente con santiagoWeekDay = domingo.
+    expect(mod.santiagoCurrentWeek(instant)).toBe(9);
+  });
+
+  it('en un runtime que ya corre en hora de Chile, coincide con getCurrentWeek()', async () => {
+    process.env.TZ = 'America/Santiago';
+    vi.resetModules();
+    const mod = await import('../weeks');
+    const instant = new Date('2026-08-12T15:00:00Z'); // miércoles de tarde, sin ambigüedad de zona
+    vi.useFakeTimers();
+    vi.setSystemTime(instant);
+    expect(mod.santiagoCurrentWeek(instant)).toBe(mod.getCurrentWeek());
   });
 });

@@ -49,15 +49,19 @@ export default function WeekManagerScreen() {
     }
     if (!plan) { setLoading(false); return; }
     setPlanId(plan.id);
-    const list = await fetchPlanWeeks(plan.id);
-    if (list.length === 0) {
-      const { data: firstWeek } = await supabase
-        .from('plan_weeks')
-        .insert({ plan_id: plan.id, week_number: 1, name: 'Semana 1', repeat_forever: true })
-        .select('*').single();
-      setWeeks(firstWeek ? [firstWeek as PlanWeek] : []);
-    } else {
-      setWeeks(list);
+    try {
+      const list = await fetchPlanWeeks(plan.id);
+      if (list.length === 0) {
+        const { data: firstWeek } = await supabase
+          .from('plan_weeks')
+          .insert({ plan_id: plan.id, week_number: 1, name: 'Semana 1', repeat_forever: true })
+          .select('*').single();
+        setWeeks(firstWeek ? [firstWeek as PlanWeek] : []);
+      } else {
+        setWeeks(list);
+      }
+    } catch (e: any) {
+      showAlert('Error', e?.message ?? 'No se pudieron cargar las semanas del plan.');
     }
     setLoading(false);
   }

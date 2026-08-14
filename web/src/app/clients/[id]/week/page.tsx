@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { getCurrentWeek, WEEK_DAYS_SHORT, formatShortDate } from '@/lib/weeks';
+import { santiagoCurrentWeek, WEEK_DAYS_SHORT, formatShortDate } from '@/lib/weeks';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ export default async function ClientWeekPage({
     .from('users').select('id, name, coach_id').eq('id', id).maybeSingle();
   if (!client || (client as AppUser).coach_id !== user.id) notFound();
 
-  const currentWeek = getCurrentWeek();
+  const currentWeek = santiagoCurrentWeek();
   const week = Math.max(1, parseInt(weekParam ?? '', 10) || currentWeek);
 
   const { data: plan } = await supabase
@@ -110,7 +110,7 @@ export default async function ClientWeekPage({
           <Link href="/dashboard" className="brand"><Logo /></Link>
           <div style={{ display: 'flex', gap: 10 }}>
             <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>CALENDARIO</Link>
-            <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>EVOLUCIÓN</Link>
+            <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>POR EJERCICIO</Link>
             <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>← PLAN</Link>
           </div>
         </div>
