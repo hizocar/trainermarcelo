@@ -36,10 +36,11 @@ export function resolveActiveWeek(weeks: PlanWeek[], calendarWeek: number): Plan
 }
 
 export async function fetchPlanWeeks(planId: string): Promise<PlanWeek[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('plan_weeks').select('*')
     .eq('plan_id', planId).eq('archived', false)
     .order('week_number');
+  if (error) throw new Error(`No se pudieron cargar las semanas del plan: ${error.message}`);
   return (data ?? []) as PlanWeek[];
 }
 

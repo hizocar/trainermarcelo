@@ -64,7 +64,27 @@ export default function ClientCalendarScreen() {
 
   async function load(y: number, m: number) {
     setLoading(true);
+    setLogsError(false);
 
+    try {
+      await loadInner(y, m);
+    } catch (e: any) {
+      // Un fallo acá (por ejemplo, fetchPlanWeeks) NO puede disfrazarse de
+      // "nada planificado": se limpia lo que ya se había cargado de otro mes
+      // y se avisa en pantalla, reusando el mismo aviso que el de registros.
+      console.error('calendario: error cargando el calendario del mes', e);
+      setTrainingDays([]);
+      setPlanWeeks([]);
+      setDoneByDay(new Map());
+      setCardioByDay(new Map());
+      setHasAnyDay(false);
+      setLogsError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadInner(y: number, m: number) {
     const grid = monthGrid(y, m);
 
     const { data: plan, error: planError } = await supabase
@@ -171,8 +191,6 @@ export default function ClientCalendarScreen() {
       cardioMap.set(k, (cardioMap.get(k) ?? 0) + c.duration_minutes);
     });
     setCardioByDay(cardioMap);
-
-    setLoading(false);
   }
 
   const grid = monthGrid(year, month);
@@ -230,8 +248,9 @@ export default function ClientCalendarScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {logsError && (
             <Text style={styles.errorText}>
-              No se pudieron cargar los registros de entrenamiento de este mes. Por eso ningún día
-              se marca como no registrado por ahora — vuelve a intentarlo más tarde.
+              No se pudieron cargar todos los datos de este mes (planificación o registros de
+              entrenamiento). Por eso el calendario puede verse incompleto — vuelve a intentarlo
+              más tarde.
             </Text>
           )}
 
