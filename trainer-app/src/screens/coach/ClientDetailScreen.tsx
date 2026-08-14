@@ -112,43 +112,57 @@ export default function ClientDetailScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => navigation.navigate('WeekManager', { client })}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.actionBtnText}>✏ EDITAR PLAN · SEMANAS</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => navigation.navigate('Chat', {
-                peerId: client.id, peerName: client.name, peerAvatar: client.avatar_url,
-                coachId: user!.id, clientId: client.id,
-              })}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.actionBtnText}>💬 CHATEAR{unread > 0 ? `  ·  ${unread}` : ''}</Text>
-            </TouchableOpacity>
+            <Text style={styles.groupLabel}>CÓMO VA</Text>
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => navigation.navigate('ClientWeek', { client })}
               activeOpacity={0.8}
             >
-              <Text style={styles.actionBtnText}>📅 PROGRESO SEMANA A SEMANA</Text>
+              <Text style={styles.actionBtnText}>ESTA SEMANA</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnSecondary]}
+              onPress={() => navigation.navigate('ClientCalendar', { client })}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>CALENDARIO</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnSecondary]}
               onPress={() => navigation.navigate('ClientProgress', { client })}
               activeOpacity={0.8}
             >
-              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>📈 EVOLUCIÓN POR EJERCICIO</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>POR EJERCICIO</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnSecondary]}
               onPress={() => navigation.navigate('ClientBody', { client })}
               activeOpacity={0.8}
             >
-              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🧍 MEDIDAS Y FOTOS</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>MEDIDAS Y FOTOS</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.groupLabel}>QUÉ VA A HACER</Text>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => navigation.navigate('WeekManager', { client })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.actionBtnText}>PLAN Y SEMANAS</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.groupLabel}>HABLAR</Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnSecondary]}
+              onPress={() => navigation.navigate('Chat', {
+                peerId: client.id, peerName: client.name, peerAvatar: client.avatar_url,
+                coachId: user!.id, clientId: client.id,
+              })}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>
+                CHAT{unread > 0 ? `  ·  ${unread}` : ''}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -346,6 +360,13 @@ const styles = StyleSheet.create({
   },
   actionBtnTextSecondary: {
     color: colors.textPrimary,
+  },
+  groupLabel: {
+    ...typography.label,
+    letterSpacing: 3,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   sectionLabel: {
     ...typography.label,
