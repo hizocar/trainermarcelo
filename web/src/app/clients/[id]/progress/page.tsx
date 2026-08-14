@@ -5,7 +5,7 @@ import Logo from '@/components/Logo';
 import TrendChart from '@/components/TrendChart';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { getCurrentWeek } from '@/lib/weeks';
+import { santiagoCurrentWeek } from '@/lib/weeks';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,7 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
   const { data: weeksData } = plan
     ? await supabase.from('plan_weeks').select('*').eq('plan_id', (plan as any).id).eq('archived', false)
     : { data: null };
-  const activeWeek = resolveActiveWeek((weeksData ?? []) as PlanWeek[], getCurrentWeek());
+  const activeWeek = resolveActiveWeek((weeksData ?? []) as PlanWeek[], santiagoCurrentWeek());
 
   const allDays = ((plan as any)?.training_days ?? []).filter((d: any) => !d.archived);
   const allExercises = allDays.flatMap((d: any) => (d.exercises ?? []).filter((e: any) => !e.archived));

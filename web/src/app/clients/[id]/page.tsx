@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase-server';
 import type { AppUser, PlanDay } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { getCurrentWeek } from '@/lib/weeks';
+import { santiagoCurrentWeek } from '@/lib/weeks';
 import PlanEditor from './PlanEditor';
 import WeekManager from './WeekManager';
 import AssignToClients from './AssignToClients';
@@ -53,7 +53,7 @@ export default async function ClientPlanPage({
   // tampoco existe, la más reciente que sí tenga.
   const selectedWeek: PlanWeek | null =
     (requestedWeekId && weeks.find(w => w.id === requestedWeekId)) ||
-    resolveActiveWeek(weeks, getCurrentWeek()) ||
+    resolveActiveWeek(weeks, santiagoCurrentWeek()) ||
     weeks[weeks.length - 1] ||
     null;
 
