@@ -1,4 +1,4 @@
-import { DURATION, DELAY, rowDelay } from '../motion';
+import { DURATION, DELAY, RING_BEZIER, rowDelay } from '../motion';
 
 describe('rowDelay', () => {
   it('la primera fila entra después del retardo base', () => {
@@ -29,5 +29,15 @@ describe('duraciones', () => {
   it('el número del centro empieza después de que arranca el anillo', () => {
     expect(DELAY.value).toBeGreaterThan(0);
     expect(DELAY.value).toBeLessThan(DURATION.ring);
+  });
+
+  it('el anillo dura los ~1.1s del diseño', () => {
+    expect(DURATION.ring).toBe(1100);
+  });
+});
+
+describe('curva del anillo', () => {
+  it('es exactamente la cubic-bezier(.22, 1, .36, 1) que especifica el diseño', () => {
+    expect([...RING_BEZIER]).toEqual([0.22, 1, 0.36, 1]);
   });
 });

@@ -8,7 +8,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { TrainingDay, Exercise } from '../../types';
+import { TrainingDay } from '../../types';
 import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, PlanDay, PlanExercise } from '../../lib/plan';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
@@ -45,6 +45,11 @@ export default function TodayScreen() {
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Qué semana es la que está dibujada en pantalla ahora mismo (null = ninguna).
+  // Va en ref y no en estado porque `fetchWeek` corre desde el callback de
+  // `useFocusEffect`, que captura el render en que cambiaron sus dependencias y
+  // no vería el valor más reciente.
+  const loadedWeekRef = React.useRef<number | null>(null);
   // null mientras carga; false = hay semana definida; true = el coach no
   // planificó esta semana calendario (ni hay una anterior marcada "repetir")
   const [noPlanForWeek, setNoPlanForWeek] = useState(false);
@@ -94,15 +99,23 @@ export default function TodayScreen() {
 
   async function fetchWeek(week: number) {
     if (!user?.id) return;
-    setLoading(true);
+    // El spinner es solo para cuando no hay nada que mostrar de esta semana: la
+    // carga inicial o un cambio de semana. Un refetch de la semana YA dibujada
+    // (volver de registrar un ejercicio, p.ej.) no debe vaciar el árbol: al
+    // desmontarse, el anillo se rellena desde 0 en vez de avanzar desde el valor
+    // viejo, las filas repiten la cascada, y durante esa cascada quedan táctiles
+    // con opacidad 0 y corridas 10px — tocar donde estaba una fila abría otro
+    // ejercicio.
+    setLoading(loadedWeekRef.current !== week);
     const plan = await fetchFullPlan(user.id, week);
-    if (!plan) { setLoading(false); setDays([]); setNoPlanAtAll(true); setNoPlanForWeek(true); return; }
+    if (!plan) { setLoading(false); loadedWeekRef.current = null; setDays([]); setNoPlanAtAll(true); setNoPlanForWeek(true); return; }
     setNoPlanAtAll(false);
 
     setPhase(plan.activeWeek?.is_deload ? 'descarga' : null);
     setNoPlanForWeek(!plan.activeWeek);
 
     const list = activeDays(plan.days);
+    loadedWeekRef.current = list.length > 0 ? week : null;
     setDays(list);
 
     const logs = await fetchLogs(plan.seriesIds, week);
@@ -227,12 +240,17 @@ export default function TodayScreen() {
         )}
       </View>
 
-      {!loading && selectedDay && exercises.length > 0 && (
-        <View style={styles.hero}>
-          <ProgressRing
-            done={dayStatus[selectedDay.id]?.done ?? 0}
-            total={exercises.length}
-          />
+      {/* Sin ejercicios no hay anillo que llenar, pero el nombre del día se
+          queda: si no, "PIERNAS" desaparece de la pantalla por completo y el
+          alumno no sabe qué día está mirando. */}
+      {!loading && days.length > 0 && selectedDay && (
+        <View style={exercises.length > 0 ? styles.hero : styles.heroBare}>
+          {exercises.length > 0 && (
+            <ProgressRing
+              done={dayStatus[selectedDay.id]?.done ?? 0}
+              total={exercises.length}
+            />
+          )}
           <Text style={styles.dayName}>{selectedDay.name.toUpperCase()}</Text>
         </View>
       )}
@@ -354,7 +372,7 @@ export default function TodayScreen() {
                           exercise={ex}
                           state={rowState(ex.id)}
                           index={rowIndex}
-                          lastLog={topSets[ex.id]}
+                          topSet={topSets[ex.id]}
                           onPress={() => navigation.navigate('WorkoutLog', {
                             exercise: ex,
                             week: selectedWeek,
@@ -400,8 +418,19 @@ export default function TodayScreen() {
               </Card>
             )}
 
+            {exercises.length === 0 && selectedDay && (
+              <Card style={styles.noExCard}>
+                <Text style={styles.noExTitle}>SIN EJERCICIOS</Text>
+                <Text style={styles.noExText}>
+                  Tu coach aún no ha agregado ejercicios para el {selectedDay.week_day != null ? WEEK_DAYS[selectedDay.week_day] : `Día ${selectedDay.day_number}`}.
+                </Text>
+              </Card>
+            )}
+
             {/* Cardio: secundario respecto al entrenamiento del día, así que va
-                al final y sin fondo — solo un borde que lo delimita. */}
+                al final y sin fondo — solo un borde que lo delimita. Va DESPUÉS
+                de "SIN EJERCICIOS": en un día vacío lo primero que el alumno
+                tiene que leer es por qué la pantalla está vacía. */}
             <View style={styles.cardioBlock}>
               <View style={styles.cardioHeader}>
                 <View style={{ flex: 1 }}>
@@ -433,15 +462,6 @@ export default function TodayScreen() {
                 </View>
               )}
             </View>
-
-            {exercises.length === 0 && selectedDay && (
-              <Card style={styles.noExCard}>
-                <Text style={styles.noExTitle}>SIN EJERCICIOS</Text>
-                <Text style={styles.noExText}>
-                  Tu coach aún no ha agregado ejercicios para el {selectedDay.week_day != null ? WEEK_DAYS[selectedDay.week_day] : `Día ${selectedDay.day_number}`}.
-                </Text>
-              </Card>
-            )}
           </ScrollView>
         </>
       )}
@@ -518,6 +538,8 @@ const styles = StyleSheet.create({
   date: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
   weekLabel: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
   hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.xs },
+  // mismo bloque sin anillo: el nombre del día solo
+  heroBare: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs },
   dayName: { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary, letterSpacing: 0.5, marginTop: 2 },
   weekNav: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.textPrimary },

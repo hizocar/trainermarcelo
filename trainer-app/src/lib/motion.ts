@@ -27,9 +27,20 @@ export const DELAY = {
  * Configuración de `withSpring` que produce la desaceleración del diseño.
  * Se usa un resorte y no una curva fija porque interrumpe bien: si el alumno
  * cambia de día a media animación, el resorte reacciona desde donde está en
- * vez de saltar.
+ * vez de saltar. La usan las filas de ejercicio al entrar.
  */
 export const EASING_OUT = { damping: 18, stiffness: 90, mass: 1 } as const;
+
+/**
+ * La curva del anillo, tal como la escribe el diseño: `cubic-bezier(.22,1,.36,1)`.
+ * Va como tupla de números y no como `Easing.bezier(...)` para que este módulo
+ * siga siendo lógica pura y testeable sin cargar Reanimated; quien anima la
+ * arma con `Easing.bezier(...RING_BEZIER)`.
+ *
+ * El anillo NO usa resorte: con `EASING_OUT` se asentaba en ~450ms, menos de la
+ * mitad de los 1100ms que pide el diseño para el gesto principal de la pantalla.
+ */
+export const RING_BEZIER = [0.22, 1, 0.36, 1] as const;
 
 /** Máximo de filas que participan de la cascada. */
 const MAX_STAGGERED_ROWS = 8;

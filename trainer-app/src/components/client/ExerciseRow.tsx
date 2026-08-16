@@ -1,11 +1,11 @@
 import React from 'react';
-import { Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withDelay, withTiming, withSpring,
   useReducedMotion,
 } from 'react-native-reanimated';
 import { PlanExercise } from '../../lib/plan';
-import { colors, spacing, typography, fonts } from '../../theme';
+import { colors, spacing, fonts } from '../../theme';
 import { DURATION, rowDelay, EASING_OUT } from '../../lib/motion';
 
 export type RowState = 'done' | 'next' | 'pending';
@@ -15,8 +15,8 @@ interface Props {
   state: RowState;
   /** posición en la lista, para escalonar la entrada */
   index: number;
-  /** lo que realmente levantó, si ya lo hizo */
-  lastLog?: { weight: number; reps: number };
+  /** su MEJOR serie registrada en este ejercicio, si ya lo hizo */
+  topSet?: { weight: number; reps: number };
   onPress: () => void;
 }
 
@@ -31,7 +31,7 @@ interface Props {
  *   next    → blanco puro, más grande, etiquetado SIGUIENTE
  *   pending → gris medio
  */
-export default function ExerciseRow({ exercise, state, index, lastLog, onPress }: Props) {
+export default function ExerciseRow({ exercise, state, index, topSet, onPress }: Props) {
   const reduced = useReducedMotion();
 
   const opacity = useSharedValue(reduced ? 1 : 0);
@@ -67,9 +67,9 @@ export default function ExerciseRow({ exercise, state, index, lastLog, onPress }
       ? `SIGUIENTE · ${series} SERIES · ${exercise.reps_objective}`
       : `${series} SERIES · ${exercise.reps_objective}`;
 
-  // hecho: lo que levantó de verdad. Si no, el peso de referencia del coach.
-  const valueText = isDone && lastLog
-    ? `${lastLog.weight}×${lastLog.reps}`
+  // hecho: su mejor serie de verdad. Si no, el peso de referencia del coach.
+  const valueText = isDone && topSet
+    ? `${topSet.weight}×${topSet.reps}`
     : exercise.ref_weight != null
       ? `${exercise.ref_weight}`
       : '—';
@@ -77,12 +77,14 @@ export default function ExerciseRow({ exercise, state, index, lastLog, onPress }
   return (
     <Animated.View style={[styles.row, animStyle]}>
       <TouchableOpacity style={styles.touch} onPress={onPress} activeOpacity={0.6}>
-        <Animated.View style={styles.info}>
-          <Text style={[styles.name, isNext && styles.nameNext]} numberOfLines={1}>
+        <View style={styles.info}>
+          {/* dos líneas: con la columna de valor en mono 21px, un nombre real
+              como "Prensa inclinada 45° a una pierna" no cabe en una sola */}
+          <Text style={[styles.name, isNext && styles.nameNext]} numberOfLines={2}>
             {exercise.name}
           </Text>
           <Text style={[styles.meta, isNext && styles.metaNext]}>{meta}</Text>
-        </Animated.View>
+        </View>
         <Text style={[styles.value, isNext && styles.valueNext, isDone && styles.valueDone]}>
           {valueText}
           {!isDone && exercise.ref_weight != null && (

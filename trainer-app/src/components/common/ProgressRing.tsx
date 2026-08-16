@@ -2,11 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
-  useSharedValue, useAnimatedProps, useAnimatedStyle, withSpring, withDelay, withTiming,
-  useReducedMotion,
+  useSharedValue, useAnimatedProps, useAnimatedStyle, withDelay, withTiming,
+  useReducedMotion, Easing,
 } from 'react-native-reanimated';
-import { colors, typography, fonts } from '../../theme';
-import { DURATION, DELAY, EASING_OUT } from '../../lib/motion';
+import { colors, fonts } from '../../theme';
+import { DURATION, DELAY, RING_BEZIER } from '../../lib/motion';
+
+// cubic-bezier(.22, 1, .36, 1) — la desaceleración que especifica el diseño
+const RING_EASING = Easing.bezier(...RING_BEZIER);
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -48,7 +51,7 @@ export default function ProgressRing({ done, total, size = 132, label = 'EJERCIC
       valueOpacity.value = 1;
       return;
     }
-    progress.value = withSpring(ratio, EASING_OUT);
+    progress.value = withTiming(ratio, { duration: DURATION.ring, easing: RING_EASING });
     valueOpacity.value = withDelay(DELAY.value, withTiming(1, { duration: DURATION.value }));
   }, [ratio, reduced]);
 
