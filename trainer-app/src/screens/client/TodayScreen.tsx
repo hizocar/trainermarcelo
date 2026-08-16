@@ -537,9 +537,9 @@ const styles = StyleSheet.create({
   },
   date: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
   weekLabel: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
-  hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.xs },
+  hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm },
   // mismo bloque sin anillo: el nombre del día solo
-  heroBare: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  heroBare: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.sm },
   dayName: { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary, letterSpacing: 0.5, marginTop: 2 },
   weekNav: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.textPrimary },
@@ -568,8 +568,11 @@ const styles = StyleSheet.create({
   noteSaveText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
   noteSaved: { ...typography.caption, fontSize: 10, color: colors.success, textAlign: 'right' },
 
-  dayTabsScroll: { flexGrow: 0, marginBottom: spacing.xs },
-  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.xs },
+  // Las píldoras necesitan aire propio: quedan entre el nombre del día en
+  // Anton 24px y lo que venga abajo — que puede ser una tarjeta sólida, como
+  // el aviso de semana completa. Con el padding mínimo se veían aplastadas.
+  dayTabsScroll: { flexGrow: 0, marginBottom: spacing.sm },
+  dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.sm },
   dayPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing.sm + 3, paddingVertical: 4,
@@ -587,7 +590,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
 
-  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.sm },
+  scroll: { paddingHorizontal: spacing.xl, paddingTop: spacing.xs, paddingBottom: spacing.xl, gap: spacing.sm },
   doneCard: { gap: spacing.sm, marginBottom: spacing.sm },
   doneHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   doneInfo: { flex: 1 },
