@@ -95,3 +95,13 @@ Es una pantalla, no lógica pura: se verifica **mirándola**, no con tests unita
 **Es la pantalla más usada de la app.** Un error acá lo ve todo alumno que entrena. A cambio, es también donde una mejora se nota más.
 
 **El cambio es visual y subjetivo.** Si al verlo en el teléfono no convence, revertir es barato: es una sola pantalla y una rama.
+
+## Adenda (al escribir el plan): las biseries
+
+Al leer el código para planificar se detectó algo que el diseño no cubría: las biseries y triseries se marcan hoy con un **recuadro de uno de seis colores brillantes** (`#f59e0b`, `#8b5cf6`, `#06b6d4`, `#ec4899`, `#22c55e`, `#ef4444`) en `TodayScreen.tsx`. Se agregaron antes de que existiera la regla del color único y **contradicen el monocromo**: con seis colores en pantalla, el ámbar de las alertas deja de ser el único y pierde su fuerza.
+
+**Decisión del dueño:** se reemplazan por un **corchete monocromo a la izquierda** — una línea vertical que une las filas encadenadas, con la etiqueta `BISERIE` (o `TRISERIE` según cuántas sean) arriba, en `textMuted`. Sin color.
+
+La agrupación en sí no cambia: se sigue usando `groupBySuperseries` de `trainer-app/src/lib/plan.ts`, que ya devuelve los ejercicios agrupados en el orden del plan. Lo que se elimina es la función local `groupColor()` y su arreglo `GROUP_COLORS`.
+
+Esto aplica **solo a la pantalla del alumno** en este plan. El coach ve las biseries con color en `PlanEditorScreen`, `ProgramEditorScreen` y en los editores web; unificar eso es trabajo aparte y queda fuera de alcance.
