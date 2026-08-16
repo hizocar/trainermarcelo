@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Image, TextInput, Modal,
+  StatusBar, ActivityIndicator, TextInput, Modal,
   KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -10,23 +10,16 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { TrainingDay, Exercise } from '../../types';
 import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, PlanDay, PlanExercise } from '../../lib/plan';
-import { colors, spacing, radius, typography } from '../../theme';
+import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
+import ProgressRing from '../../components/common/ProgressRing';
+import ExerciseRow, { RowState } from '../../components/client/ExerciseRow';
+import { topSetByExercise } from '../../lib/progress';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
 import { CARDIO_TYPES, CardioLog, fetchCardioLogs, addCardioLog, deleteCardioLog } from '../../lib/cardio';
-
-// Colores estables para biseries/triseries — el mismo texto de grupo siempre
-// se ve del mismo color, así el cliente identifica de un vistazo qué
-// ejercicios van encadenados sin descanso entre ellos.
-const GROUP_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#22c55e', '#ef4444'];
-function groupColor(group: string) {
-  let h = 0;
-  for (let i = 0; i < group.length; i++) h = (h * 31 + group.charCodeAt(i)) >>> 0;
-  return GROUP_COLORS[h % GROUP_COLORS.length];
-}
 
 // atajos para no tener que abrir el teclado en el caso común
 const CARDIO_QUICK_MINUTES = [15, 20, 30, 45, 60];
@@ -46,6 +39,8 @@ export default function TodayScreen() {
   const [exercises, setExercises] = useState<PlanExercise[]>([]);
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
+  // la mejor serie registrada por ejercicio, para mostrarla en las filas ya hechas
+  const [topSets, setTopSets] = useState<Record<string, { weight: number; reps: number }>>({});
   const [phase, setPhase] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
@@ -119,7 +114,7 @@ export default function TodayScreen() {
   // recalcula estado (ejercicios hechos, progreso, recordatorios) de la semana ya cargada
   function applyWeek(
     list: PlanDay[],
-    logs: { series_id: string; week_number: number }[],
+    logs: { series_id: string; week_number: number; weight: number; reps: number }[],
     seriesToExercise: Record<string, string>,
     isCurrentWeek: boolean,
   ) {
@@ -128,6 +123,7 @@ export default function TodayScreen() {
       Object.entries(seriesToExercise).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
     );
     setLoggedExercises(doneEx);
+    setTopSets(topSetByExercise(logs, seriesToExercise));
 
     const status: Record<string, { total: number; done: number }> = {};
     list.forEach(d => {
@@ -197,16 +193,47 @@ export default function TodayScreen() {
   const nextWeek = currentWeek + 1;
   const daysToNext = daysUntilWeek(nextWeek);
 
+  // el primer ejercicio sin registrar es "el siguiente"; el resto, pendientes
+  const nextExerciseId = exercises.find(e => !loggedExercises.has(e.id))?.id ?? null;
+  const rowState = (exId: string): RowState =>
+    loggedExercises.has(exId) ? 'done' : exId === nextExerciseId ? 'next' : 'pending';
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>
-            {formatShortDate(new Date().toISOString()).toUpperCase()}
-          </Text>
-          <Text style={styles.userName}>{user?.name?.split(' ')[0].toUpperCase()}</Text>
+      <View style={styles.topBar}>
+        <Text style={styles.date}>{formatShortDate(new Date().toISOString()).toUpperCase()}</Text>
+        {!loading && days.length > 0 && (
+          <View style={styles.weekNav}>
+            <TouchableOpacity
+              onPress={() => setSelectedWeek(w => Math.max(1, w - 1))}
+              disabled={selectedWeek <= 1}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-back" size={13}
+                color={selectedWeek <= 1 ? colors.border : colors.textMuted} />
+            </TouchableOpacity>
+            <Text style={styles.weekLabel}>SEMANA {selectedWeek}</Text>
+            <TouchableOpacity
+              onPress={() => setSelectedWeek(w => Math.min(currentWeek, w + 1))}
+              disabled={selectedWeek >= currentWeek}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-forward" size={13}
+                color={selectedWeek >= currentWeek ? colors.border : colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {!loading && selectedDay && exercises.length > 0 && (
+        <View style={styles.hero}>
+          <ProgressRing
+            done={dayStatus[selectedDay.id]?.done ?? 0}
+            total={exercises.length}
+          />
+          <Text style={styles.dayName}>{selectedDay.name.toUpperCase()}</Text>
           {phase && PHASE_INFO[phase] && (
             <View style={[styles.phaseBadge, { borderColor: PHASE_INFO[phase].color }]}>
               <Text style={[styles.phaseText, { color: PHASE_INFO[phase].color }]}>
@@ -215,50 +242,17 @@ export default function TodayScreen() {
             </View>
           )}
         </View>
-        {selectedDay && (
-          <View style={[styles.weekBadge, isToday(selectedDay) && styles.weekBadgeToday]}>
-            <Text style={[styles.weekBadgeText, !isToday(selectedDay) && styles.weekBadgeTextIdle]}>
-              D{selectedDay.day_number}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {!loading && days.length > 0 && (
-        <View style={styles.weekNav}>
-          <TouchableOpacity
-            style={styles.weekNavBtn}
-            onPress={() => setSelectedWeek(w => Math.max(1, w - 1))}
-            disabled={selectedWeek <= 1}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="chevron-back" size={16} color={selectedWeek <= 1 ? colors.textMuted : colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.weekNavLabel}>
-            SEMANA {selectedWeek}{viewingPastWeek ? ' · PASADA' : ''}
-          </Text>
-          <TouchableOpacity
-            style={styles.weekNavBtn}
-            onPress={() => setSelectedWeek(w => Math.min(currentWeek, w + 1))}
-            disabled={selectedWeek >= currentWeek}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="chevron-forward" size={16} color={selectedWeek >= currentWeek ? colors.textMuted : colors.textPrimary} />
-          </TouchableOpacity>
-          {viewingPastWeek && (
-            <TouchableOpacity style={styles.weekNavToday} onPress={() => setSelectedWeek(currentWeek)}>
-              <Text style={styles.weekNavTodayText}>VOLVER A HOY</Text>
-            </TouchableOpacity>
-          )}
-        </View>
       )}
 
       {viewingPastWeek && (
         <View style={styles.pastBanner}>
-          <Ionicons name="time-outline" size={14} color={colors.accent} />
+          <Ionicons name="time-outline" size={13} color={colors.textMuted} />
           <Text style={styles.pastBannerText}>
             ¿Se te quedó pendiente un día? Regístralo acá — quedará guardado en la fecha que indiques.
           </Text>
+          <TouchableOpacity onPress={() => setSelectedWeek(currentWeek)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.weekNavTodayText}>VOLVER A HOY</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -289,82 +283,30 @@ export default function TodayScreen() {
               return (
                 <TouchableOpacity
                   key={day.id}
-                  style={[styles.dayTab, active && styles.dayTabActive, complete && !active && styles.dayTabDone]}
+                  style={[styles.dayPill, active && styles.dayPillActive, complete && !active && styles.dayPillDone]}
                   onPress={() => selectDay(day)}
                   activeOpacity={0.7}
                 >
                   {complete ? (
                     <View style={styles.tabBadge}>
-                      <Ionicons name="checkmark-circle" size={15} color={active ? colors.background : colors.success} />
+                      <Ionicons name="checkmark-circle" size={11} color={active ? colors.background : colors.textMuted} />
                     </View>
                   ) : isCurrentDay ? (
                     <View style={styles.todayDot} />
                   ) : null}
-                  <Text style={[styles.dayTabNum, active && styles.dayTabNumActive]}>
+                  <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
                     DÍA {day.day_number}
-                  </Text>
-                  <Text style={[styles.dayTabName, active && styles.dayTabNameActive]} numberOfLines={1}>
-                    {day.name.toUpperCase()}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          {/* barra de progreso del día */}
-          {exercises.length > 0 && selectedDay && (
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.round(((dayStatus[selectedDay.id]?.done ?? 0) / exercises.length) * 100)}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.progressCount}>
-                {dayStatus[selectedDay.id]?.done ?? 0}/{exercises.length}
-              </Text>
-            </View>
-          )}
-
           <ScrollView
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
           >
             <SyncBanner />
-
-            <Card style={styles.cardioCard}>
-              <View style={styles.cardioHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardioTitle}>CARDIO · ÚLTIMOS 7 DÍAS</Text>
-                  <Text style={styles.cardioSub}>
-                    {cardioLogs.length === 0
-                      ? 'Sin registros todavía'
-                      : `${cardioLogs.length} sesión${cardioLogs.length === 1 ? '' : 'es'} · ${cardioLogs.reduce((a, c) => a + c.duration_minutes, 0)} min`}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.cardioAddBtn}
-                  onPress={() => { setCardioType(CARDIO_TYPES[0]); setCardioMinutes(''); setShowCardioModal(true); }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={16} color={colors.background} />
-                  <Text style={styles.cardioAddBtnText}>CARDIO</Text>
-                </TouchableOpacity>
-              </View>
-              {cardioLogs.length > 0 && (
-                <View style={styles.cardioList}>
-                  {cardioLogs.map(c => (
-                    <TouchableOpacity key={c.id} style={styles.cardioRow} onLongPress={() => removeCardio(c)} activeOpacity={0.7}>
-                      <Ionicons name="walk-outline" size={14} color={colors.accent} />
-                      <Text style={styles.cardioRowText}>{c.type} · {c.duration_minutes} min</Text>
-                      <Text style={styles.cardioRowDate}>{formatShortDate(c.logged_at)}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </Card>
 
             {weekComplete && !viewingPastWeek && (
               <Card highlight style={styles.doneCard}>
@@ -393,70 +335,45 @@ export default function TodayScreen() {
                 </Text>
               </Card>
             )}
-            {groupBySuperseries(exercises).map(group => {
-              const color = group.superseries ? groupColor(group.superseries) : null;
-              const body = group.exercises.map(ex => {
-                const done = loggedExercises.has(ex.id);
+            {(() => {
+              let rowIndex = -1;
+              return groupBySuperseries(exercises).map(group => {
+                const encadenado = group.exercises.length > 1;
+                const etiqueta = group.exercises.length >= 3 ? 'TRISERIE' : 'BISERIE';
                 return (
-                  <TouchableOpacity
-                    key={ex.id}
-                    onPress={() => navigation.navigate('WorkoutLog', {
-                      exercise: ex,
-                      week: selectedWeek,
-                      // Registrando en vivo (semana actual): la fecha es HOY de
-                      // verdad, sin importar qué día de la semana le toca a este
-                      // entrenamiento en el split — si lo entrenaste antes o
-                      // después de lo calendarizado, igual queda con la fecha
-                      // real. Solo al ponerse al día con una semana PASADA tiene
-                      // sentido usar la fecha calendarizada de ese día (acá sí
-                      // se puede corregir a mano con los chips "¿cuándo lo
-                      // hiciste?" si hace falta).
-                      date: viewingPastWeek && selectedDay?.week_day != null
-                        ? dateForWeekDay(selectedWeek, selectedDay.week_day).toISOString()
-                        : new Date().toISOString(),
+                  <View key={group.key} style={encadenado ? styles.chain : undefined}>
+                    {encadenado && <Text style={styles.chainLabel}>{etiqueta}</Text>}
+                    {group.exercises.map(ex => {
+                      rowIndex += 1;
+                      return (
+                        <ExerciseRow
+                          key={ex.id}
+                          exercise={ex}
+                          state={rowState(ex.id)}
+                          index={rowIndex}
+                          lastLog={topSets[ex.id]}
+                          onPress={() => navigation.navigate('WorkoutLog', {
+                            exercise: ex,
+                            week: selectedWeek,
+                            // Registrando en vivo (semana actual): la fecha es HOY de
+                            // verdad, sin importar qué día de la semana le toca a este
+                            // entrenamiento en el split — si lo entrenaste antes o
+                            // después de lo calendarizado, igual queda con la fecha
+                            // real. Solo al ponerse al día con una semana PASADA tiene
+                            // sentido usar la fecha calendarizada de ese día (acá sí
+                            // se puede corregir a mano con los chips "¿cuándo lo
+                            // hiciste?" si hace falta).
+                            date: viewingPastWeek && selectedDay?.week_day != null
+                              ? dateForWeekDay(selectedWeek, selectedDay.week_day).toISOString()
+                              : new Date().toISOString(),
+                          })}
+                        />
+                      );
                     })}
-                    activeOpacity={0.7}
-                  >
-                    <Card style={done ? { ...styles.exerciseCard, ...styles.exerciseCardDone } : styles.exerciseCard}>
-                      <View style={styles.exerciseRow}>
-                        {ex.image_url ? (
-                          <Image source={{ uri: ex.image_url }} style={styles.thumb} />
-                        ) : (
-                          <View style={[styles.thumb, styles.thumbPlaceholder]}>
-                            <Ionicons name="barbell-outline" size={22} color={colors.textMuted} />
-                          </View>
-                        )}
-                        <View style={styles.exerciseInfo}>
-                          <Text style={styles.exerciseName}>{ex.name}</Text>
-                          <Text style={styles.exerciseMeta}>
-                            {ex.muscle_group ? `${ex.muscle_group} · ` : ''}
-                            {ex.exercise_series.length} series · {ex.reps_objective} reps
-                            {ex.ref_weight ? ` · ref ${ex.ref_weight}${ex.unit}` : ''}
-                          </Text>
-                        </View>
-                        <View style={[styles.logBtn, done && styles.logBtnDone]}>
-                          <Ionicons name={done ? 'checkmark' : 'add'} size={22} color={colors.background} />
-                        </View>
-                      </View>
-                    </Card>
-                  </TouchableOpacity>
+                  </View>
                 );
               });
-
-              if (!color) return <React.Fragment key={group.key}>{body}</React.Fragment>;
-
-              return (
-                <View key={group.key} style={[styles.superGroup, { borderColor: color }]}>
-                  <View style={[styles.superGroupTag, { backgroundColor: color }]}>
-                    <Ionicons name="link" size={11} color={colors.background} />
-                    <Text style={styles.superGroupTagText}>
-                      {group.exercises.length >= 3 ? 'TRISERIE' : 'BISERIE'} {group.superseries}
-                    </Text>
-                  </View>
-                  <View style={{ gap: spacing.sm }}>{body}</View>
-                </View>
-              );
-            })}
+            })()}
 
             {exercises.length > 0 && selectedDay && (
               <Card style={styles.noteCard}>
@@ -479,6 +396,40 @@ export default function TodayScreen() {
                 )}
               </Card>
             )}
+
+            {/* Cardio: secundario respecto al entrenamiento del día, así que va
+                al final y sin fondo — solo un borde que lo delimita. */}
+            <View style={styles.cardioBlock}>
+              <View style={styles.cardioHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardioTitle}>CARDIO · ÚLTIMOS 7 DÍAS</Text>
+                  <Text style={styles.cardioSub}>
+                    {cardioLogs.length === 0
+                      ? 'Sin registros todavía'
+                      : `${cardioLogs.length} sesión${cardioLogs.length === 1 ? '' : 'es'} · ${cardioLogs.reduce((a, c) => a + c.duration_minutes, 0)} min`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.cardioAddBtn}
+                  onPress={() => { setCardioType(CARDIO_TYPES[0]); setCardioMinutes(''); setShowCardioModal(true); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={13} color={colors.textPrimary} />
+                  <Text style={styles.cardioAddBtnText}>CARDIO</Text>
+                </TouchableOpacity>
+              </View>
+              {cardioLogs.length > 0 && (
+                <View style={styles.cardioList}>
+                  {cardioLogs.map(c => (
+                    <TouchableOpacity key={c.id} style={styles.cardioRow} onLongPress={() => removeCardio(c)} activeOpacity={0.7}>
+                      <Ionicons name="walk-outline" size={13} color={colors.textMuted} />
+                      <Text style={styles.cardioRowText}>{c.type} · {c.duration_minutes} min</Text>
+                      <Text style={styles.cardioRowDate}>{formatShortDate(c.logged_at)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
 
             {exercises.length === 0 && selectedDay && (
               <Card style={styles.noExCard}>
@@ -557,46 +508,25 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    paddingHorizontal: spacing.xl, marginBottom: spacing.lg,
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl, paddingTop: spacing.xs,
   },
-  greeting: { ...typography.label, letterSpacing: 2, color: colors.accent },
-  userName: { ...typography.display, fontSize: 34, marginTop: 2 },
-  weekBadge: {
-    width: 52, height: 52, borderRadius: radius.full,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  weekBadgeToday: { backgroundColor: colors.accent, borderColor: colors.accent },
-  weekBadgeText: { color: colors.background, fontWeight: '900', fontSize: 16 },
-  weekBadgeTextIdle: { color: colors.accent },
-  weekNav: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingHorizontal: spacing.xl, marginBottom: spacing.sm,
-  },
-  weekNavBtn: {
-    width: 30, height: 30, borderRadius: radius.full,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  weekNavLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 11 },
-  weekNavToday: {
-    marginLeft: 'auto',
-    borderWidth: 1, borderColor: colors.accent, borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm, paddingVertical: 4,
-  },
-  weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.accent },
+  date: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
+  weekLabel: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
+  hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.xs },
+  dayName: { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary, letterSpacing: 0.5, marginTop: 2 },
+  weekNav: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.textPrimary },
   pastBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
     marginHorizontal: spacing.xl, marginBottom: spacing.sm,
-    backgroundColor: colors.accentSoft, borderRadius: radius.sm,
-    borderWidth: 1, borderColor: colors.accent + '33',
+    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2,
   },
-  pastBannerText: { ...typography.caption, fontSize: 11, flex: 1, color: colors.textSecondary },
+  pastBannerText: { ...typography.caption, fontSize: 11, flex: 1, color: colors.textMuted },
   phaseBadge: {
-    alignSelf: 'flex-start', marginTop: spacing.xs,
+    alignSelf: 'center', marginTop: spacing.xs,
     borderWidth: 1, borderRadius: radius.sm,
     paddingHorizontal: spacing.sm, paddingVertical: 2,
   },
@@ -615,45 +545,20 @@ const styles = StyleSheet.create({
 
   dayTabsScroll: { flexGrow: 0, marginBottom: spacing.xs },
   dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.xs },
-  dayTab: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md, paddingBottom: spacing.sm,
-    justifyContent: 'center',
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface, alignItems: 'center', minWidth: 82, maxWidth: 140, position: 'relative',
+  dayPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing.sm + 3, paddingVertical: 4,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
   },
-  dayTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  dayTabDone: { borderColor: colors.success + '88' },
-  tabBadge: { position: 'absolute', top: 5, right: 6 },
+  dayPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dayPillDone: { borderColor: colors.borderLight },
+  dayPillText: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
+  dayPillTextActive: { color: colors.background },
+  // marcadores en línea, no flotando en la esquina: en una píldora de 19px de
+  // alto una insignia absoluta se sale del borde y Android la recorta
+  tabBadge: { justifyContent: 'center' },
   todayDot: {
-    position: 'absolute', top: 4, right: 6,
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: colors.accent,
-  },
-  dayTabNum: { fontSize: 12, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-  dayTabNumActive: { color: colors.background },
-  dayTabName: { fontSize: 9, fontWeight: '700', color: colors.textMuted, marginTop: 2 },
-  dayTabNameActive: { color: colors.background },
-
-  dayIndicator: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingHorizontal: spacing.xl, paddingVertical: spacing.sm,
-  },
-  progressRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.xl, marginBottom: spacing.sm,
-  },
-  progressTrack: {
-    flex: 1,
-    height: 5,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-  },
-  progressCount: { fontSize: 11, fontWeight: '900', color: colors.accent, letterSpacing: 0.5 },
-  progressFill: {
-    height: '100%',
-    borderRadius: radius.full,
+    width: 5, height: 5, borderRadius: 2.5,
     backgroundColor: colors.accent,
   },
 
@@ -667,25 +572,28 @@ const styles = StyleSheet.create({
   nextLabel: { ...typography.label, letterSpacing: 2, fontSize: 9 },
   nextText: { ...typography.body, fontSize: 14 },
   nextHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },
-  superGroup: {
-    borderWidth: 1.5, borderRadius: radius.md,
-    padding: spacing.sm, marginBottom: spacing.sm, gap: spacing.sm,
+  chain: {
+    borderLeftWidth: 2, borderLeftColor: colors.borderLight,
+    paddingLeft: spacing.sm, marginLeft: 2,
   },
-  superGroupTag: {
-    flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 4,
-    borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3,
+  chainLabel: {
+    fontSize: 8, fontWeight: '900', letterSpacing: 2,
+    color: colors.textMuted, marginTop: spacing.sm,
   },
-  superGroupTagText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.background },
-  cardioCard: { gap: spacing.sm, marginBottom: spacing.sm },
+  cardioBlock: {
+    gap: spacing.sm, marginTop: spacing.lg,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    padding: spacing.md,
+  },
   cardioHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardioTitle: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
   cardioSub: { ...typography.caption, marginTop: 2 },
   cardioAddBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.accent, borderRadius: radius.full,
-    paddingHorizontal: spacing.sm + 2, paddingVertical: 7,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 2, paddingVertical: 5,
   },
-  cardioAddBtnText: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: colors.background },
+  cardioAddBtnText: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: colors.textPrimary },
   cardioList: { gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
   cardioRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   cardioRowText: { ...typography.caption, flex: 1, color: colors.textPrimary },
@@ -718,24 +626,6 @@ const styles = StyleSheet.create({
   modalCancelBtnText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   modalConfirmBtn: { flex: 1, paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md, backgroundColor: colors.accent },
   modalConfirmBtnText: { color: colors.background, fontWeight: '900', fontSize: 13, letterSpacing: 2 },
-  exerciseCard: { },
-  exerciseCardDone: { borderColor: colors.accent + '66' },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  thumb: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.surface },
-  thumbPlaceholder: {
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border,
-  },
-  exerciseInfo: { flex: 1 },
-  superTag: { ...typography.caption, color: colors.accent, marginBottom: 2 },
-  exerciseName: { ...typography.h3 },
-  exerciseMeta: { ...typography.caption, marginTop: 2 },
-  logBtn: {
-    width: 40, height: 40, borderRadius: radius.full,
-    backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center',
-  },
-  logBtnDone: { backgroundColor: colors.success },
-
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
   emptyTitle: { ...typography.h2, color: colors.textMuted, marginBottom: spacing.sm },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
