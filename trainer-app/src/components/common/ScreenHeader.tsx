@@ -23,7 +23,7 @@ export default function ScreenHeader({ left, right, onBack }: Props) {
         <TouchableOpacity
           style={styles.back}
           onPress={onBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
         >
           <Ionicons name="chevron-back" size={13} color={colors.textMuted} />
           <Text style={styles.text}>{left}</Text>
@@ -41,7 +41,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.xl, paddingTop: spacing.xs,
   },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -4 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -4, minHeight: 44, justifyContent: 'center' },
+  // minHeight: 44 para cumplir con Apple HIG (mínimo 44×44pt para controles de navegación).
+  // justifyContent: 'center' centra el contenido verticalmente dentro del área táctil.
   text: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
   right: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
 });
