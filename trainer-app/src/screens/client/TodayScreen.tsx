@@ -234,13 +234,16 @@ export default function TodayScreen() {
             total={exercises.length}
           />
           <Text style={styles.dayName}>{selectedDay.name.toUpperCase()}</Text>
-          {phase && PHASE_INFO[phase] && (
-            <View style={[styles.phaseBadge, { borderColor: PHASE_INFO[phase].color }]}>
-              <Text style={[styles.phaseText, { color: PHASE_INFO[phase].color }]}>
-                FASE · {PHASE_INFO[phase].label}
-              </Text>
-            </View>
-          )}
+        </View>
+      )}
+
+      {/* Fuera del hero: en un día al que el coach todavía no le cargó
+          ejercicios el alumno igual tiene que ver que está en descarga. */}
+      {!loading && phase && PHASE_INFO[phase] && (
+        <View style={[styles.phaseBadge, { borderColor: PHASE_INFO[phase].color }]}>
+          <Text style={[styles.phaseText, { color: PHASE_INFO[phase].color }]}>
+            FASE · {PHASE_INFO[phase].label}
+          </Text>
         </View>
       )}
 
@@ -526,7 +529,7 @@ const styles = StyleSheet.create({
   },
   pastBannerText: { ...typography.caption, fontSize: 11, flex: 1, color: colors.textMuted },
   phaseBadge: {
-    alignSelf: 'center', marginTop: spacing.xs,
+    alignSelf: 'center', marginTop: spacing.xs, marginBottom: spacing.xs,
     borderWidth: 1, borderRadius: radius.sm,
     paddingHorizontal: spacing.sm, paddingVertical: 2,
   },

@@ -48,13 +48,17 @@ export default function ExerciseRow({ exercise, state, index, lastLog, onPress }
     translateY.value = withDelay(delay, withSpring(0, EASING_OUT));
   }, [index, reduced]);
 
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
   const isDone = state === 'done';
   const isNext = state === 'next';
+
+  // El atenuado de "hecho" va DENTRO del estilo animado a propósito: al aplanar
+  // [styles.rowDone, animStyle] ganaba el último, y animStyle termina con
+  // opacity 1 — los ejercicios completados se veían igual que los pendientes.
+  // `isDone` se captura en el closure del worklet, por eso se declara arriba.
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value * (isDone ? 0.45 : 1),
+    transform: [{ translateY: translateY.value }],
+  }), [isDone]);
 
   const series = exercise.exercise_series.length;
   const meta = isDone
@@ -71,7 +75,7 @@ export default function ExerciseRow({ exercise, state, index, lastLog, onPress }
       : '—';
 
   return (
-    <Animated.View style={[styles.row, isDone && styles.rowDone, animStyle]}>
+    <Animated.View style={[styles.row, animStyle]}>
       <TouchableOpacity style={styles.touch} onPress={onPress} activeOpacity={0.6}>
         <Animated.View style={styles.info}>
           <Text style={[styles.name, isNext && styles.nameNext]} numberOfLines={1}>
@@ -93,7 +97,6 @@ export default function ExerciseRow({ exercise, state, index, lastLog, onPress }
 
 const styles = StyleSheet.create({
   row: { borderTopWidth: 1, borderTopColor: colors.border },
-  rowDone: { opacity: 0.45 },
   touch: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md - 4 },
   info: { flex: 1 },
   name: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
