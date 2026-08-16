@@ -213,7 +213,7 @@ export interface ExerciseRecord {
  * que usan `bestSet` y `topSetByExercise`.
  */
 export function latestRecord(records: ExerciseRecord[]): ExerciseRecord | null {
-  const conDatos = records.filter(r => r.best.week > 0 && r.best.weight > 0);
+  const conDatos = records.filter(r => r.best.week > 0);
   if (conDatos.length === 0) return null;
   return conDatos.reduce((mejor, cur) => {
     if (cur.best.week !== mejor.best.week) return cur.best.week > mejor.best.week ? cur : mejor;

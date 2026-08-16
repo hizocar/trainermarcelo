@@ -226,4 +226,10 @@ describe('latestRecord', () => {
     expect(latestRecord([vacio])).toBeNull();
     expect(latestRecord([])).toBeNull();
   });
+
+  it('un ejercicio de peso corporal cuenta: el peso 0 es un dato, no un vacío', () => {
+    const dominadas = { name: 'Dominadas', unit: 'kg', best: { weight: 0, reps: 12, week: 9 } };
+    const prensa = { name: 'Prensa', unit: 'kg', best: { weight: 200, reps: 10, week: 3 } };
+    expect(latestRecord([dominadas, prensa])).toEqual(dominadas);
+  });
 });
