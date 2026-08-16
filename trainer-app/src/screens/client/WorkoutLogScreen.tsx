@@ -12,6 +12,9 @@ import { useAuth } from '../../context/AuthContext';
 import { Exercise, ExerciseSeries, WorkoutLog } from '../../types';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import SectionLabel from '../../components/common/SectionLabel';
+import StatHero from '../../components/common/StatHero';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
 import TrendChart from '../../components/common/TrendChart';
@@ -289,6 +292,9 @@ export default function WorkoutLogScreen() {
     return best as { weight: number; reps: number; week: number } | null;
   }, [history]);
 
+  // la primera serie sin guardar es la que el alumno está haciendo ahora
+  const indiceActivo = entries.findIndex(e => !e.saved);
+
   if (loading) return (
     <View style={styles.container}>
       <ActivityIndicator color={colors.accent} style={{ marginTop: 100 }} />
@@ -297,26 +303,29 @@ export default function WorkoutLogScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
-          <Text style={styles.backText}>ATRÁS</Text>
-        </TouchableOpacity>
-        <View style={styles.nameRow}>
-          <Text style={[styles.exerciseName, { flex: 1 }]}>{exercise.name.toUpperCase()}</Text>
-          <TouchableOpacity
-            style={styles.histBtn}
-            onPress={() => setShowHistory(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="stats-chart" size={15} color={colors.accent} />
-            <Text style={styles.histBtnText}>HISTORIAL</Text>
+      <ScreenHeader
+        left="ATRÁS"
+        onBack={() => navigation.goBack()}
+        right={
+          <TouchableOpacity onPress={() => setShowHistory(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.headerAction}>HISTORIAL</Text>
           </TouchableOpacity>
-        </View>
+        }
+      />
+
+      <View style={styles.hero}>
+        <Text style={styles.exerciseName}>{exercise.name.toUpperCase()}</Text>
         {exercise.name_en ? <Text style={styles.nameEn}>{exercise.name_en}</Text> : null}
-        <Text style={styles.meta}>
-          {formatShortDate(logDate).toUpperCase()} · {exercise.reps_objective} REPS · {exercise.unit.toUpperCase()}
-        </Text>
+        <View style={styles.heroStat}>
+          <StatHero
+            value={exercise.ref_weight != null ? `${exercise.ref_weight}` : '—'}
+            unit={exercise.ref_weight != null ? exercise.unit : undefined}
+            label="REFERENCIA DEL COACH"
+            caption={`${formatShortDate(logDate).toUpperCase()} · OBJETIVO ${exercise.reps_objective}`}
+            font="mono"
+            size={38}
+          />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -378,52 +387,56 @@ export default function WorkoutLogScreen() {
         )}
 
         <View style={styles.tableHeader}>
-          <Text style={[styles.th, { flex: 0.5 }]}>SERIE</Text>
-          <Text style={[styles.th, { flex: 1 }]}>PESO ({exercise.unit})</Text>
-          <Text style={[styles.th, { flex: 1 }]}>REPS</Text>
-          <Text style={[styles.th, { flex: 0.6 }]}>RIR</Text>
+          <View style={{ width: 26 }} />
+          {/* interpolado en un solo string: SectionLabel acepta un hijo de texto */}
+          <SectionLabel style={{ flex: 1 }}>{`PESO (${exercise.unit.toUpperCase()})`}</SectionLabel>
+          <SectionLabel style={{ flex: 1 }}>REPS</SectionLabel>
+          <SectionLabel style={{ flex: 0.7 }}>RIR</SectionLabel>
         </View>
 
-        {entries.map((entry, i) => (
-          <View key={entry.series.id}>
-            <View style={[styles.row, entry.saved && styles.rowSaved]}>
-              <View style={[styles.seriesBadge, { flex: 0.5 }]}>
-                <Text style={styles.seriesText}>S{entry.series.series_number}</Text>
-                {entry.saved && <Ionicons name="checkmark-circle" size={14} color={colors.success} />}
+        {entries.map((entry, i) => {
+          const esActiva = i === indiceActivo;
+          return (
+            <View key={entry.series.id}>
+              <View style={[styles.serieRow, entry.saved && styles.serieRowSaved, esActiva && styles.serieRowActive]}>
+                <Text style={[styles.serieNum, esActiva && styles.serieNumActive]}>
+                  S{entry.series.series_number}
+                </Text>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={entry.weight}
+                  onChangeText={v => updateEntry(i, 'weight', v)}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                />
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={entry.reps}
+                  onChangeText={v => updateEntry(i, 'reps', v)}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                />
+                <TextInput
+                  style={[styles.input, { flex: 0.7 }]}
+                  value={entry.rir}
+                  onChangeText={v => updateEntry(i, 'rir', v)}
+                  keyboardType="number-pad"
+                  placeholder="–"
+                  placeholderTextColor={colors.textMuted}
+                  maxLength={1}
+                />
+                {entry.saved && <Ionicons name="checkmark" size={13} color={colors.textMuted} />}
               </View>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                value={entry.weight}
-                onChangeText={v => updateEntry(i, 'weight', v)}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor={colors.textMuted}
-              />
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                value={entry.reps}
-                onChangeText={v => updateEntry(i, 'reps', v)}
-                keyboardType="number-pad"
-                placeholder="0"
-                placeholderTextColor={colors.textMuted}
-              />
-              <TextInput
-                style={[styles.input, { flex: 0.6 }]}
-                value={entry.rir}
-                onChangeText={v => updateEntry(i, 'rir', v)}
-                keyboardType="number-pad"
-                placeholder="–"
-                placeholderTextColor={colors.textMuted}
-                maxLength={1}
-              />
+              {entry.prev && (
+                <Text style={styles.prevText}>
+                  SEMANA PASADA (S{entry.prev.week}): {entry.prev.weight}{exercise.unit.toUpperCase()} × {entry.prev.reps}
+                </Text>
+              )}
             </View>
-            {entry.prev && (
-              <Text style={styles.prevText}>
-                Última vez (S{entry.prev.week}): {entry.prev.weight}{exercise.unit} × {entry.prev.reps}
-              </Text>
-            )}
-          </View>
-        ))}
+          );
+        })}
 
         {timerLeft != null ? (
           <TouchableOpacity style={styles.timerActive} onPress={stopRestTimer} activeOpacity={0.8}>
@@ -551,14 +564,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     paddingTop: 60,
   },
-  header: {
-    paddingHorizontal: spacing.xl,
-    marginBottom: spacing.lg,
-    gap: spacing.xs,
-  },
-  backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerAction: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
+  hero: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  heroStat: { marginTop: spacing.sm },
   whenCard: { gap: spacing.sm, marginBottom: spacing.sm },
   whenLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
   whenRow: { flexDirection: 'row', gap: spacing.xs + 2 },
@@ -573,14 +581,10 @@ const styles = StyleSheet.create({
   whenChipDayActive: { color: colors.background },
   whenChipNum: { ...typography.mono, fontSize: 13, color: colors.textPrimary },
   whenChipNumActive: { color: colors.background },
-  exerciseName: { ...typography.display, fontSize: 28 },
-  histBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent + '55',
-    backgroundColor: colors.accentSoft,
-    paddingHorizontal: spacing.sm + 2, paddingVertical: 7,
+  exerciseName: {
+    fontFamily: fonts.display, fontSize: 26, color: colors.textPrimary,
+    letterSpacing: 0.5, textAlign: 'center',
   },
-  histBtnText: { ...typography.label, fontSize: 10, color: colors.accent, letterSpacing: 1 },
   histEmpty: { ...typography.caption, fontStyle: 'italic', textAlign: 'center', lineHeight: 18 },
   histWeek: { gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
   histWeekHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -631,15 +635,7 @@ const styles = StyleSheet.create({
     padding: spacing.md, gap: spacing.xs,
   },
   chartCaption: { ...typography.label, fontSize: 9, letterSpacing: 1.5 },
-  meta: { ...typography.label, color: colors.accent, letterSpacing: 2 },
   nameEn: { ...typography.caption, fontStyle: 'italic', marginTop: -2 },
-  paramRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
-  paramChip: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.textSecondary,
-    backgroundColor: colors.surface, borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
-  },
   suggestionBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.accent, borderRadius: radius.md,
@@ -689,63 +685,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   exampleNotes: { ...typography.body, color: colors.textPrimary, lineHeight: 21 },
-  muscleRow: { alignItems: 'center', gap: spacing.xs },
-  muscleTag: {
-    ...typography.label, fontSize: 9, letterSpacing: 2, color: colors.accent,
-  },
 
   tableHeader: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
   },
-  th: {
-    ...typography.label,
-    letterSpacing: 1,
-    textAlign: 'center',
+  serieRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: spacing.sm,
   },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rowSaved: {
-    borderColor: colors.accent,
-  },
-  seriesBadge: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  seriesText: {
-    fontWeight: '900',
-    color: colors.accent,
-    fontSize: 16,
-  },
+  serieRowSaved: { opacity: 0.45 },
+  serieRowActive: { borderTopColor: colors.accent },
+  serieNum: { width: 26, fontSize: 10, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
+  // el blanco puro es la única excepción de color: marca la serie en curso
+  serieNumActive: { color: '#FFFFFF' },
   prevText: {
-    ...typography.monoSm,
-    fontSize: 11,
-    paddingHorizontal: spacing.sm,
+    fontSize: 9,
+    letterSpacing: 1,
+    color: colors.textMuted,
+    paddingLeft: 34,
     paddingTop: 4,
   },
   input: {
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
     color: colors.textPrimary,
     fontFamily: fonts.mono,
-    fontSize: 17,
+    fontSize: 19,
     textAlign: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   saveBtn: {
     backgroundColor: colors.accent,
