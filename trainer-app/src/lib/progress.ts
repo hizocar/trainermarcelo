@@ -194,3 +194,31 @@ export function topSetByExercise(
   });
   return mejores;
 }
+
+export interface ExerciseRecord {
+  name: string;
+  unit: string;
+  best: { weight: number; reps: number; week: number };
+}
+
+/**
+ * El récord más reciente del alumno, para encabezar la pantalla de progreso.
+ *
+ * No se elige "la marca más pesada": comparar 1RM entre ejercicios distintos
+ * siempre daría sentadilla o peso muerto, y la pantalla mostraría el mismo
+ * número para siempre. El récord más reciente, en cambio, se mueve cuando el
+ * alumno progresa — que es lo que da ganas de mirarlo.
+ *
+ * Ante empate de semana gana la mayor fuerza estimada, con el mismo `score`
+ * que usan `bestSet` y `topSetByExercise`.
+ */
+export function latestRecord(records: ExerciseRecord[]): ExerciseRecord | null {
+  const conDatos = records.filter(r => r.best.week > 0 && r.best.weight > 0);
+  if (conDatos.length === 0) return null;
+  return conDatos.reduce((mejor, cur) => {
+    if (cur.best.week !== mejor.best.week) return cur.best.week > mejor.best.week ? cur : mejor;
+    return score(cur.best.weight, cur.best.reps) > score(mejor.best.weight, mejor.best.reps)
+      ? cur
+      : mejor;
+  });
+}

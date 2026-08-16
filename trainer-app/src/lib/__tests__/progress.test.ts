@@ -1,7 +1,7 @@
 import {
   score, oneRepMax, splitClosedWeeks, toneOf, weeklyDelta,
   repTopOf, suggestProgression, platesPerSide, energyPerformance, bestSet,
-  topSetByExercise,
+  topSetByExercise, latestRecord,
 } from '../progress';
 
 describe('score / oneRepMax', () => {
@@ -197,5 +197,33 @@ describe('topSetByExercise', () => {
 
   it('sin registros devuelve un objeto vacío', () => {
     expect(topSetByExercise([], mapa)).toEqual({});
+  });
+});
+
+describe('latestRecord', () => {
+  const sentadilla = { name: 'Sentadilla', unit: 'kg', best: { weight: 140, reps: 8, week: 7 } };
+  const prensa = { name: 'Prensa', unit: 'kg', best: { weight: 200, reps: 10, week: 3 } };
+
+  it('gana el récord más reciente, aunque sea de menos peso', () => {
+    expect(latestRecord([prensa, sentadilla])).toEqual(sentadilla);
+  });
+
+  it('ante empate de semana gana la marca de mayor fuerza estimada', () => {
+    const a = { name: 'A', unit: 'kg', best: { weight: 100, reps: 5, week: 9 } };
+    const b = { name: 'B', unit: 'kg', best: { weight: 90, reps: 12, week: 9 } };
+    // score: A = 100*(1+5/30) = 116.7 ; B = 90*(1+12/30) = 126
+    expect(latestRecord([a, b])).toEqual(b);
+  });
+
+  it('ignora los ejercicios sin registros', () => {
+    // week 0 es el centinela de "sin datos" que usa ProgressScreen
+    const vacio = { name: 'Vacío', unit: 'kg', best: { weight: 0, reps: 0, week: 0 } };
+    expect(latestRecord([vacio, prensa])).toEqual(prensa);
+  });
+
+  it('sin ningún récord real devuelve null', () => {
+    const vacio = { name: 'Vacío', unit: 'kg', best: { weight: 0, reps: 0, week: 0 } };
+    expect(latestRecord([vacio])).toBeNull();
+    expect(latestRecord([])).toBeNull();
   });
 });
