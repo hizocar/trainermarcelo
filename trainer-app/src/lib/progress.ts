@@ -164,3 +164,33 @@ export function energyPerformance(
     highDays: highs.length,
   };
 }
+
+export interface TopSetLog {
+  series_id: string;
+  weight: number;
+  reps: number;
+}
+
+/**
+ * La mejor serie registrada de cada ejercicio, para mostrarla en "Hoy" en los
+ * ejercicios ya completados.
+ *
+ * Usa el mismo `score` que `bestSet`: si dos pantallas de la app usaran
+ * criterios distintos para "la mejor serie", volveríamos a tener un alumno
+ * viendo dos números diferentes para lo mismo.
+ */
+export function topSetByExercise(
+  logs: TopSetLog[],
+  seriesToExercise: Record<string, string>,
+): Record<string, { weight: number; reps: number }> {
+  const mejores: Record<string, { weight: number; reps: number }> = {};
+  logs.forEach(l => {
+    const exId = seriesToExercise[l.series_id];
+    if (!exId) return; // registro de una serie que ya no está en el plan
+    const actual = mejores[exId];
+    if (!actual || score(l.weight, l.reps) > score(actual.weight, actual.reps)) {
+      mejores[exId] = { weight: l.weight, reps: l.reps };
+    }
+  });
+  return mejores;
+}

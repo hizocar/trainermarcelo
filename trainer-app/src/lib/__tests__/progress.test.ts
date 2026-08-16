@@ -1,6 +1,7 @@
 import {
   score, oneRepMax, splitClosedWeeks, toneOf, weeklyDelta,
   repTopOf, suggestProgression, platesPerSide, energyPerformance, bestSet,
+  topSetByExercise,
 } from '../progress';
 
 describe('score / oneRepMax', () => {
@@ -162,5 +163,39 @@ describe('bestSet', () => {
 
   it('ante empate se queda con la más antigua (la marca original)', () => {
     expect(bestSet([log(3, 60, 10), log(7, 60, 10)])).toEqual({ weight: 60, reps: 10, week: 3 });
+  });
+});
+
+describe('topSetByExercise', () => {
+  const mapa = { s1: 'ex1', s2: 'ex1', s3: 'ex2' };
+
+  it('devuelve la mejor serie de cada ejercicio, no la última', () => {
+    const logs = [
+      { series_id: 's1', weight: 80, reps: 10 },
+      { series_id: 's2', weight: 60, reps: 10 },
+      { series_id: 's3', weight: 40, reps: 12 },
+    ];
+    expect(topSetByExercise(logs, mapa)).toEqual({
+      ex1: { weight: 80, reps: 10 },
+      ex2: { weight: 40, reps: 12 },
+    });
+  });
+
+  it('más reps con menos peso puede ser la mejor serie', () => {
+    // 60×20 estima más fuerza que 70×8 con Epley
+    const logs = [
+      { series_id: 's1', weight: 70, reps: 8 },
+      { series_id: 's2', weight: 60, reps: 20 },
+    ];
+    expect(topSetByExercise(logs, mapa).ex1).toEqual({ weight: 60, reps: 20 });
+  });
+
+  it('ignora registros de series que no están en el plan', () => {
+    const logs = [{ series_id: 'fantasma', weight: 99, reps: 99 }];
+    expect(topSetByExercise(logs, mapa)).toEqual({});
+  });
+
+  it('sin registros devuelve un objeto vacío', () => {
+    expect(topSetByExercise([], mapa)).toEqual({});
   });
 });
