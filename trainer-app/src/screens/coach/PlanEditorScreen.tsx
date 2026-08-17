@@ -14,8 +14,11 @@ import Card from '../../components/common/Card';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/media';
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
+import { parseRepsRange, formatRepsRange } from '../../lib/reps';
+import {
+  chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel,
+} from '../../lib/superseries';
 
-const REPS_OPTIONS = ['4-6', '6-8', '8-10', '8-12', '10-12', '12-15', '10-15'];
 const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
 const RIR_OPTIONS = ['0', '0-1', '1-2', '2-3', '3+'];
 const MUSCLE_GROUPS = [
@@ -53,10 +56,10 @@ export default function PlanEditorScreen() {
   const [showExModal, setShowExModal] = useState(false);
   const [targetDayId, setTargetDayId] = useState('');
   const [exName, setExName] = useState('');
-  const [exReps, setExReps] = useState('8-12');
+  const [exRepsFrom, setExRepsFrom] = useState('');
+  const [exRepsTo, setExRepsTo] = useState('');
   const [exUnit, setExUnit] = useState<'kg' | 'lb'>('kg');
   const [exRefWeight, setExRefWeight] = useState('');
-  const [exSuperseries, setExSuperseries] = useState('');
   const [exSeries, setExSeries] = useState('3');
   const [exNotes, setExNotes] = useState('');
   const [exMuscle, setExMuscle] = useState('');
@@ -191,8 +194,8 @@ export default function PlanEditorScreen() {
 
   function openAddExercise(dayId: string) {
     setTargetDayId(dayId);
-    setExName(''); setExReps('8-12'); setExUnit('kg');
-    setExRefWeight(''); setExSuperseries(''); setExSeries('3');
+    setExName(''); setExRepsFrom(''); setExRepsTo(''); setExUnit('kg');
+    setExRefWeight(''); setExSeries('3');
     setExNotes(''); setExVideoUrl(''); setExImageUrl(null); setExNewImage(null);
     setExMuscle('');
     setExTempo(''); setExRest(null); setExTargetRir('');
@@ -210,10 +213,11 @@ export default function PlanEditorScreen() {
       .eq('exercise_id', ex.id);
     setExSeries(String(count ?? 3));
     setExName(ex.name);
-    setExReps(ex.reps_objective);
+    const rango = parseRepsRange(ex.reps_objective);
+    setExRepsFrom(rango.from);
+    setExRepsTo(rango.to);
     setExUnit(ex.unit);
     setExRefWeight(ex.ref_weight?.toString() ?? '');
-    setExSuperseries(ex.superseries_group ?? '');
     setExNotes(ex.notes ?? '');
     setExMuscle(ex.muscle_group ?? '');
     setExTempo(ex.tempo ?? ''); setExRest(ex.rest_seconds ?? null); setExTargetRir(ex.target_rir ?? '');
@@ -350,10 +354,11 @@ export default function PlanEditorScreen() {
     if (editingEx) {
       // el nombre no se actualiza: identifica al ejercicio y su historial
       const { data, error } = await supabase.from('exercises').update({
-        reps_objective: exReps,
+        reps_objective: formatRepsRange(exRepsFrom, exRepsTo),
         unit: exUnit,
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
-        superseries_group: exSuperseries.trim() || null,
+        // la agrupación se maneja desde la lista (⛓ UNIR / SACAR): editar otros
+        // campos del ejercicio no debe pisar `superseries_group`
         ...mediaFields,
       }).eq('id', editingEx.id).select().single();
 
@@ -402,10 +407,12 @@ export default function PlanEditorScreen() {
       const { data: exData, error } = await supabase.from('exercises').insert({
         day_id: targetDayId,
         name: exName.trim(),
-        reps_objective: exReps,
+        reps_objective: formatRepsRange(exRepsFrom, exRepsTo),
         unit: exUnit,
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
-        superseries_group: exSuperseries.trim() || null,
+        // nace suelto: se encadena después desde la lista, con ⛓ UNIR.
+        // Explícito para no depender del valor por omisión de la columna.
+        superseries_group: null,
         order_index: orderIndex,
         ...mediaFields,
       }).select().single();
@@ -447,6 +454,51 @@ export default function PlanEditorScreen() {
     // persistir usando las posiciones del array como orden canónico
     await supabase.from('exercises').update({ order_index: index }).eq('id', b.id);
     await supabase.from('exercises').update({ order_index: j }).eq('id', a.id);
+  }
+
+  // `Exercise.superseries_group` es opcional (`string | null | undefined`) y las
+  // funciones de superseries.ts piden `string | null`. Se normaliza acá, sin
+  // tocar la lista ni su orden.
+  type Encadenable = Exercise & { superseries_group: string | null };
+  const encadenables = (list: Exercise[]): Encadenable[] =>
+    list.map(e => ({ ...e, superseries_group: e.superseries_group ?? null }));
+
+  // Encadenar no reordena: solo cambia `superseries_group` de los ejercicios
+  // afectados. Por eso acá nunca se toca `order_index`.
+  async function persistGroups(dayId: string, antes: Encadenable[], despues: Encadenable[]) {
+    const cambiados = despues.filter((e, i) => e.superseries_group !== antes[i].superseries_group);
+    setDays(prev => prev.map(d => (d.id === dayId ? { ...d, exercises: despues } : d)));
+    for (const e of cambiados) {
+      const { error } = await supabase
+        .from('exercises')
+        .update({ superseries_group: e.superseries_group })
+        .eq('id', e.id);
+      if (error) {
+        showAlert('Error', 'No se pudo guardar la agrupación: ' + error.message);
+        return;
+      }
+    }
+  }
+
+  function chainExercise(dayId: string, exerciseId: string) {
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    const lista = encadenables(day.exercises);
+    persistGroups(dayId, lista, chainWith(lista, exerciseId));
+  }
+
+  function unchainExercise(dayId: string, exerciseId: string) {
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    const lista = encadenables(day.exercises);
+    persistGroups(dayId, lista, unchain(lista, exerciseId));
+  }
+
+  function dissolveExerciseGroup(dayId: string, label: string) {
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    const lista = encadenables(day.exercises);
+    persistGroups(dayId, lista, dissolveGroup(lista, label));
   }
 
   function deleteExercise(ex: Exercise) {
@@ -514,7 +566,34 @@ export default function PlanEditorScreen() {
             </View>
 
             {day.exercises.map((ex, idx) => (
-              <Card key={ex.id} style={styles.exCard}>
+              <React.Fragment key={ex.id}>
+                {(() => {
+                  if (idx === 0) return null;
+                  const anterior = day.exercises[idx - 1];
+                  const mismoGrupo =
+                    !!ex.superseries_group && ex.superseries_group === anterior.superseries_group;
+                  if (mismoGrupo) return null;
+                  return (
+                    <TouchableOpacity
+                      style={styles.chainBtn}
+                      onPress={() => chainExercise(day.id, ex.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 20, right: 20 }}
+                    >
+                      <View style={styles.chainLine} />
+                      <Text style={styles.chainText}>⛓ UNIR</Text>
+                      <View style={styles.chainLine} />
+                    </TouchableOpacity>
+                  );
+                })()}
+                <Card
+                  style={ex.superseries_group
+                    ? {
+                        ...styles.exCard,
+                        borderColor: colorForLabel(ex.superseries_group),
+                        borderWidth: 1.5,
+                      }
+                    : styles.exCard}
+                >
                 <View style={styles.exRow}>
                   <View style={styles.reorderCol}>
                     <TouchableOpacity
@@ -539,7 +618,34 @@ export default function PlanEditorScreen() {
                   ) : null}
                   <View style={styles.exInfo}>
                     {ex.superseries_group && (
-                      <Text style={styles.superTag}>⛓ {ex.superseries_group}</Text>
+                      <View style={styles.superRow}>
+                        {/* tocar la etiqueta deshace el grupo entero; "SACAR"
+                            saca solo este ejercicio */}
+                        <TouchableOpacity
+                          onPress={() => dissolveExerciseGroup(day.id, ex.superseries_group!)}
+                          // 16 arriba y abajo, no 12: la píldora mide ~15pt de
+                          // alto y el hitSlop es lo único que la lleva a 44pt
+                          hitSlop={{ top: 16, bottom: 16, left: 8, right: 8 }}
+                          style={[
+                            styles.superTag,
+                            { backgroundColor: colorForLabel(ex.superseries_group) },
+                          ]}
+                        >
+                          <Text style={styles.superTagText}>
+                            ⛓ {groupNameFor(
+                              day.exercises.filter(e => e.superseries_group === ex.superseries_group).length,
+                              ex.superseries_group,
+                            )} ✕
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => unchainExercise(day.id, ex.id)}
+                          // ídem: el texto mide ~11pt, con 18 de hitSlop llega a 44pt
+                          hitSlop={{ top: 18, bottom: 18, left: 12, right: 12 }}
+                        >
+                          <Text style={styles.superUnchain}>SACAR</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                     <Text style={styles.exName}>{ex.name}</Text>
                     <Text style={styles.exMeta}>
@@ -557,7 +663,8 @@ export default function PlanEditorScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-              </Card>
+                </Card>
+              </React.Fragment>
             ))}
 
             {day.exercises.length === 0 && (
@@ -714,15 +821,6 @@ export default function PlanEditorScreen() {
               </>
             )}
 
-            <Text style={styles.inputLabel}>GRUPO / SUPERSERIE (opcional)</Text>
-            <TextInput
-              style={styles.input}
-              value={exSuperseries}
-              onChangeText={setExSuperseries}
-              placeholder="ej: Superserie 1"
-              placeholderTextColor={colors.textMuted}
-            />
-
             <Text style={styles.inputLabel}>GRUPO MUSCULAR</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
               {MUSCLE_GROUPS.map(g => (
@@ -737,17 +835,27 @@ export default function PlanEditorScreen() {
             </ScrollView>
 
             <Text style={styles.inputLabel}>OBJETIVO DE REPS</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
-              {REPS_OPTIONS.map(r => (
-                <TouchableOpacity
-                  key={r}
-                  style={[styles.repsOption, exReps === r && styles.repsOptionActive]}
-                  onPress={() => setExReps(r)}
-                >
-                  <Text style={[styles.repsOptionText, exReps === r && styles.repsOptionTextActive]}>{r}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.repsRow}>
+              <TextInput
+                style={styles.repsInput}
+                value={exRepsFrom}
+                onChangeText={setExRepsFrom}
+                keyboardType="number-pad"
+                placeholder="desde"
+                placeholderTextColor={colors.textMuted}
+                maxLength={3}
+              />
+              <Text style={styles.repsDash}>a</Text>
+              <TextInput
+                style={styles.repsInput}
+                value={exRepsTo}
+                onChangeText={setExRepsTo}
+                keyboardType="number-pad"
+                placeholder="hasta"
+                placeholderTextColor={colors.textMuted}
+                maxLength={3}
+              />
+            </View>
 
             <Text style={styles.inputLabel}>UNIDAD</Text>
             <View style={styles.unitPicker}>
@@ -980,7 +1088,18 @@ const styles = StyleSheet.create({
   reorderCol: { justifyContent: 'center', gap: 2 },
   reorderBtn: { padding: 2 },
   exInfo: { flex: 1 },
-  superTag: { ...typography.caption, color: colors.accent, marginBottom: 2 },
+  superRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
+  superTag: { borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  superTagText: { fontSize: 8, fontWeight: '900', letterSpacing: 1, color: colors.background },
+  superUnchain: { fontSize: 8, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
+  // el minHeight va en el propio TouchableOpacity: en React Native el padding
+  // del contenedor padre no amplía el área táctil de un hijo
+  chainBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    minHeight: 44, paddingHorizontal: spacing.md,
+  },
+  chainLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  chainText: { fontSize: 9, letterSpacing: 1.5, fontWeight: '800', color: colors.textMuted },
   exName: { ...typography.h3 },
   lockedName: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm,
@@ -1093,6 +1212,17 @@ const styles = StyleSheet.create({
   repsOptionActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   repsOptionText: { ...typography.caption, color: colors.textMuted, fontWeight: '700' },
   repsOptionTextActive: { color: colors.background },
+  repsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  repsInput: {
+    // colors.card (no surface) porque el modal ya es surface: el campo tiene
+    // que despegarse del fondo, igual que el resto de los inputs
+    flex: 1, backgroundColor: colors.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingVertical: spacing.md - 4, paddingHorizontal: spacing.md,
+    fontSize: 15, color: colors.textPrimary, textAlign: 'center',
+    minHeight: 44, // área táctil real del campo, no la del contenedor
+  },
+  repsDash: { fontSize: 11, color: colors.textMuted },
   unitPicker: { flexDirection: 'row', gap: spacing.sm },
   unitOption: {
     flex: 1, paddingVertical: spacing.sm, alignItems: 'center',
