@@ -8,9 +8,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { MoodLog } from '../../types';
-import { colors, spacing, radius, typography } from '../../theme';
-import Card from '../../components/common/Card';
+import { colors, spacing, radius, typography, fonts } from '../../theme';
 import MuscleMap from '../../components/common/MuscleMap';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import SectionLabel from '../../components/common/SectionLabel';
+import StatHero from '../../components/common/StatHero';
+import DataRow from '../../components/common/DataRow';
 import { fetchFullPlan, fetchLogs, activeDays } from '../../lib/plan';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
@@ -124,17 +127,39 @@ export default function HomeScreen() {
     [moods, today],
   );
 
+  const diasCompletos = weekDays.filter(d => d.total > 0 && d.done >= d.total).length;
+
   return (
     <View style={styles.container}>
+      <ScreenHeader
+        left={formatShortDate(new Date().toISOString()).toUpperCase()}
+        right={<Text style={styles.weekLabel}>SEMANA {getCurrentWeek()}</Text>}
+      />
+
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text style={styles.greeting}>{formatShortDate(new Date().toISOString()).toUpperCase()}</Text>
-          <Text style={styles.userName}>HOLA, {user?.name?.split(' ')[0].toUpperCase()}</Text>
-        </View>
+        {weekDays.length > 0 && (
+          <View style={styles.hero}>
+            <StatHero
+              value={`${diasCompletos}`}
+              suffix={`/${weekDays.length}`}
+              label="DÍAS ENTRENADOS ESTA SEMANA"
+              font="display"
+              size={56}
+            />
+            <View style={styles.dayBars}>
+              {weekDays.map(d => (
+                <View
+                  key={d.id}
+                  style={[styles.dayBar, d.total > 0 && d.done >= d.total && styles.dayBarDone]}
+                />
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Encuesta diaria de energía */}
-        <Card style={styles.moodCard}>
-          <Text style={styles.moodTitle}>¿CÓMO TE SIENTES HOY?</Text>
+        <View style={styles.moodBlock}>
+          <SectionLabel style={styles.section}>¿CÓMO TE SIENTES HOY?</SectionLabel>
           <View style={styles.energyRow}>
             {ENERGY_LEVELS.map(n => {
               const active = todayEnergy === n;
@@ -174,46 +199,35 @@ export default function HomeScreen() {
               </View>
             </View>
           )}
-        </Card>
+        </View>
 
         {/* Días entrenados vs pendientes */}
         {weekDays.length > 0 && (
-          <Card style={styles.weekCard}>
-            <Text style={styles.groupTitle}>MI SEMANA</Text>
-            <View style={styles.weekRow}>
-              {weekDays.map(d => {
-                const complete = d.done >= d.total;
-                const started = d.done > 0 && !complete;
-                return (
-                  <TouchableOpacity
-                    key={d.id}
-                    style={[styles.weekDayChip, complete && styles.weekDayChipDone, started && styles.weekDayChipStarted]}
-                    onPress={() => navigation.navigate('Today')}
-                    activeOpacity={0.7}
-                  >
-                    {complete ? (
-                      <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                    ) : started ? (
-                      <Text style={styles.weekDayCount}>{d.done}/{d.total}</Text>
-                    ) : (
-                      <Ionicons name="ellipse-outline" size={16} color={colors.textMuted} />
-                    )}
-                    <Text style={[styles.weekDayNum, complete && { color: colors.success }]}>DÍA {d.day_number}</Text>
-                    <Text style={styles.weekDayName} numberOfLines={1}>{d.name.toUpperCase()}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View>
+            <SectionLabel style={styles.section}>MI SEMANA</SectionLabel>
+            {weekDays.map((d, i) => {
+              const completo = d.total > 0 && d.done >= d.total;
+              return (
+                <DataRow
+                  key={d.id}
+                  label={d.name.toUpperCase()}
+                  value={`${d.done}/${d.total}`}
+                  state={completo ? 'done' : d.done > 0 ? 'active' : 'idle'}
+                  index={i}
+                  onPress={() => navigation.navigate('Today')}
+                />
+              );
+            })}
             <Text style={styles.weekSummary}>
               {weekDays.filter(d => d.done >= d.total).length} de {weekDays.length} días completados esta semana
             </Text>
-          </Card>
+          </View>
         )}
 
         {/* Series por grupo muscular (semana en curso) */}
-        <Card style={styles.groupCard}>
+        <View style={styles.groupBlock}>
           <View>
-            <Text style={styles.groupTitle}>SERIES POR GRUPO MUSCULAR</Text>
+            <SectionLabel style={styles.section}>SERIES POR GRUPO MUSCULAR</SectionLabel>
             <Text style={styles.groupWeek}>SPLIT SEMANAL</Text>
           </View>
           {loading ? (
@@ -238,7 +252,7 @@ export default function HomeScreen() {
               <Text style={styles.groupTotal}>{totalSets} series planificadas por semana</Text>
             </>
           )}
-        </Card>
+        </View>
 
         {/* Accesos rápidos */}
         <TouchableOpacity
@@ -267,19 +281,27 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
-  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.md },
-  greeting: { ...typography.label, letterSpacing: 3, color: colors.accent },
-  userName: { ...typography.display, fontSize: 30, marginTop: 2 },
+  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.lg },
+  weekLabel: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
 
-  moodCard: { gap: spacing.md },
-  moodTitle: { ...typography.h3, fontSize: 15 },
+  hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm },
+  dayBars: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
+  dayBar: { width: 26, height: 4, borderRadius: radius.full, backgroundColor: colors.surface },
+  dayBarDone: { backgroundColor: colors.accent },
+
+  section: { marginBottom: spacing.sm },
+
+  moodBlock: { gap: spacing.md },
+  // El mínimo táctil de Apple HIG es 44×44pt: aspectRatio por sí solo daba
+  // botones de ~35px de alto con 10 en fila. minHeight se impone sobre la
+  // altura derivada del ratio para garantizar el área real, no solo visual.
   energyRow: { flexDirection: 'row', gap: 5 },
   energyBtn: {
-    flex: 1, aspectRatio: 0.8, borderRadius: radius.sm,
+    flex: 1, minHeight: 44, borderRadius: radius.sm,
     borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  energyBtnText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+  energyBtnText: { fontFamily: fonts.mono, fontSize: 13, fontWeight: '600', color: colors.textMuted },
   energyBtnTextActive: { color: colors.background },
   energyLegend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   energyLegendText: { ...typography.caption, fontSize: 9, letterSpacing: 1 },
@@ -289,25 +311,12 @@ const styles = StyleSheet.create({
   moodHistoryRow: { flexDirection: 'row', gap: spacing.md },
   moodHistoryItem: { alignItems: 'center', gap: 2 },
   moodHistoryEnergy: { fontSize: 16, fontWeight: '900' },
-  moodHistoryDate: { ...typography.caption, fontSize: 9 },
+  moodHistoryDate: { ...typography.caption, fontSize: 8, color: colors.textMuted },
 
-  weekCard: { gap: spacing.sm },
-  weekRow: { flexDirection: 'row', gap: spacing.sm },
-  weekDayChip: {
-    flex: 1, alignItems: 'center', gap: 3,
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
-    paddingVertical: spacing.sm + 2, paddingHorizontal: 2,
-  },
-  weekDayChipDone: { borderColor: colors.success + '88', backgroundColor: colors.success + '11' },
-  weekDayChipStarted: { borderColor: colors.accent + '66' },
-  weekDayCount: { fontSize: 13, fontWeight: '900', color: colors.accent },
-  weekDayNum: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5, color: colors.textPrimary },
-  weekDayName: { fontSize: 8, fontWeight: '700', letterSpacing: 0.3, color: colors.textMuted },
-  weekSummary: { ...typography.caption, fontSize: 10, textAlign: 'center' },
-  groupCard: { gap: spacing.sm },
-  groupTitle: { ...typography.h3, fontSize: 15 },
-  groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.accent, marginTop: 2 },
+  weekSummary: { ...typography.caption, fontSize: 9, color: colors.textMuted, textAlign: 'center', marginTop: spacing.sm },
+
+  groupBlock: { gap: spacing.sm },
+  groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, marginTop: 2 },
   groupEmpty: { ...typography.caption, textAlign: 'center', paddingVertical: spacing.md },
   groupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   groupName: { fontSize: 10.5, color: colors.textMuted, fontWeight: '800', letterSpacing: 0.3, width: 112 },
