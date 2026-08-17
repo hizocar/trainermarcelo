@@ -1,5 +1,6 @@
 import {
   nextGroupLabel, chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel,
+  normalizeGroups,
 } from '../superseries';
 
 const ej = (id: string, g: string | null = null) => ({ id, superseries_group: g });
@@ -142,5 +143,30 @@ describe('colorForLabel', () => {
 
   it('una etiqueta vieja escrita a mano también recibe color', () => {
     expect(typeof colorForLabel('Superserie 1')).toBe('string');
+  });
+});
+
+describe('normalizeGroups', () => {
+  // se usa al CARGAR el plan: una escritura que quedó a medias, o una etiqueta
+  // huérfana de planes viejos, no debe dibujar una píldora de grupo sobre un
+  // ejercicio suelto
+  it('limpia un grupo de un solo miembro', () => {
+    const lista = [ej('1', 'A'), ej('2'), ej('3')];
+    expect(normalizeGroups(lista)).toEqual([ej('1'), ej('2'), ej('3')]);
+  });
+
+  it('deja intacto un grupo real de dos consecutivos', () => {
+    const lista = [ej('1', 'A'), ej('2', 'A'), ej('3')];
+    expect(normalizeGroups(lista)).toEqual(lista);
+  });
+
+  it('limpia una etiqueta repetida en ejercicios no consecutivos', () => {
+    const lista = [ej('1', 'A'), ej('2'), ej('3', 'A')];
+    expect(normalizeGroups(lista)).toEqual([ej('1'), ej('2'), ej('3')]);
+  });
+
+  it('no altera el orden de la lista', () => {
+    const lista = [ej('1', 'A'), ej('2'), ej('3', 'B'), ej('4', 'B')];
+    expect(normalizeGroups(lista).map(e => e.id)).toEqual(['1', '2', '3', '4']);
   });
 });

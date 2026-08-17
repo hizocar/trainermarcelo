@@ -16,7 +16,7 @@ import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/med
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 import { parseRepsRange, formatRepsRange } from '../../lib/reps';
 import {
-  chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel,
+  chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel, normalizeGroups,
 } from '../../lib/superseries';
 
 const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
@@ -161,7 +161,11 @@ export default function PlanEditorScreen() {
       const { data: exData } = await supabase
         .from('exercises').select('*')
         .eq('day_id', d.id).eq('archived', false).order('order_index');
-      daysWithEx.push({ ...d, exercises: exData ?? [] });
+      // se normaliza solo lo que se muestra: una etiqueta huérfana —de un
+      // guardado que quedó a medias, o de planes viejos— dibujaría una píldora
+      // de grupo sobre un ejercicio suelto. No se escribe nada al cargar:
+      // reescribir los datos del coach a sus espaldas sería peor que el bug.
+      daysWithEx.push({ ...d, exercises: normalizeGroups(encadenables(exData ?? [])) });
     }
     setDays(daysWithEx);
     setLoading(false);

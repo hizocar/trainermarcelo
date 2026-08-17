@@ -46,8 +46,13 @@ export function nextGroupLabel(existing: (string | null)[]): string {
  * o con ejercicios no consecutivos (algo que `groupBySuperseries` tampoco
  * agruparía). Un grupo de uno no es un grupo, y por eso esta regla vive en un
  * solo lugar y la usan `chainWith`, `unchain` y `dissolveGroup`.
+ *
+ * Se exporta como `normalizeGroups` para poder aplicarla también al **cargar**
+ * un plan: una escritura que quedó a medias, o una etiqueta huérfana de planes
+ * viejos, dibujaría una píldora de grupo sobre un ejercicio suelto. Normalizar
+ * lo que se muestra es correcto; reescribir los datos del coach al cargar, no.
  */
-function limpiarGruposInvalidos<T extends Chainable>(exercises: T[]): T[] {
+export function normalizeGroups<T extends Chainable>(exercises: T[]): T[] {
   const conteo = new Map<string, number>();
   for (const e of exercises) {
     if (e.superseries_group) {
@@ -88,7 +93,7 @@ export function chainWith<T extends Chainable>(exercises: T[], exerciseId: strin
   );
   // si el de arriba ya tenía grupo y era el único puente entre dos tramos,
   // encadenarlo con otro puede dejar huérfano al resto de su grupo viejo
-  return limpiarGruposInvalidos(resultado);
+  return normalizeGroups(resultado);
 }
 
 /** Saca un ejercicio de su grupo; si el grupo queda de uno, lo disuelve. */
@@ -99,7 +104,7 @@ export function unchain<T extends Chainable>(exercises: T[], exerciseId: string)
   const sinEl = exercises.map(e =>
     e.id === exerciseId ? { ...e, superseries_group: null } : e,
   );
-  return limpiarGruposInvalidos(sinEl);
+  return normalizeGroups(sinEl);
 }
 
 /** Deshace un grupo completo. */
@@ -107,7 +112,7 @@ export function dissolveGroup<T extends Chainable>(exercises: T[], label: string
   const resultado = exercises.map(e =>
     e.superseries_group === label ? { ...e, superseries_group: null } : e,
   );
-  return limpiarGruposInvalidos(resultado);
+  return normalizeGroups(resultado);
 }
 
 /** Cómo se llama un grupo según cuántos ejercicios tenga. */
