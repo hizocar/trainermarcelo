@@ -474,6 +474,12 @@ export default function PlanEditorScreen() {
         .update({ superseries_group: e.superseries_group })
         .eq('id', e.id);
       if (error) {
+        // se revierte la lista completa a `antes`: acá pueden cambiar varias
+        // filas de una vez (una triserie encadena tres), y dejar el estado
+        // optimista tras un fallo le mostraría al coach una agrupación
+        // —píldora, color, borde— que la base no tiene. Lo que se ve en
+        // pantalla tiene que ser lo que quedó guardado.
+        setDays(prev => prev.map(d => (d.id === dayId ? { ...d, exercises: antes } : d)));
         showAlert('Error', 'No se pudo guardar la agrupación: ' + error.message);
         return;
       }
