@@ -97,6 +97,9 @@ export default function PlanEditorScreen() {
   // devolver la misma letra a dos pares distintos—, así que mientras hay una
   // persistencia corriendo se ignoran los toques.
   const enVuelo = React.useRef<Promise<void> | null>(null);
+  // el ref es la guarda real (síncrona); este estado es solo para que el coach
+  // VEA que los controles están inactivos en vez de sentir que no responden
+  const [operando, setOperando] = useState(false);
 
   useEffect(() => { fetchPlan(); fetchTemplates(); }, []);
 
@@ -526,9 +529,17 @@ export default function PlanEditorScreen() {
   // coach: al cargar no se escribe nada, pero en cuanto encadena algo la base
   // queda igual a lo que él ve.
   async function persistirGrupos(dayId: string, despues: Encadenable[]) {
-    const cambiados = despues.filter(
-      e => e.superseries_group !== (grupoEnBase.current.get(e.id) ?? null),
-    );
+    // El orden de este lote importa y no es cosmético: primero las limpiezas
+    // (`null`) y después las asignaciones. Escrito en el orden de la lista, una
+    // etiqueta huérfana que quede DESPUÉS del par recién encadenado hace que la
+    // base pase por un estado real de triserie ['A','A','A'] antes de
+    // limpiarla; si justo esa última escritura falla, queda así, y un alumno
+    // que cargue en esa ventana entrena algo que el coach nunca armó. Limpiando
+    // primero, el peor caso deja MENOS ejercicios agrupados de los que
+    // corresponde — el lado seguro. No reordenar esto.
+    const cambiados = despues
+      .filter(e => e.superseries_group !== (grupoEnBase.current.get(e.id) ?? null))
+      .sort((a, b) => Number(a.superseries_group !== null) - Number(b.superseries_group !== null));
     setDays(prev => prev.map(d => (d.id === dayId ? { ...d, exercises: despues } : d)));
     for (const e of cambiados) {
       const { error } = await supabase
@@ -554,10 +565,14 @@ export default function PlanEditorScreen() {
   async function conGuarda(operacion: () => Promise<void>) {
     const tarea = operacion();
     enVuelo.current = tarea;
+    setOperando(true);
     try {
       await tarea;
     } finally {
-      if (enVuelo.current === tarea) enVuelo.current = null;
+      if (enVuelo.current === tarea) {
+        enVuelo.current = null;
+        setOperando(false);
+      }
     }
   }
 
@@ -676,8 +691,9 @@ export default function PlanEditorScreen() {
                   if (mismoGrupo) return null;
                   return (
                     <TouchableOpacity
-                      style={styles.chainBtn}
+                      style={operando ? [styles.chainBtn, styles.controlInactivo] : styles.chainBtn}
                       onPress={() => chainExercise(day.id, ex.id)}
+                      disabled={operando}
                       hitSlop={{ top: 8, bottom: 8, left: 20, right: 20 }}
                     >
                       <View style={styles.chainLine} />
@@ -699,16 +715,16 @@ export default function PlanEditorScreen() {
                   <View style={styles.reorderCol}>
                     <TouchableOpacity
                       onPress={() => moveExercise(day.id, idx, -1)}
-                      disabled={idx === 0}
-                      style={styles.reorderBtn}
+                      disabled={operando || idx === 0}
+                      style={operando ? [styles.reorderBtn, styles.controlInactivo] : styles.reorderBtn}
                       hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
                     >
                       <Ionicons name="chevron-up" size={15} color={idx === 0 ? colors.border : colors.textMuted} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => moveExercise(day.id, idx, 1)}
-                      disabled={idx === day.exercises.length - 1}
-                      style={styles.reorderBtn}
+                      disabled={operando || idx === day.exercises.length - 1}
+                      style={operando ? [styles.reorderBtn, styles.controlInactivo] : styles.reorderBtn}
                       hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
                     >
                       <Ionicons name="chevron-down" size={15} color={idx === day.exercises.length - 1 ? colors.border : colors.textMuted} />
@@ -724,12 +740,14 @@ export default function PlanEditorScreen() {
                             saca solo este ejercicio */}
                         <TouchableOpacity
                           onPress={() => dissolveExerciseGroup(day.id, ex.superseries_group!)}
+                          disabled={operando}
                           // 16 arriba y abajo, no 12: la píldora mide ~15pt de
                           // alto y el hitSlop es lo único que la lleva a 44pt
                           hitSlop={{ top: 16, bottom: 16, left: 8, right: 8 }}
                           style={[
                             styles.superTag,
                             { backgroundColor: colorForLabel(ex.superseries_group) },
+                            operando && styles.controlInactivo,
                           ]}
                         >
                           <Text style={styles.superTagText}>
@@ -741,6 +759,8 @@ export default function PlanEditorScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => unchainExercise(day.id, ex.id)}
+                          disabled={operando}
+                          style={operando ? styles.controlInactivo : undefined}
                           // ídem: el texto mide ~11pt, con 18 de hitSlop llega a 44pt
                           hitSlop={{ top: 18, bottom: 18, left: 12, right: 12 }}
                         >
@@ -1204,6 +1224,10 @@ const styles = StyleSheet.create({
   },
   chainLine: { flex: 1, height: 1, backgroundColor: colors.border },
   chainText: { fontSize: 9, letterSpacing: 1.5, fontWeight: '800', color: colors.textMuted },
+  // se aplica mientras hay una agrupación guardándose: los controles quedan
+  // inactivos y tienen que verse inactivos, si no el coach toca y cree que el
+  // botón está roto. Solo opacidad: nada de spinners ni cambios de layout.
+  controlInactivo: { opacity: 0.4 },
   exName: { ...typography.h3 },
   lockedName: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm,
