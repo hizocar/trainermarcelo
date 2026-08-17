@@ -328,7 +328,14 @@ export default function WorkoutLogScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {/* automaticallyAdjustKeyboardInsets: con el teclado numérico abierto la
+          cabecera fija deja poco alto útil; esto desplaza la lista y mantiene
+          visible el campo enfocado sin tocar el diseño */}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+      >
         {/* ¿Cuándo lo hiciste? — corrige la fecha real si registras un día atrasado */}
         <View style={styles.whenCard}>
           <Text style={styles.whenLabel}>¿CUÁNDO LO HICISTE?</Text>
@@ -389,49 +396,58 @@ export default function WorkoutLogScreen() {
         <View style={styles.tableHeader}>
           <View style={{ width: 26 }} />
           {/* interpolado en un solo string: SectionLabel acepta un hijo de texto */}
-          <SectionLabel style={{ flex: 1 }}>{`PESO (${exercise.unit.toUpperCase()})`}</SectionLabel>
-          <SectionLabel style={{ flex: 1 }}>REPS</SectionLabel>
-          <SectionLabel style={{ flex: 0.7 }}>RIR</SectionLabel>
+          <SectionLabel style={{ flex: 1, textAlign: 'center' }}>{`PESO (${exercise.unit.toUpperCase()})`}</SectionLabel>
+          <SectionLabel style={{ flex: 1, textAlign: 'center' }}>REPS</SectionLabel>
+          <SectionLabel style={{ flex: 0.7, textAlign: 'center' }}>RIR</SectionLabel>
+          <View style={styles.checkSlot} />
         </View>
 
         {entries.map((entry, i) => {
           const esActiva = i === indiceActivo;
           return (
             <View key={entry.series.id}>
-              <View style={[styles.serieRow, entry.saved && styles.serieRowSaved, esActiva && styles.serieRowActive]}>
-                <Text style={[styles.serieNum, esActiva && styles.serieNumActive]}>
-                  S{entry.series.series_number}
-                </Text>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  value={entry.weight}
-                  onChangeText={v => updateEntry(i, 'weight', v)}
-                  keyboardType="decimal-pad"
-                  placeholder="0"
-                  placeholderTextColor={colors.textMuted}
-                />
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  value={entry.reps}
-                  onChangeText={v => updateEntry(i, 'reps', v)}
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor={colors.textMuted}
-                />
-                <TextInput
-                  style={[styles.input, { flex: 0.7 }]}
-                  value={entry.rir}
-                  onChangeText={v => updateEntry(i, 'rir', v)}
-                  keyboardType="number-pad"
-                  placeholder="–"
-                  placeholderTextColor={colors.textMuted}
-                  maxLength={1}
-                />
-                {entry.saved && <Ionicons name="checkmark" size={13} color={colors.textMuted} />}
+              <View style={[styles.serieRow, esActiva && styles.serieRowActive]}>
+                {/* el atenuado va solo en los campos: el visto de "guardado" es
+                    la señal que más importa acá y no puede quedar al 45% */}
+                <View style={[styles.serieFields, entry.saved && styles.serieRowSaved]}>
+                  <Text style={[styles.serieNum, esActiva && styles.serieNumActive]}>
+                    S{entry.series.series_number}
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    value={entry.weight}
+                    onChangeText={v => updateEntry(i, 'weight', v)}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    value={entry.reps}
+                    onChangeText={v => updateEntry(i, 'reps', v)}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <TextInput
+                    style={[styles.input, { flex: 0.7 }]}
+                    value={entry.rir}
+                    onChangeText={v => updateEntry(i, 'rir', v)}
+                    keyboardType="number-pad"
+                    placeholder="–"
+                    placeholderTextColor={colors.textMuted}
+                    maxLength={1}
+                  />
+                </View>
+                {/* ancho reservado siempre: si el visto apareciera y desapareciera,
+                    los campos saltarían bajo el dedo al re-editar una serie guardada */}
+                <View style={styles.checkSlot}>
+                  {entry.saved && <Ionicons name="checkmark" size={14} color={colors.textPrimary} />}
+                </View>
               </View>
               {entry.prev && (
                 <Text style={styles.prevText}>
-                  SEMANA PASADA (S{entry.prev.week}): {entry.prev.weight}{exercise.unit.toUpperCase()} × {entry.prev.reps}
+                  ÚLTIMA VEZ (S{entry.prev.week}): {entry.prev.weight}{exercise.unit.toUpperCase()} × {entry.prev.reps}
                 </Text>
               )}
             </View>
@@ -695,13 +711,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: spacing.sm,
   },
+  serieFields: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   serieRowSaved: { opacity: 0.45 },
   serieRowActive: { borderTopColor: colors.accent },
   serieNum: { width: 26, fontSize: 10, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
   // el blanco puro es la única excepción de color: marca la serie en curso
   serieNumActive: { color: '#FFFFFF' },
+  checkSlot: { width: 20, alignItems: 'center' },
   prevText: {
-    fontSize: 9,
+    fontFamily: fonts.mono,
+    fontSize: 10,
     letterSpacing: 1,
     color: colors.textMuted,
     paddingLeft: 34,
@@ -710,7 +729,9 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
-    paddingVertical: 7,
+    // 12 + 12 + ~20 de línea ≈ 44pt: mínimo táctil de Apple HIG. RN no propaga
+    // el toque desde el padding del padre, así que tiene que estar en el input.
+    paddingVertical: 12,
     paddingHorizontal: 9,
     color: colors.textPrimary,
     fontFamily: fonts.mono,
