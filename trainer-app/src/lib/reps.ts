@@ -21,7 +21,16 @@ export function parseRepsRange(value?: string | null): { from: string; to: strin
 export function formatRepsRange(from: string, to: string): string {
   const desde = from.trim();
   const hasta = to.trim();
-  if (desde && hasta) return `${desde}-${hasta}`;
+  if (desde && hasta) {
+    // si ambos son numéricos y el primero es mayor, se ordenan solos para
+    // evitar que un tecleo al revés rompa la autoprogresión en silencio
+    const desdeNum = Number(desde);
+    const hastaNum = Number(hasta);
+    if (!isNaN(desdeNum) && !isNaN(hastaNum) && desdeNum > hastaNum) {
+      return `${hastaNum}-${desdeNum}`;
+    }
+    return `${desde}-${hasta}`;
+  }
   if (desde) return desde;
   if (hasta) return hasta;
   return DEFAULT_REPS;

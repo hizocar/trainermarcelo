@@ -45,4 +45,14 @@ describe('formatRepsRange', () => {
   it('ignora espacios que el coach haya tecleado', () => {
     expect(formatRepsRange(' 8 ', ' 12 ')).toBe('8-12');
   });
+
+  it('un rango tecleado al revés se ordena solo', () => {
+    // "desde 12 hasta 8" es un error de tecleo, y dejarlo pasar haría que
+    // repTopOf lea 8 como tope y la sugerencia de subir peso se dispare antes
+    expect(formatRepsRange('12', '8')).toBe('8-12');
+  });
+
+  it('un texto viejo no numérico no se toca', () => {
+    expect(formatRepsRange('al fallo', '')).toBe('al fallo');
+  });
 });
