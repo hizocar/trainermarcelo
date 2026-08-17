@@ -21,6 +21,12 @@ describe('nextGroupLabel', () => {
     // planes hechos antes de este cambio tienen cosas como "Superserie 1"
     expect(nextGroupLabel(['Superserie 1', null])).toBe('A');
   });
+
+  it('con todas las letras usadas nunca devuelve una etiqueta ya ocupada', () => {
+    const usadas = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    expect(usadas).not.toContain(nextGroupLabel(usadas));
+  });
 });
 
 describe('chainWith', () => {
@@ -59,6 +65,13 @@ describe('chainWith', () => {
     const lista = [ej('1'), ej('2'), ej('3')];
     expect(chainWith(lista, '2').map(e => e.id)).toEqual(['1', '2', '3']);
   });
+
+  it('encadenar no deja grupos huérfanos de un solo ejercicio', () => {
+    const lista = [ej('1', 'A'), ej('2', 'A'), ej('3'), ej('4', 'B'), ej('5', 'B')];
+    const r = chainWith(lista, '4');
+    // el 4 se va con el 3; el 5 se queda solo, así que su grupo se disuelve
+    expect(r.find(e => e.id === '5')!.superseries_group).toBeNull();
+  });
 });
 
 describe('unchain', () => {
@@ -92,6 +105,15 @@ describe('dissolveGroup', () => {
   it('sirve para las etiquetas viejas escritas a mano', () => {
     const lista = [ej('1', 'Superserie 1'), ej('2', 'Superserie 1')];
     expect(dissolveGroup(lista, 'Superserie 1')).toEqual([ej('1'), ej('2')]);
+  });
+
+  it('una etiqueta repetida pero no consecutiva no es un grupo real, y se limpia', () => {
+    // "1" y "3" comparten etiqueta A pero "2" está en el medio sin ella:
+    // groupBySuperseries jamás los uniría, así que no cuenta como grupo
+    const lista = [ej('1', 'A'), ej('2'), ej('3', 'A'), ej('4', 'B'), ej('5', 'B')];
+    expect(dissolveGroup(lista, 'B')).toEqual([
+      ej('1'), ej('2'), ej('3'), ej('4'), ej('5'),
+    ]);
   });
 });
 
