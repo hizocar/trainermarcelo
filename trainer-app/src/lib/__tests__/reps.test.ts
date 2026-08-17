@@ -55,4 +55,15 @@ describe('formatRepsRange', () => {
   it('un texto viejo no numérico no se toca', () => {
     expect(formatRepsRange('al fallo', '')).toBe('al fallo');
   });
+
+  it('un texto legado truncado por el campo se corrompería: por eso el editor guarda el original', () => {
+    // lo que pasaba con maxLength={3} en iOS: "al fallo" llegaba al campo
+    // "desde" recortado a "al " y toda edición del ejercicio lo reescribía
+    expect(formatRepsRange('al '.slice(0, 3), '')).toBe('al');
+    // el editor no vuelve a pasar por el formulario si el coach no tocó los
+    // campos, así que el valor que se guarda es el original íntegro
+    const original = 'al fallo';
+    const tocadas = false;
+    expect(!tocadas && original !== null ? original : formatRepsRange('al ', '')).toBe('al fallo');
+  });
 });

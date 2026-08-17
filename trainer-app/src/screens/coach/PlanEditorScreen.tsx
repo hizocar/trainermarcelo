@@ -80,6 +80,23 @@ export default function PlanEditorScreen() {
   const [libEquipment, setLibEquipment] = useState('');
   const [libSaving, setLibSaving] = useState(false);
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // El objetivo de reps tal como vino de la base, y si el coach tocó los campos.
+  // Un texto legado ("al fallo") se muestra entero en "desde"; si no lo edita,
+  // se vuelve a guardar tal cual en vez de reescribirlo desde el formulario.
+  const [repsOriginal, setRepsOriginal] = useState<string | null>(null);
+  const [repsTocadas, setRepsTocadas] = useState(false);
+
+  // Etiqueta de grupo tal como está guardada en la base (id → superseries_group).
+  // Es la referencia de `persistGroups`: al cargar se normaliza solo lo que se
+  // muestra, así que compararse con la lista en pantalla dejaba sin escribir
+  // justo las filas que la normalización limpió.
+  const grupoEnBase = React.useRef<Map<string, string | null>>(new Map());
+  // Guarda de concurrencia: los handlers leen `days` del closure y
+  // `persistGroups` reemplaza la lista completa del día. Dos toques rápidos en
+  // botones distintos calcularían sobre estado viejo —`nextGroupLabel` podría
+  // devolver la misma letra a dos pares distintos—, así que mientras hay una
+  // persistencia corriendo se ignoran los toques.
+  const enVuelo = React.useRef<Promise<void> | null>(null);
 
   useEffect(() => { fetchPlan(); fetchTemplates(); }, []);
 
@@ -130,6 +147,7 @@ export default function PlanEditorScreen() {
         await supabase.from('exercise_series').insert(
           Array.from({ length: 3 }, (_, s) => ({ exercise_id: ex.id, series_number: s + 1 }))
         );
+        grupoEnBase.current.set(ex.id, ex.superseries_group ?? null);
         created.push(ex);
       }
     }
@@ -157,16 +175,22 @@ export default function PlanEditorScreen() {
       .eq('plan_week_id', planWeekId).eq('archived', false).order('week_day');
 
     const daysWithEx: DayWithExercises[] = [];
+    // se guarda la lista CRUDA (antes de normalizar) en `grupoEnBase`: es lo
+    // que hay realmente en la base, y contra eso compara `persistGroups`.
+    const base = new Map<string, string | null>();
     for (const d of (daysData ?? [])) {
       const { data: exData } = await supabase
         .from('exercises').select('*')
         .eq('day_id', d.id).eq('archived', false).order('order_index');
+      for (const e of (exData ?? [])) base.set(e.id, e.superseries_group ?? null);
       // se normaliza solo lo que se muestra: una etiqueta huérfana —de un
       // guardado que quedó a medias, o de planes viejos— dibujaría una píldora
       // de grupo sobre un ejercicio suelto. No se escribe nada al cargar:
       // reescribir los datos del coach a sus espaldas sería peor que el bug.
+      // La limpieza se guarda junto con la primera acción real del coach.
       daysWithEx.push({ ...d, exercises: normalizeGroups(encadenables(exData ?? [])) });
     }
+    grupoEnBase.current = base;
     setDays(daysWithEx);
     setLoading(false);
   }
@@ -199,6 +223,7 @@ export default function PlanEditorScreen() {
   function openAddExercise(dayId: string) {
     setTargetDayId(dayId);
     setExName(''); setExRepsFrom(''); setExRepsTo(''); setExUnit('kg');
+    setRepsOriginal(null); setRepsTocadas(false);
     setExRefWeight(''); setExSeries('3');
     setExNotes(''); setExVideoUrl(''); setExImageUrl(null); setExNewImage(null);
     setExMuscle('');
@@ -220,6 +245,11 @@ export default function PlanEditorScreen() {
     const rango = parseRepsRange(ex.reps_objective);
     setExRepsFrom(rango.from);
     setExRepsTo(rango.to);
+    // se conserva el objetivo original: si el coach no toca los campos de reps
+    // (por ejemplo, entra solo a cambiar las notas) se vuelve a guardar tal
+    // cual. Un texto legado como "al fallo" no se pierde ni se trunca.
+    setRepsOriginal(ex.reps_objective ?? null);
+    setRepsTocadas(false);
     setExUnit(ex.unit);
     setExRefWeight(ex.ref_weight?.toString() ?? '');
     setExNotes(ex.notes ?? '');
@@ -310,6 +340,12 @@ export default function PlanEditorScreen() {
     }
     setSaving(true);
     const seriesCount = parseInt(exSeries) || 3;
+    // si el coach no tocó los campos de reps, se reescribe el objetivo original
+    // sin pasarlo por el formulario: los campos son numéricos y un valor legado
+    // ("al fallo") podría volver truncado desde el TextInput.
+    const repsObjetivo = !repsTocadas && repsOriginal !== null
+      ? repsOriginal
+      : formatRepsRange(exRepsFrom, exRepsTo);
 
     // subir imagen de ejemplo si el coach eligió una nueva
     let imageUrl = exImageUrl;
@@ -358,7 +394,7 @@ export default function PlanEditorScreen() {
     if (editingEx) {
       // el nombre no se actualiza: identifica al ejercicio y su historial
       const { data, error } = await supabase.from('exercises').update({
-        reps_objective: formatRepsRange(exRepsFrom, exRepsTo),
+        reps_objective: repsObjetivo,
         unit: exUnit,
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
         // la agrupación se maneja desde la lista (⛓ UNIR / SACAR): editar otros
@@ -411,7 +447,7 @@ export default function PlanEditorScreen() {
       const { data: exData, error } = await supabase.from('exercises').insert({
         day_id: targetDayId,
         name: exName.trim(),
-        reps_objective: formatRepsRange(exRepsFrom, exRepsTo),
+        reps_objective: repsObjetivo,
         unit: exUnit,
         ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
         // nace suelto: se encadena después desde la lista, con ⛓ UNIR.
@@ -432,6 +468,7 @@ export default function PlanEditorScreen() {
           series_number: i + 1,
         }));
         await supabase.from('exercise_series').insert(seriesRows);
+        grupoEnBase.current.set(exData.id, exData.superseries_group ?? null);
         setDays(prev => prev.map(d =>
           d.id === targetDayId ? { ...d, exercises: [...d.exercises, exData] } : d
         ));
@@ -443,6 +480,7 @@ export default function PlanEditorScreen() {
   }
 
   async function moveExercise(dayId: string, index: number, dir: -1 | 1) {
+    if (enVuelo.current) return; // hay una persistencia de grupos corriendo
     const day = days.find(d => d.id === dayId);
     if (!day) return;
     const j = index + dir;
@@ -455,9 +493,18 @@ export default function PlanEditorScreen() {
       [list[index], list[j]] = [list[j], list[index]];
       return { ...d, exercises: list };
     }));
-    // persistir usando las posiciones del array como orden canónico
-    await supabase.from('exercises').update({ order_index: index }).eq('id', b.id);
-    await supabase.from('exercises').update({ order_index: j }).eq('id', a.id);
+    await conGuarda(async () => {
+      // persistir usando las posiciones del array como orden canónico
+      await supabase.from('exercises').update({ order_index: index }).eq('id', b.id);
+      await supabase.from('exercises').update({ order_index: j }).eq('id', a.id);
+      // mover rompe la adyacencia: un ejercicio suelto que cae en medio de una
+      // biserie deja la misma etiqueta en posiciones no consecutivas (dos cajas
+      // "BISERIE A" para el coach, ninguna para el alumno). Se re-normaliza y se
+      // guarda la limpieza. `order_index` ya quedó escrito arriba y no se toca.
+      const movida = [...day.exercises];
+      [movida[index], movida[j]] = [movida[j], movida[index]];
+      await persistirGrupos(dayId, normalizeGroups(encadenables(movida)));
+    });
   }
 
   // `Exercise.superseries_group` es opcional (`string | null | undefined`) y las
@@ -469,8 +516,19 @@ export default function PlanEditorScreen() {
 
   // Encadenar no reordena: solo cambia `superseries_group` de los ejercicios
   // afectados. Por eso acá nunca se toca `order_index`.
-  async function persistGroups(dayId: string, antes: Encadenable[], despues: Encadenable[]) {
-    const cambiados = despues.filter((e, i) => e.superseries_group !== antes[i].superseries_group);
+  //
+  // Qué filas se escriben se decide contra `grupoEnBase` —lo que hay guardado—
+  // y no contra la lista en pantalla: al cargar se normaliza solo en memoria,
+  // así que compararse con ese snapshot dejaba sin escribir justo las filas que
+  // la normalización limpió. La letra se reciclaba sobre una etiqueta que
+  // seguía viva en la base, y el alumno terminaba con una triserie que el coach
+  // nunca armó. Así la limpieza viaja junto con la primera acción real del
+  // coach: al cargar no se escribe nada, pero en cuanto encadena algo la base
+  // queda igual a lo que él ve.
+  async function persistirGrupos(dayId: string, despues: Encadenable[]) {
+    const cambiados = despues.filter(
+      e => e.superseries_group !== (grupoEnBase.current.get(e.id) ?? null),
+    );
     setDays(prev => prev.map(d => (d.id === dayId ? { ...d, exercises: despues } : d)));
     for (const e of cambiados) {
       const { error } = await supabase
@@ -478,47 +536,80 @@ export default function PlanEditorScreen() {
         .update({ superseries_group: e.superseries_group })
         .eq('id', e.id);
       if (error) {
-        // se revierte la lista completa a `antes`: acá pueden cambiar varias
-        // filas de una vez (una triserie encadena tres), y dejar el estado
-        // optimista tras un fallo le mostraría al coach una agrupación
-        // —píldora, color, borde— que la base no tiene. Lo que se ve en
-        // pantalla tiene que ser lo que quedó guardado.
-        setDays(prev => prev.map(d => (d.id === dayId ? { ...d, exercises: antes } : d)));
+        // no se revierte a ciegas: acá pueden cambiar varias filas de una vez
+        // (una triserie encadena tres) y, si el lote falla a la mitad, parte ya
+        // quedó escrita. Volver al estado previo mostraría una agrupación que
+        // la base no tiene, y dejar el estado optimista, una que sí tiene a
+        // medias. Se recarga desde la base: lo que se ve es lo que hay guardado.
         showAlert('Error', 'No se pudo guardar la agrupación: ' + error.message);
+        await fetchPlan();
         return;
       }
+      grupoEnBase.current.set(e.id, e.superseries_group);
     }
   }
 
+  // Guarda de concurrencia: mientras la operación esté viva, los handlers de
+  // ⛓ UNIR / SACAR / ✕ y las flechas de reordenar ignoran los toques.
+  async function conGuarda(operacion: () => Promise<void>) {
+    const tarea = operacion();
+    enVuelo.current = tarea;
+    try {
+      await tarea;
+    } finally {
+      if (enVuelo.current === tarea) enVuelo.current = null;
+    }
+  }
+
+  async function persistGroups(dayId: string, despues: Encadenable[]) {
+    await conGuarda(() => persistirGrupos(dayId, despues));
+  }
+
   function chainExercise(dayId: string, exerciseId: string) {
+    if (enVuelo.current) return;
     const day = days.find(d => d.id === dayId);
     if (!day) return;
     const lista = encadenables(day.exercises);
-    persistGroups(dayId, lista, chainWith(lista, exerciseId));
+    persistGroups(dayId, chainWith(lista, exerciseId));
   }
 
   function unchainExercise(dayId: string, exerciseId: string) {
+    if (enVuelo.current) return;
     const day = days.find(d => d.id === dayId);
     if (!day) return;
     const lista = encadenables(day.exercises);
-    persistGroups(dayId, lista, unchain(lista, exerciseId));
+    persistGroups(dayId, unchain(lista, exerciseId));
   }
 
   function dissolveExerciseGroup(dayId: string, label: string) {
+    if (enVuelo.current) return;
     const day = days.find(d => d.id === dayId);
     if (!day) return;
     const lista = encadenables(day.exercises);
-    persistGroups(dayId, lista, dissolveGroup(lista, label));
+    persistGroups(dayId, dissolveGroup(lista, label));
   }
 
   function deleteExercise(ex: Exercise) {
     showConfirm('Eliminar ejercicio', `"${ex.name}" se quitará del plan. El historial del cliente se conserva.`, async () => {
       // archivado, no borrado: el historial del cliente queda intacto
-      await supabase.from('exercises').update({ archived: true }).eq('id', ex.id);
+      const { error } = await supabase.from('exercises').update({ archived: true }).eq('id', ex.id);
+      if (error) {
+        showAlert('Error', 'No se pudo eliminar el ejercicio: ' + error.message);
+        return;
+      }
+      grupoEnBase.current.delete(ex.id);
+      const day = days.find(d => d.id === ex.day_id);
       setDays(prev => prev.map(d => ({
         ...d,
         exercises: d.exercises.filter(e => e.id !== ex.id)
       })));
+      // borrar es el productor principal de etiquetas huérfanas: sacar un
+      // ejercicio de una biserie deja al superviviente con la etiqueta puesta
+      // en la base. Se re-normaliza y se guarda la limpieza.
+      if (day) {
+        const restante = encadenables(day.exercises.filter(e => e.id !== ex.id));
+        await persistGroups(day.id, normalizeGroups(restante));
+      }
     }, 'Eliminar');
   }
 
@@ -849,21 +940,24 @@ export default function PlanEditorScreen() {
               <TextInput
                 style={styles.repsInput}
                 value={exRepsFrom}
-                onChangeText={setExRepsFrom}
+                onChangeText={v => { setExRepsFrom(v); setRepsTocadas(true); }}
                 keyboardType="number-pad"
                 placeholder="desde"
                 placeholderTextColor={colors.textMuted}
-                maxLength={3}
+                // 24 y no 3: acá también cae el objetivo legado escrito a mano
+                // ("al fallo"), y en iOS `maxLength` recorta el valor puesto por
+                // JS, no solo lo que se teclea.
+                maxLength={24}
               />
               <Text style={styles.repsDash}>a</Text>
               <TextInput
                 style={styles.repsInput}
                 value={exRepsTo}
-                onChangeText={setExRepsTo}
+                onChangeText={v => { setExRepsTo(v); setRepsTocadas(true); }}
                 keyboardType="number-pad"
                 placeholder="hasta"
                 placeholderTextColor={colors.textMuted}
-                maxLength={3}
+                maxLength={24}
               />
             </View>
 

@@ -169,4 +169,43 @@ describe('normalizeGroups', () => {
     const lista = [ej('1', 'A'), ej('2'), ej('3', 'B'), ej('4', 'B')];
     expect(normalizeGroups(lista).map(e => e.id)).toEqual(['1', '2', '3', '4']);
   });
+
+  // los dos productores de etiquetas huérfanas en el editor del coach
+  it('borrar un miembro de una biserie deja al superviviente sin etiqueta', () => {
+    const biserie = [ej('1', 'A'), ej('2', 'A'), ej('3')];
+    const restante = biserie.filter(e => e.id !== '2');
+    expect(normalizeGroups(restante)).toEqual([ej('1'), ej('3')]);
+  });
+
+  it('mover un suelto al medio de una biserie disuelve el grupo partido', () => {
+    // '3' (suelto) queda entre los dos miembros de A: la etiqueta ya no es
+    // consecutiva y groupBySuperseries no la agruparía
+    const movida = [ej('1', 'A'), ej('3'), ej('2', 'A')];
+    expect(normalizeGroups(movida)).toEqual([ej('1'), ej('3'), ej('2')]);
+  });
+});
+
+describe('la letra se pide sobre lo guardado, no sobre lo normalizado', () => {
+  // el defecto crítico: la lista en pantalla se normaliza al cargar, así que
+  // 'A' desaparece de ella aunque siga escrita en la base. Pedir la próxima
+  // letra sobre la lista normalizada devolvía 'A' otra vez, y la fila huérfana
+  // —que nunca se reescribió— terminaba sumándose al grupo nuevo.
+  const crudas = [ej('1', 'A'), ej('2'), ej('3')]; // 'A' huérfana en la base
+  const enPantalla = normalizeGroups(crudas);
+
+  it('la normalización solo limpia lo que se muestra', () => {
+    expect(enPantalla[0].superseries_group).toBeNull();
+    expect(crudas[0].superseries_group).toBe('A');
+  });
+
+  it('encadenar 2 y 3 sobre la lista en pantalla vuelve a elegir A', () => {
+    const resultado = chainWith(enPantalla, '3');
+    expect(resultado.map(e => e.superseries_group)).toEqual([null, 'A', 'A']);
+    // por eso `persistGroups` compara contra las filas crudas: '1' difiere
+    // ('A' guardada vs null en pantalla) y se limpia en la misma operación
+    const aEscribir = resultado.filter(
+      (e, i) => e.superseries_group !== crudas[i].superseries_group,
+    );
+    expect(aEscribir.map(e => e.id)).toEqual(['1', '2', '3']);
+  });
 });
