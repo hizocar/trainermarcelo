@@ -133,7 +133,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <ScreenHeader
         left={formatShortDate(new Date().toISOString()).toUpperCase()}
-        right={<Text style={styles.weekLabel}>SEMANA {getCurrentWeek()}</Text>}
+        right={<Text style={styles.weekLabel}>SEMANA {currentWeek}</Text>}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -211,6 +211,7 @@ export default function HomeScreen() {
                 <DataRow
                   key={d.id}
                   label={d.name.toUpperCase()}
+                  meta={`DÍA ${d.day_number}`}
                   value={`${d.done}/${d.total}`}
                   state={completo ? 'done' : d.done > 0 ? 'active' : 'idle'}
                   index={i}
@@ -219,7 +220,7 @@ export default function HomeScreen() {
               );
             })}
             <Text style={styles.weekSummary}>
-              {weekDays.filter(d => d.done >= d.total).length} de {weekDays.length} días completados esta semana
+              {diasCompletos} de {weekDays.length} días completados esta semana
             </Text>
           </View>
         )}

@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import SectionLabel from '../../components/common/SectionLabel';
 import StatHero from '../../components/common/StatHero';
 import DataRow from '../../components/common/DataRow';
@@ -277,12 +278,7 @@ export default function ProgressScreen() {
   return (
     <View style={styles.container}>
       {isCoachView && (
-        <View style={styles.navHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
-            <Text style={styles.backText}>ATRÁS</Text>
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader left="ATRÁS" onBack={() => navigation.goBack()} />
       )}
 
       <View style={styles.headerBlock}>
@@ -377,7 +373,7 @@ export default function ProgressScreen() {
                 <TouchableOpacity
                   style={[styles.volDayChip, volDay == null && styles.volDayChipActive]}
                   onPress={() => setVolDay(null)}
-                  hitSlop={{ top: 12, bottom: 12 }}
+                  hitSlop={{ top: 14, bottom: 14 }}
                 >
                   <Text style={[styles.volDayChipText, volDay == null && styles.volDayChipTextActive]}>TODO</Text>
                 </TouchableOpacity>
@@ -386,7 +382,7 @@ export default function ProgressScreen() {
                     key={d.id}
                     style={[styles.volDayChip, volDay === d.id && styles.volDayChipActive]}
                     onPress={() => setVolDay(volDay === d.id ? null : d.id)}
-                    hitSlop={{ top: 12, bottom: 12 }}
+                    hitSlop={{ top: 14, bottom: 14 }}
                   >
                     <Text style={[styles.volDayChipText, volDay === d.id && styles.volDayChipTextActive]}>
                       DÍA {d.day_number} · {d.name.toUpperCase()}
@@ -525,11 +521,6 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
-  navHeader: { paddingHorizontal: spacing.xl, marginBottom: spacing.sm },
-  // minHeight: 44 por el mismo motivo que segmentBtn: el TouchableOpacity
-  // no hereda área táctil del padding de su contenedor.
-  backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, gap: 4 },
-  backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
   headerBlock: { paddingHorizontal: spacing.xl, gap: spacing.sm, marginBottom: spacing.sm },
   segment: {

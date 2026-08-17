@@ -73,7 +73,12 @@ export default function DataRow({
         {value}
         {unit ? <Text style={styles.unit}>{unit}</Text> : null}
       </Text>
-      {isDone ? <Text style={styles.check}>✓</Text> : null}
+      {/* ranura de ancho fijo, siempre presente: si el ✓ solo apareciera al
+          completar, la columna de cifras saltaría horizontalmente al lado
+          del borde derecho (visto igual que WorkoutLogScreen resolvió a mano) */}
+      <View style={styles.checkSlot}>
+        {isDone ? <Text style={styles.check}>✓</Text> : null}
+      </View>
     </View>
   );
 
@@ -100,5 +105,6 @@ const styles = StyleSheet.create({
   valueActive: { fontSize: 21, color: colors.textPrimary },
   valueDone: { fontSize: 16, color: colors.textMuted },
   unit: { fontFamily: fonts.mono, fontSize: 10, color: colors.textMuted },
+  checkSlot: { width: 20, alignItems: 'center' },
   check: { fontSize: 13, color: colors.textMuted },
 });

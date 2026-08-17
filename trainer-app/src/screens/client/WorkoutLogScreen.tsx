@@ -307,7 +307,7 @@ export default function WorkoutLogScreen() {
         left="ATRÁS"
         onBack={() => navigation.goBack()}
         right={
-          <TouchableOpacity onPress={() => setShowHistory(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={() => setShowHistory(true)} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}>
             <Text style={styles.headerAction}>HISTORIAL</Text>
           </TouchableOpacity>
         }

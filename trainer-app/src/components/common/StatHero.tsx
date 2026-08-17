@@ -5,6 +5,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, spacing, fonts } from '../../theme';
 import { DURATION, DELAY } from '../../lib/motion';
+import SectionLabel from './SectionLabel';
 
 interface Props {
   /** la cifra, ya formateada */
@@ -56,7 +57,7 @@ export default function StatHero({
           <Text style={[styles.suffix, { fontFamily: familia, fontSize: size * 0.46 }]}>{suffix}</Text>
         ) : null}
       </Animated.View>
-      <Text style={styles.label}>{label}</Text>
+      <SectionLabel>{label}</SectionLabel>
       {caption ? <Text style={styles.caption}>{caption}</Text> : null}
     </View>
   );
@@ -66,8 +67,7 @@ const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   value: { color: colors.textPrimary },
-  unit: { fontSize: 13, color: colors.textMuted },
+  unit: { fontFamily: fonts.mono, fontSize: 13, color: colors.textMuted },
   suffix: { color: colors.textMuted },
-  label: { fontSize: 8, fontWeight: '800', letterSpacing: 2, color: colors.textMuted, marginTop: spacing.xs },
   caption: { fontSize: 8, letterSpacing: 2, color: colors.textMuted, marginTop: 2, opacity: 0.7 },
 });
