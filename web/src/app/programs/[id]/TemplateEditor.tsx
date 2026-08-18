@@ -79,7 +79,7 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       ref_weight: e.ref_weight != null ? String(e.ref_weight) : '',
       rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
       target_rir: e.target_rir ?? '',
-      superseries_group: (e as any).superseries_group ?? '',
+      superseries_group: e.superseries_group ?? '',
       series: (e.exercise_series ?? []).map((s) => ({ id: s.id, series_number: s.series_number })),
     })),
   }));
