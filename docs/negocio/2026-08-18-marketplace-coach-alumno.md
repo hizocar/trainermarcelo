@@ -17,6 +17,10 @@ Dos entradas nuevas:
 
 **El alumno nunca paga suscripción.** Se le ayuda a encontrar coach y se le ofrece la app; quien paga sigue siendo el entrenador.
 
+**El alumno que se registra sin coach ve solo el marketplace.** Buscar entrenador es su app hasta que consiga uno; el resto —plan, registro de series, progreso— aparece cuando un coach lo toma. El mes gratis del coach se activa al contactar a ese primer alumno, y es **una sola vez por coach**, no uno por cada alumno.
+
+**Para qué sirve realmente:** darle visibilidad a la app. No es una línea de ingresos —el alumno no paga y el coach recibe un descuento— sino un **canal de captación**: cada alumno que busca coach es alguien que conoce el producto, y cada coach que consigue un cliente por acá tiene una razón para quedarse.
+
 ## Por qué encaja
 
 **El incentivo se paga en producto, no en efectivo.** No hay costo hasta que hay resultado, y el resultado —un alumno nuevo— aumenta el uso de la app y la dependencia del coach hacia ella. Un coach con más alumnos dentro tiene más razones para quedarse.
@@ -36,6 +40,8 @@ Dos entradas nuevas:
 **4. Confianza entre desconocidos.** Hoy la relación coach-alumno nace fuera de la app: ya se conocen. Poner en contacto a extraños trae preguntas que el producto nunca ha tenido que responder: quién valida que un coach es quien dice ser, qué pasa si la cosa sale mal, si hay reseñas, si se cobra dentro o fuera de la plataforma.
 
 **5. Qué se le muestra al alumno.** Un buscador necesita algo por lo que filtrar: ubicación, presencial o remoto, especialidad, precio, disponibilidad. Nada de eso existe hoy en la ficha del coach.
+
+**6. Resuelto:** *qué ve un alumno sin coach al abrir la app.* Era el problema más grande de la etapa 2 —toda la app asume que un alumno tiene entrenador— y la decisión de que **vea solo el marketplace** lo convierte en una pantalla con propósito en vez de un estado roto. No hay que rediseñar la app para un usuario huérfano: hay que darle una sola cosa que hacer.
 
 ## El camino, por etapas
 
@@ -64,12 +70,12 @@ Marcelo y los coaches beta publican en sus redes que se puede pedir coach a trav
 - Registro de alumno **sin invitación**, que hoy no existe: es el cambio más grande, porque toda la app asume que un alumno tiene coach.
 - Un listado de coaches con los filtros que la etapa 1 haya demostrado que importan.
 - Solicitud de contacto, con el coach pudiendo aceptar o rechazar.
-- **Qué ve un alumno sin coach al entrar a la app**, que hoy es una pantalla que no existe.
+- El alumno sin coach entra directo al marketplace: es lo único que ve hasta que un entrenador lo tome. Las pestañas de plan, progreso y perfil aparecen recién entonces.
 
 ### Etapa 3 — El incentivo automático
 
 - Marcar de dónde vino cada alumno.
-- Aplicar el mes gratis al primer alumno conseguido, una sola vez por coach.
+- Aplicar el mes gratis al primer alumno conseguido, **una sola vez por coach** (decidido el 2026-08-18).
 - Reflejarlo en la suscripción.
 
 Antes de esta etapa el incentivo se aplica **a mano**, que con la regla de "un solo mes" es perfectamente viable.
