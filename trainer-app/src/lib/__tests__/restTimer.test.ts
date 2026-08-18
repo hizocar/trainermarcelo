@@ -16,7 +16,10 @@ describe('secondsLeft', () => {
     expect(secondsLeft(now - 5_500, now)).toBe(0);
   });
 
-  it('un endsAt del pasado lejano (volver de segundo plano mucho después) da 0', () => {
+  // Ojo: esto prueba solo el clamp para un endsAt muy viejo, la misma rama que
+  // los dos casos de arriba. El regreso desde segundo plano en sí (AppState, el
+  // intervalo y el ciclo de programar/cancelar el aviso) NO tiene cobertura.
+  it('un endsAt del pasado lejano (6 h) da 0, no un negativo enorme', () => {
     expect(secondsLeft(now - 6 * 60 * 60 * 1000, now)).toBe(0);
   });
 

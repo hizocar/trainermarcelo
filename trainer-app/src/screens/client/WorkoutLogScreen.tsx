@@ -63,29 +63,55 @@ export default function WorkoutLogScreen() {
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [restLeft, setRestLeft] = useState(0);
   const restAlertIdRef = React.useRef<string | null>(null);
+  // token de secuencia: solo el último toque puede escribir `restAlertIdRef`
+  const restTokenRef = React.useRef(0);
   const avisoPrevioRef = React.useRef(false);
   const opcionesDescanso = React.useMemo(
     () => restOptions(exercise.rest_seconds),
     [exercise.rest_seconds],
   );
 
-  function startRestTimer(seconds: number) {
+  async function startRestTimer(seconds: number) {
+    const token = ++restTokenRef.current;
     const endsAt = Date.now() + seconds * 1000;
     avisoPrevioRef.current = false;
     setRestEndsAt(endsAt);
     setRestLeft(seconds);
-    // aviso local: es lo único que llega con la pantalla bloqueada
-    cancelRestAlert(restAlertIdRef.current);
-    restAlertIdRef.current = null;
-    scheduleRestAlert(endsAt).then(id => { restAlertIdRef.current = id; });
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // El aviso local es lo único que llega con la pantalla bloqueada.
+    //
+    // Hay que ESPERAR la cancelación antes de programar: sin el await las dos
+    // promesas corren en paralelo y, cuando `restAlertIdRef` es null,
+    // `cancelRestAlert` entra en la rama de barrido por `kind === 'rest'` y
+    // puede borrar el aviso que se acaba de programar. El ref es null justo en
+    // los dos casos que importan —volver a la pantalla tras salir (la biserie)
+    // y tocar dos duraciones seguidas para corregirse— y la falla es
+    // silenciosa: o no llega el aviso, o queda uno huérfano sonando a mitad de
+    // la serie siguiente. El token de secuencia asegura que solo el último
+    // toque escriba el ref.
+    const anterior = restAlertIdRef.current;
+    restAlertIdRef.current = null;
+    await cancelRestAlert(anterior);
+    if (restTokenRef.current !== token) return;
+    const id = await scheduleRestAlert(endsAt);
+    if (restTokenRef.current !== token) {
+      // otro toque (o una cancelación) mandó mientras programábamos: este aviso
+      // ya no corresponde y se cancela por identificador, sin barrer
+      await cancelRestAlert(id);
+      return;
+    }
+    restAlertIdRef.current = id;
   }
 
   function limpiarDescanso() {
+    // invalida cualquier programación en vuelo: su `then` se cancelará a sí mismo
+    restTokenRef.current++;
     setRestEndsAt(null);
     setRestLeft(0);
-    cancelRestAlert(restAlertIdRef.current);
+    const id = restAlertIdRef.current;
     restAlertIdRef.current = null;
+    cancelRestAlert(id);
   }
 
   function stopRestTimer() {
@@ -515,7 +541,7 @@ export default function WorkoutLogScreen() {
                 <TouchableOpacity
                   key={o.seconds}
                   style={[styles.timerChip, o.sugerida && styles.timerChipSuggested]}
-                  onPress={() => startRestTimer(o.seconds)}
+                  onPress={() => { void startRestTimer(o.seconds); }}
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.timerChipText, o.sugerida && styles.timerChipTextSuggested]}>

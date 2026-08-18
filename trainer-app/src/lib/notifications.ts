@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -42,12 +42,26 @@ if (Platform.OS === 'android') {
 }
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async notification => {
+    // El aviso de fin de descanso está agendado para el instante exacto del
+    // término, así que iOS lo entrega antes de que el tick (cada 500ms) alcance
+    // a cancelarlo: la cancelación SIEMPRE llega tarde con la app abierta. Si
+    // lo dejáramos mostrarse, cada descanso terminado dejaría un banner y una
+    // entrada en el Centro de Notificaciones encima de la serie que el alumno
+    // ya está haciendo. Con la app en primer plano el háptico ya avisa, así que
+    // lo silenciamos; con la app en segundo plano se muestra normal, que es
+    // justo para lo que existe.
+    const esDescanso =
+      (notification.request.content.data as any)?.kind === REST_KIND;
+    const enPrimerPlano = AppState.currentState === 'active';
+    const mostrar = !(esDescanso && enPrimerPlano);
+    return {
+      shouldShowBanner: mostrar,
+      shouldShowList: mostrar,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 export async function notificationsEnabled(): Promise<boolean> {
@@ -184,8 +198,20 @@ async function cancelarSoloRecordatorios(): Promise<void> {
  */
 export async function scheduleRestAlert(endsAt: number): Promise<string | null> {
   if (Platform.OS === 'web') return null;
-  if (!(await requestPermission())) return null;
   if (endsAt - Date.now() < 1000) return null;
+  // Solo CONSULTA el permiso, nunca lo pide: iOS deja pedirlo una sola vez, y
+  // pedirlo acá haría aparecer el diálogo del sistema encima del teclado a
+  // mitad de una serie, sin explicar nada. Un "No permitir" por reflejo mata
+  // para siempre los recordatorios de entrenamiento y obliga a ir a Ajustes.
+  // El pedido explícito se queda donde el alumno entiende qué acepta
+  // (`scheduleReminders`, desde el perfil). Sin permiso, no hay aviso: el
+  // temporizador en pantalla y el háptico funcionan igual.
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return null;
+  } catch {
+    return null;
+  }
   try {
     return await Notifications.scheduleNotificationAsync({
       content: {
