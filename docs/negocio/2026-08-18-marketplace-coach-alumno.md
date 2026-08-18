@@ -21,6 +21,8 @@ Dos entradas nuevas:
 
 **Para qué sirve realmente:** darle visibilidad a la app. No es una línea de ingresos —el alumno no paga y el coach recibe un descuento— sino un **canal de captación**: cada alumno que busca coach es alguien que conoce el producto, y cada coach que consigue un cliente por acá tiene una razón para quedarse.
 
+**El alumno como palanca de adopción.** No basta con que el alumno encuentre coach: hay que engancharlo para que **quiera que su coach use la app**. Hoy la adopción depende solo del entrenador; acá aparece un segundo empuje, desde el lado del cliente, que es quien más gana con que su plan esté ordenado y su progreso registrado. Un alumno que ya vio la app pidiéndole a su coach que la use vale más que cualquier argumento de venta.
+
 ## Por qué encaja
 
 **El incentivo se paga en producto, no en efectivo.** No hay costo hasta que hay resultado, y el resultado —un alumno nuevo— aumenta el uso de la app y la dependencia del coach hacia ella. Un coach con más alumnos dentro tiene más razones para quedarse.
@@ -42,6 +44,21 @@ Dos entradas nuevas:
 **5. Qué se le muestra al alumno.** Un buscador necesita algo por lo que filtrar: ubicación, presencial o remoto, especialidad, precio, disponibilidad. Nada de eso existe hoy en la ficha del coach.
 
 **6. Resuelto:** *qué ve un alumno sin coach al abrir la app.* Era el problema más grande de la etapa 2 —toda la app asume que un alumno tiene entrenador— y la decisión de que **vea solo el marketplace** lo convierte en una pantalla con propósito en vez de un estado roto. No hay que rediseñar la app para un usuario huérfano: hay que darle una sola cosa que hacer.
+
+## Cómo incentivar al coach, más allá del mes gratis
+
+El mes gratis es el enganche inicial, pero no la única palanca. Otra, sin costo: **el coach con suscripción activa se muestra primero** en el listado. Ordenar por quién paga es una forma de que la suscripción valga por sí sola, no solo por las funciones.
+
+**El reparo, para que quede escrito:** si el orden termina dependiendo *únicamente* de quién paga, el alumno deja de encontrar al coach que le sirve y encuentra al que compró el lugar. Cuando eso pasa, los alumnos dejan de venir y el canal se muere — y con él, el incentivo. La prioridad por suscripción debería ser **un factor entre varios** (cercanía, especialidad, si acepta alumnos nuevos), no el único criterio.
+
+## Cómo medir si funciona
+
+Hay dos preguntas distintas y conviene no confundirlas, porque llevan a decisiones opuestas:
+
+1. **¿El canal trae gente?** Se mide en solicitudes de alumnos y coaches nuevos registrados desde el marketplace.
+2. **¿El producto convence?** Se mide en cuántos coaches siguen pagando después del mes gratis.
+
+Un coach que no renueva **no significa que el canal falle**: significa que la app no lo convenció. Meter ambas cosas en una sola cifra —"cuántos siguieron pagando"— lleva a cerrar un canal que estaba funcionando por un problema que vive en el producto.
 
 ## El camino, por etapas
 
