@@ -16,7 +16,8 @@ import SyncBanner from '../../components/common/SyncBanner';
 import ProgressRing from '../../components/common/ProgressRing';
 import ExerciseRow from '../../components/client/ExerciseRow';
 import { seriesDoneByExercise } from '../../lib/progress';
-import { WEEK_DAYS, WEEK_DAYS_SHORT, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
+import { pickSelectedDayId } from '../../lib/selectedDay';
+import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
 import { CARDIO_TYPES, CardioLog, fetchCardioLogs, addCardioLog, deleteCardioLog } from '../../lib/cardio';
@@ -31,13 +32,10 @@ const PHASE_INFO: Record<string, { label: string; color: string }> = {
 };
 
 // `week_day` es un int sin restricción en la base: un valor fuera de 0-6
-// (o null) daría `undefined` en WEEK_DAYS[_SHORT] y `.toUpperCase()` lanzaría.
-// Estas dos ayudan a caer siempre en el fallback "DÍA N" / "Día N".
+// (o null) daría `undefined` en WEEK_DAYS y el texto largo del día quedaría vacío.
+// Ayuda a caer siempre en el fallback "Día N".
 const isValidWeekDay = (weekDay: number | null | undefined): weekDay is number =>
   weekDay != null && weekDay >= 0 && weekDay <= 6;
-
-const weekDayShortLabel = (day: TrainingDay): string =>
-  isValidWeekDay(day.week_day) ? WEEK_DAYS_SHORT[day.week_day].toUpperCase() : `DÍA ${day.day_number}`;
 
 const weekDayLongLabel = (day: TrainingDay): string =>
   isValidWeekDay(day.week_day) ? WEEK_DAYS[day.week_day] : `Día ${day.day_number}`;
@@ -177,14 +175,14 @@ export default function TodayScreen() {
       }));
     }
 
-    // selección: conservar la elección manual; si no hay, el primer día incompleto
-    const isDayComplete = (d: PlanDay) =>
-      (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total;
-
-    const prevId = selectedIdRef.current;
-    const kept = prevId ? list.find(d => d.id === prevId) : undefined;
-    const firstIncomplete = list.find(d => !isDayComplete(d));
-    const selected = kept ?? firstIncomplete ?? list.find(d => d.week_day === todayWeekDay) ?? list[0] ?? null;
+    // selección: conservar la elección manual solo mientras ese día no esté
+    // completo; si ya se completó, saltar al siguiente incompleto (ver
+    // pickSelectedDayId en lib/selectedDay.ts).
+    const completedIds = new Set(
+      list.filter(d => (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total).map(d => d.id),
+    );
+    const selectedId = pickSelectedDayId(list, completedIds, selectedIdRef.current, todayWeekDay);
+    const selected = list.find(d => d.id === selectedId) ?? null;
     selectedIdRef.current = selected?.id ?? null;
     setSelectedDay(selected);
     setExercises(selected?.exercises ?? []);
@@ -342,7 +340,7 @@ export default function TodayScreen() {
                     style={[styles.dayPillText, active && styles.dayPillTextActive]}
                     maxFontSizeMultiplier={1.1}
                   >
-                    {weekDayShortLabel(day)}
+                    {`DÍA ${day.day_number}`}
                   </Text>
                 </TouchableOpacity>
               );
