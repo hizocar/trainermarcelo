@@ -37,6 +37,8 @@ export default function HomeScreen() {
   const [savingMood, setSavingMood] = useState(false);
   // el alumno puede arrepentirse: vuelve al selector aunque ya haya respondido
   const [editingMood, setEditingMood] = useState(false);
+  // la consulta de ánimo falló: no sabemos si respondió, así que no preguntamos
+  const [moodFailed, setMoodFailed] = useState(false);
   const [groupSets, setGroupSets] = useState<Record<string, number>>({});
   const [weekDays, setWeekDays] = useState<{ id: string; day_number: number; name: string; total: number; done: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,22 +48,33 @@ export default function HomeScreen() {
   // los registros viejos siguen en escala 1-10 (hay 3, 7 y 9 guardados):
   // se muestran con la cara más cercana, sin tocar el dato
   const todayFace = faceForMoodText(moods.find(m => m.logged_date === today)?.mood);
-  const showMoodPicker = todayFace == null || editingMood;
+  const showMoodPicker = !moodFailed && (todayFace == null || editingMood);
 
   useFocusEffect(useCallback(() => { if (user?.id) fetchAll(); }, [user?.id]));
 
   async function fetchAll() {
-    // ánimo: últimos 14 días. No son 30 por el ancho del gráfico: con 30 puntos
+    // ánimo: últimos 13 días. No son 30 por el ancho del gráfico: con 30 puntos
     // en ~294pt de ancho los círculos quedan a 10pt entre centros y miden 8pt,
-    // así que la línea se convierte en una oruga. Con 14 quedan a ~22pt y se
-    // leen uno por uno.
-    const { data: moodData } = await supabase
+    // así que la línea se convierte en una oruga. Y son 13 y no 14 porque
+    // TrendChart etiqueta cada ceil(n/6) puntos y ADEMÁS siempre el último: con
+    // 14 eso da 0,3,6,9,12 y 13, y las dos últimas etiquetas se encinan. Con 13
+    // el último punto cae justo en la grilla (0,3,6,9,12).
+    const { data: moodData, error: moodError } = await supabase
       .from('mood_logs')
       .select('*')
       .eq('user_id', user!.id)
       .order('logged_date', { ascending: false })
-      .limit(14);
-    setMoods(moodData ?? []);
+      .limit(13);
+    // Tragarse este error no es cosmético: sin datos la pantalla concluye que
+    // el alumno NUNCA respondió, le ofrece el selector, y el upsert le pisa el
+    // registro real del día. Ante la duda, no se muestra el selector.
+    if (moodError) {
+      console.error('inicio: error cargando el ánimo', moodError);
+      setMoodFailed(true);
+    } else {
+      setMoodFailed(false);
+      setMoods(moodData ?? []);
+    }
 
     // plan completo en una sola consulta anidada
     const plan = await fetchFullPlan(user!.id);
@@ -164,9 +177,32 @@ export default function HomeScreen() {
         {/* Encuesta diaria de energía: se pregunta con caras, no con números.
             Una vez respondida, el selector deja lugar al historial. */}
         <View style={styles.moodBlock}>
-          {showMoodPicker ? (
+          {moodFailed ? (
             <>
               <SectionLabel style={styles.section}>¿CÓMO TE SIENTES HOY?</SectionLabel>
+              <Text style={styles.moodFailedText}>
+                No pudimos leer tu registro de hoy. Vuelve a entrar a esta pantalla en un
+                rato: preferimos no preguntarte de nuevo antes que pisar lo que ya respondiste.
+              </Text>
+            </>
+          ) : showMoodPicker ? (
+            <>
+              <View style={styles.moodChartHeader}>
+                <SectionLabel>¿CÓMO TE SIENTES HOY?</SectionLabel>
+                {/* del modo "cambiar" se tiene que poder salir sin responder:
+                    si lo tocó sin querer, no le quitamos el gráfico */}
+                {editingMood && todayFace != null && (
+                  <TouchableOpacity
+                    style={styles.moodChangeBtn}
+                    onPress={() => setEditingMood(false)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancelar y volver al gráfico"
+                  >
+                    <Text style={styles.moodChangeText}>CANCELAR</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.faceRow}>
                 {MOOD_FACE_LEVELS.map(level => {
                   const active = todayFace === level;
@@ -205,9 +241,11 @@ export default function HomeScreen() {
                 <MoodFace level={todayFace!} size={28} />
                 <Text style={styles.moodTodayText}>HOY: {moodFaceLabel(todayFace!).toUpperCase()}</Text>
               </View>
-              {/* fromZero: en una escala de 1 a 10, un eje que no arranque en 0
-                  convierte una diferencia de un punto en un acantilado */}
-              <TrendChart data={moodPoints} height={150} unit="/10" fromZero />
+              {/* fromZero + maxValue: en una escala de 1 a 10 el eje tiene que ir
+                  de 0 a 10 fijo. Sin piso, una diferencia de un punto parece un
+                  acantilado; sin techo, con un solo registro el punto se dibuja
+                  arriba del todo aunque sea un "muy cansado". */}
+              <TrendChart data={moodPoints} height={150} unit="/10" fromZero maxValue={10} />
             </>
           )}
         </View>
@@ -316,6 +354,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm, marginRight: -spacing.sm,
   },
   moodChangeText: { ...typography.label, fontSize: 10, color: colors.textSecondary },
+  moodFailedText: { ...typography.caption, lineHeight: 17 },
   moodTodayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   moodTodayText: { ...typography.label, fontSize: 10, color: colors.textSecondary },
 

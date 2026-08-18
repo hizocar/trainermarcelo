@@ -13,11 +13,12 @@ interface Props {
   height?: number;
   unit?: string;
   fromZero?: boolean;   // fija el eje Y en 0 (evita que valores altos parezcan "cero")
+  maxValue?: number;    // fija el techo del eje Y (ver abajo)
 }
 
 // Gráfico de línea liviano en SVG puro: funciona igual en web y nativo
 // (react-native-gifted-charts se rompe en web por reanimated).
-export default function TrendChart({ data, height = 180, unit = '', fromZero = false }: Props) {
+export default function TrendChart({ data, height = 180, unit = '', fromZero = false, maxValue }: Props) {
   const [width, setWidth] = useState(0);
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
@@ -30,7 +31,12 @@ export default function TrendChart({ data, height = 180, unit = '', fromZero = f
   const chartW = Math.max(width - padX * 2, 1);
 
   const values = data.map(d => d.value);
-  const max = Math.max(...values);
+  // Sin `maxValue` el techo es el máximo de los datos, y con UN SOLO punto ese
+  // máximo ES el punto: se dibuja pegado al borde de arriba valga 2 o valga 10.
+  // Para escalas acotadas (el ánimo va de 1 a 10) hay que pasar el techo real.
+  // Es opcional para no cambiar los gráficos que ya existen; si algún valor
+  // supera el techo declarado se usa el valor, así el dato nunca se corta.
+  const max = maxValue != null ? Math.max(maxValue, ...values) : Math.max(...values);
   // con fromZero el eje arranca en 0; si no, un pelín bajo el mínimo para dar aire
   const min = fromZero ? 0 : Math.min(...values);
   const range = max - min || 1;

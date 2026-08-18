@@ -80,7 +80,6 @@ export function shortDayLabel(loggedDate: string): string {
 export function moodChartPoints(moods: MoodRecord[]): MoodPoint[] {
   return moods
     .filter(m => Number.isFinite(parseInt(m.mood, 10)))
-    .slice()
     .sort((a, b) => a.logged_date.localeCompare(b.logged_date))
     .map(m => ({
       label: shortDayLabel(m.logged_date),

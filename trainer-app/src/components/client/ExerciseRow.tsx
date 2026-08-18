@@ -25,11 +25,11 @@ interface Props {
  * cajas y menos bordes es lo que hace que una pantalla densa se lea cara en
  * vez de recargada.
  *
- * Tres estados con peso visual muy distinto — que todo pesara lo mismo era
- * exactamente el problema del diseño anterior:
- *   done    → atenuado, con las series registradas en el anillo
- *   next    → blanco puro, más grande, etiquetado SIGUIENTE
- *   pending → gris medio
+ * Dos estados, no tres: ya no existe el "SIGUIENTE" en blanco puro. Todos los
+ * nombres pesan igual y cuál toca lo dice el anillo de series de la derecha —
+ * resaltar una fila competía con esa señal:
+ *   hecho     → atenuado al 45%, con las series registradas en el anillo
+ *   pendiente → a brillo pleno
  */
 export default function ExerciseRow({ exercise, done, index, seriesDone, onPress }: Props) {
   const reduced = useReducedMotion();

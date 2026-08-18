@@ -335,7 +335,13 @@ export default function TodayScreen() {
                   ) : isCurrentDay ? (
                     <View style={styles.todayDot} />
                   ) : null}
-                  <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                  {/* El ajuste de tamaño de letra del sistema escala también el
+                      lineHeight: en "Grande" el contenido pasa de 30 a ~34pt y
+                      volvía a cortarse la píldora. Se acota el multiplicador. */}
+                  <Text
+                    style={[styles.dayPillText, active && styles.dayPillTextActive]}
+                    maxFontSizeMultiplier={1.1}
+                  >
                     {weekDayShortLabel(day)}
                   </Text>
                 </TouchableOpacity>
@@ -591,10 +597,12 @@ const styles = StyleSheet.create({
   // Las píldoras necesitan aire propio: quedan entre el nombre del día en
   // Anton 24px y lo que venga abajo — que puede ser una tarjeta sólida, como
   // el aviso de semana completa. Con el padding mínimo se veían aplastadas.
-  // Altura explícita y flexShrink: 0 a propósito. Sin ellos este ScrollView
+  // Alto mínimo y flexShrink: 0 a propósito. Sin ellos este ScrollView
   // horizontal se comprime contra la lista de abajo y las píldoras salen
   // cortadas por la mitad: no es el texto el que se recorta, es el contenedor.
-  dayTabsScroll: { height: 44, flexGrow: 0, flexShrink: 0, marginBottom: spacing.xs },
+  // minHeight y no height: con la letra del sistema en grande el contenido
+  // supera los 44pt, y un alto fijo lo recortaría en vez de dejarlo crecer.
+  dayTabsScroll: { minHeight: 44, flexGrow: 0, flexShrink: 0, marginBottom: spacing.xs },
   dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center', paddingVertical: 6 },
   dayPill: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
