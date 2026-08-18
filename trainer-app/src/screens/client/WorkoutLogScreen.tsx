@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Image, Modal,
+  TextInput, ActivityIndicator, Image, Modal, AppState,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Platform } from 'react-native';
@@ -14,7 +14,6 @@ import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import SectionLabel from '../../components/common/SectionLabel';
-import StatHero from '../../components/common/StatHero';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
 import TrendChart from '../../components/common/TrendChart';
@@ -22,6 +21,8 @@ import { showAlert } from '../../lib/alert';
 import { formatShortDate, dateForWeekDay, WEEK_DAYS_SHORT } from '../../lib/weeks';
 import { saveLog } from '../../lib/offline';
 import { suggestProgression } from '../../lib/progress';
+import { restOptions, secondsLeft, formatRest } from '../../lib/restTimer';
+import { scheduleRestAlert, cancelRestAlert } from '../../lib/notifications';
 
 type RouteParams = { exercise: Exercise; week: number; date?: string };
 
@@ -54,32 +55,72 @@ export default function WorkoutLogScreen() {
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
   const [noteSaving, setNoteSaving] = useState(false);
-  const [timerLeft, setTimerLeft] = useState<number | null>(null);
-  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
-  const restSeconds = exercise.rest_seconds ?? 90;
+  // Temporizador de descanso: se guarda el INSTANTE EN QUE TERMINA, no los
+  // segundos restantes. iOS suspende los setInterval de JS al bloquear la
+  // pantalla —justo lo que uno hace mientras descansa— y el conteo quedaba
+  // congelado: el temporizador mentía. Ahora todo se deriva de `restEndsAt`
+  // contra la hora actual, y un aviso local cubre el caso de app cerrada.
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [restLeft, setRestLeft] = useState(0);
+  const restAlertIdRef = React.useRef<string | null>(null);
+  const avisoPrevioRef = React.useRef(false);
+  const opcionesDescanso = React.useMemo(
+    () => restOptions(exercise.rest_seconds),
+    [exercise.rest_seconds],
+  );
 
-  function startRestTimer() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setTimerLeft(restSeconds);
-    timerRef.current = setInterval(() => {
-      setTimerLeft(prev => {
-        if (prev == null || prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          return null;
-        }
-        if (prev === 4 && Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        return prev - 1;
-      });
-    }, 1000);
+  function startRestTimer(seconds: number) {
+    const endsAt = Date.now() + seconds * 1000;
+    avisoPrevioRef.current = false;
+    setRestEndsAt(endsAt);
+    setRestLeft(seconds);
+    // aviso local: es lo único que llega con la pantalla bloqueada
+    cancelRestAlert(restAlertIdRef.current);
+    restAlertIdRef.current = null;
+    scheduleRestAlert(endsAt).then(id => { restAlertIdRef.current = id; });
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  function limpiarDescanso() {
+    setRestEndsAt(null);
+    setRestLeft(0);
+    cancelRestAlert(restAlertIdRef.current);
+    restAlertIdRef.current = null;
   }
 
   function stopRestTimer() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setTimerLeft(null);
+    limpiarDescanso();
   }
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+  useEffect(() => {
+    if (restEndsAt == null) return;
+
+    let terminado = false;
+    const tick = () => {
+      if (terminado) return;
+      const left = secondsLeft(restEndsAt, Date.now());
+      setRestLeft(left);
+      if (left <= 0) {
+        terminado = true;
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // terminó con la app abierta: el aviso ya no debe llegar
+        limpiarDescanso();
+      } else if (left <= 3 && !avisoPrevioRef.current) {
+        avisoPrevioRef.current = true;
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, 500);
+    // recalcular al volver de segundo plano: el intervalo estuvo suspendido y
+    // el conteo se quedó donde estaba al bloquear la pantalla
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') tick();
+    });
+    return () => { clearInterval(id); sub.remove(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restEndsAt]);
 
   useEffect(() => {
     fetchSeriesAndLogs();
@@ -313,19 +354,17 @@ export default function WorkoutLogScreen() {
         }
       />
 
+      {/* Cabecera fija: queda fuera del ScrollView para que el nombre del
+          ejercicio siga visible mientras el alumno registra series. Se sacó la
+          cifra grande del peso de referencia; la fecha y el objetivo bajan a
+          una línea discreta para que el bloque fijo sea lo más bajo posible —
+          con el teclado numérico abierto el alto útil es poco. */}
       <View style={styles.hero}>
-        <Text style={styles.exerciseName}>{exercise.name.toUpperCase()}</Text>
-        {exercise.name_en ? <Text style={styles.nameEn}>{exercise.name_en}</Text> : null}
-        <View style={styles.heroStat}>
-          <StatHero
-            value={exercise.ref_weight != null ? `${exercise.ref_weight}` : '—'}
-            unit={exercise.ref_weight != null ? exercise.unit : undefined}
-            label="REFERENCIA DEL COACH"
-            caption={`${formatShortDate(logDate).toUpperCase()} · OBJETIVO ${exercise.reps_objective}`}
-            font="mono"
-            size={38}
-          />
-        </View>
+        <Text style={styles.exerciseName} numberOfLines={2}>{exercise.name.toUpperCase()}</Text>
+        {exercise.name_en ? <Text style={styles.nameEn} numberOfLines={1}>{exercise.name_en}</Text> : null}
+        <Text style={styles.heroMeta}>
+          {`${formatShortDate(logDate).toUpperCase()} · OBJETIVO ${exercise.reps_objective}`}
+        </Text>
       </View>
 
       {/* automaticallyAdjustKeyboardInsets: con el teclado numérico abierto la
@@ -460,20 +499,33 @@ export default function WorkoutLogScreen() {
           );
         })}
 
-        {timerLeft != null ? (
+        {restEndsAt != null ? (
           <TouchableOpacity style={styles.timerActive} onPress={stopRestTimer} activeOpacity={0.8}>
-            <Text style={styles.timerCount}>
-              {Math.floor(timerLeft / 60)}:{String(timerLeft % 60).padStart(2, '0')}
-            </Text>
+            <Text style={styles.timerCount}>{formatRest(restLeft)}</Text>
             <Text style={styles.timerHint}>DESCANSANDO · TOCA PARA CANCELAR</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.timerBtn} onPress={startRestTimer} activeOpacity={0.8}>
-            <Ionicons name="timer-outline" size={18} color={colors.accent} />
-            <Text style={styles.timerBtnText}>
-              INICIAR DESCANSO ({Math.floor(restSeconds / 60)}:{String(restSeconds % 60).padStart(2, '0')})
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.timerBlock}>
+            <View style={styles.timerHead}>
+              <Ionicons name="timer-outline" size={16} color={colors.accent} />
+              <Text style={styles.timerBtnText}>DESCANSO</Text>
+            </View>
+            <View style={styles.timerOptions}>
+              {opcionesDescanso.map(o => (
+                <TouchableOpacity
+                  key={o.seconds}
+                  style={[styles.timerChip, o.sugerida && styles.timerChipSuggested]}
+                  onPress={() => startRestTimer(o.seconds)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.timerChipText, o.sugerida && styles.timerChipTextSuggested]}>
+                    {formatRest(o.seconds)}
+                  </Text>
+                  {o.sugerida ? <Text style={styles.timerChipTag}>SUGERIDO</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         )}
 
         <Card style={styles.noteCard}>
@@ -587,8 +639,8 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
   headerAction: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
-  hero: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.md },
-  heroStat: { marginTop: spacing.sm },
+  hero: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: 2, paddingBottom: spacing.sm },
+  heroMeta: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted, marginTop: 4 },
   whenCard: { gap: spacing.sm, marginBottom: spacing.sm },
   whenLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
   whenRow: { flexDirection: 'row', gap: spacing.xs + 2 },
@@ -604,7 +656,7 @@ const styles = StyleSheet.create({
   whenChipNum: { ...typography.mono, fontSize: 13, color: colors.textPrimary },
   whenChipNumActive: { color: colors.background },
   exerciseName: {
-    fontFamily: fonts.display, fontSize: 26, color: colors.textPrimary,
+    fontFamily: fonts.display, fontSize: 22, color: colors.textPrimary,
     letterSpacing: 0.5, textAlign: 'center',
   },
   histEmpty: { ...typography.caption, fontStyle: 'italic', textAlign: 'center', lineHeight: 18 },
@@ -665,11 +717,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   suggestionText: { color: colors.background, fontSize: 12, fontWeight: '800', flex: 1 },
-  timerBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+  timerBlock: { gap: spacing.xs, marginTop: spacing.xs },
+  timerHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  timerOptions: { flexDirection: 'row', gap: spacing.xs + 2 },
+  timerChip: {
+    // 44pt reales de alto: en RN el padding del padre no agranda el área
+    // táctil del hijo, así que el mínimo va acá.
+    flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 1,
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent + '55',
-    paddingVertical: spacing.md, marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
+  timerChipSuggested: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  timerChipText: { ...typography.mono, fontSize: 15, color: colors.accent },
+  timerChipTextSuggested: { color: colors.textPrimary },
+  timerChipTag: { fontSize: 7, letterSpacing: 1.2, fontWeight: '800', color: colors.textMuted },
   timerBtnText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
   timerActive: {
     alignItems: 'center', gap: 2,

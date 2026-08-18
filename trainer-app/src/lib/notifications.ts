@@ -12,6 +12,12 @@ import { supabase } from './supabase';
 // puntuales para los próximos 7 días en vez de repeticiones semanales fijas.
 
 const ENABLED_KEY = 'notif_enabled_v1';
+/**
+ * Marca del aviso de "fin de descanso" (WorkoutLogScreen). Va en
+ * `content.data.kind` para poder distinguirlo de los recordatorios y NO
+ * borrarlo al reprogramarlos. Ver `cancelarSoloRecordatorios()`.
+ */
+const REST_KIND = 'rest';
 const TRAIN_HOUR_KEY = 'notif_train_hour_v1';
 const MOOD_HOUR_KEY = 'notif_mood_hour_v1';
 
@@ -103,7 +109,7 @@ export async function scheduleReminders(
   const trainHour = hours?.trainHour ?? saved.trainHour;
   const moodHour = hours?.moodHour ?? saved.moodHour;
 
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  await cancelarSoloRecordatorios();
 
   // recordatorios de entrenamiento: solo días pendientes, próxima ocurrencia
   for (const d of days) {
@@ -147,8 +153,77 @@ export async function refreshReminders(days: ReminderDay[]): Promise<void> {
 }
 
 export async function cancelReminders(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  await cancelarSoloRecordatorios();
   await AsyncStorage.setItem(ENABLED_KEY, '0');
+}
+
+/**
+ * Cancela los recordatorios programados SIN tocar el aviso de fin de descanso.
+ *
+ * OJO — acoplamiento fácil de romper: `refreshReminders` corre cada vez que se
+ * abre la pantalla "Hoy". Antes esto era `cancelAllScheduledNotificationsAsync()`,
+ * que borraba también el aviso del descanso que el alumno acababa de iniciar en
+ * "Registrar ejercicio" — sin ningún error ni señal: el aviso simplemente no
+ * llegaba nunca. Por eso cancelamos por identificador y saltamos los avisos
+ * marcados con `data.kind === REST_KIND`. Si agregas otro tipo de notificación
+ * que deba sobrevivir a la reprogramación, márcala igual y exclúyela acá.
+ */
+async function cancelarSoloRecordatorios(): Promise<void> {
+  const programadas = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of programadas) {
+    if ((n.content?.data as any)?.kind === REST_KIND) continue;
+    await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  }
+}
+
+/**
+ * Programa el aviso local de fin de descanso para el instante `endsAt`.
+ * Es lo único que llega si el alumno bloquea la pantalla mientras descansa:
+ * con la app suspendida no corre ni el temporizador de JS ni la vibración.
+ * Devuelve el identificador para poder cancelarlo puntualmente.
+ */
+export async function scheduleRestAlert(endsAt: number): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  if (!(await requestPermission())) return null;
+  if (endsAt - Date.now() < 1000) return null;
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Descanso terminado',
+        body: 'Vuelve a la serie 💪',
+        data: { kind: REST_KIND },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(endsAt),
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cancela el aviso de descanso: al cancelar el descanso o al terminar con la
+ * app abierta (no debe llegar un aviso de algo que ya pasó). Sin `id` —por
+ * ejemplo tras recargar la app— barre por la marca `data.kind`.
+ */
+export async function cancelRestAlert(id?: string | null): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id);
+      return;
+    }
+    const programadas = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of programadas) {
+      if ((n.content?.data as any)?.kind === REST_KIND) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
+    }
+  } catch {
+    // sin permisos o sin módulo nativo: no hay nada que cancelar
+  }
 }
 
 /**
