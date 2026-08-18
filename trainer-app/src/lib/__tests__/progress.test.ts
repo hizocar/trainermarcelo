@@ -1,6 +1,7 @@
 import {
   score, oneRepMax, splitClosedWeeks, toneOf, weeklyDelta,
   repTopOf, suggestProgression, platesPerSide, energyPerformance, bestSet,
+  topSetByExercise, latestRecord, seriesDoneByExercise,
 } from '../progress';
 
 describe('score / oneRepMax', () => {
@@ -162,5 +163,96 @@ describe('bestSet', () => {
 
   it('ante empate se queda con la más antigua (la marca original)', () => {
     expect(bestSet([log(3, 60, 10), log(7, 60, 10)])).toEqual({ weight: 60, reps: 10, week: 3 });
+  });
+});
+
+describe('topSetByExercise', () => {
+  const mapa = { s1: 'ex1', s2: 'ex1', s3: 'ex2' };
+
+  it('devuelve la mejor serie de cada ejercicio, no la última', () => {
+    const logs = [
+      { series_id: 's1', weight: 80, reps: 10 },
+      { series_id: 's2', weight: 60, reps: 10 },
+      { series_id: 's3', weight: 40, reps: 12 },
+    ];
+    expect(topSetByExercise(logs, mapa)).toEqual({
+      ex1: { weight: 80, reps: 10 },
+      ex2: { weight: 40, reps: 12 },
+    });
+  });
+
+  it('más reps con menos peso puede ser la mejor serie', () => {
+    // 60×20 estima más fuerza que 70×8 con Epley
+    const logs = [
+      { series_id: 's1', weight: 70, reps: 8 },
+      { series_id: 's2', weight: 60, reps: 20 },
+    ];
+    expect(topSetByExercise(logs, mapa).ex1).toEqual({ weight: 60, reps: 20 });
+  });
+
+  it('ignora registros de series que no están en el plan', () => {
+    const logs = [{ series_id: 'fantasma', weight: 99, reps: 99 }];
+    expect(topSetByExercise(logs, mapa)).toEqual({});
+  });
+
+  it('sin registros devuelve un objeto vacío', () => {
+    expect(topSetByExercise([], mapa)).toEqual({});
+  });
+});
+
+describe('latestRecord', () => {
+  const sentadilla = { name: 'Sentadilla', unit: 'kg', best: { weight: 140, reps: 8, week: 7 } };
+  const prensa = { name: 'Prensa', unit: 'kg', best: { weight: 200, reps: 10, week: 3 } };
+
+  it('gana el récord más reciente, aunque sea de menos peso', () => {
+    expect(latestRecord([prensa, sentadilla])).toEqual(sentadilla);
+  });
+
+  it('ante empate de semana gana la marca de mayor fuerza estimada', () => {
+    const a = { name: 'A', unit: 'kg', best: { weight: 100, reps: 5, week: 9 } };
+    const b = { name: 'B', unit: 'kg', best: { weight: 90, reps: 12, week: 9 } };
+    // score: A = 100*(1+5/30) = 116.7 ; B = 90*(1+12/30) = 126
+    expect(latestRecord([a, b])).toEqual(b);
+  });
+
+  it('ignora los ejercicios sin registros', () => {
+    // week 0 es el centinela de "sin datos" que usa ProgressScreen
+    const vacio = { name: 'Vacío', unit: 'kg', best: { weight: 0, reps: 0, week: 0 } };
+    expect(latestRecord([vacio, prensa])).toEqual(prensa);
+  });
+
+  it('sin ningún récord real devuelve null', () => {
+    const vacio = { name: 'Vacío', unit: 'kg', best: { weight: 0, reps: 0, week: 0 } };
+    expect(latestRecord([vacio])).toBeNull();
+    expect(latestRecord([])).toBeNull();
+  });
+
+  it('un ejercicio de peso corporal cuenta: el peso 0 es un dato, no un vacío', () => {
+    const dominadas = { name: 'Dominadas', unit: 'kg', best: { weight: 0, reps: 12, week: 9 } };
+    const prensa = { name: 'Prensa', unit: 'kg', best: { weight: 200, reps: 10, week: 3 } };
+    expect(latestRecord([dominadas, prensa])).toEqual(dominadas);
+  });
+});
+
+describe('seriesDoneByExercise', () => {
+  const mapa = { s1: 'ex1', s2: 'ex1', s3: 'ex1', s4: 'ex2' };
+
+  it('cuenta las series registradas de cada ejercicio', () => {
+    const logs = [{ series_id: 's1' }, { series_id: 's2' }, { series_id: 's4' }];
+    expect(seriesDoneByExercise(logs, mapa)).toEqual({ ex1: 2, ex2: 1 });
+  });
+
+  it('reeditar una serie no la cuenta dos veces', () => {
+    // corregir una serie ya guardada deja dos registros de la misma series_id
+    const logs = [{ series_id: 's1' }, { series_id: 's1' }];
+    expect(seriesDoneByExercise(logs, mapa)).toEqual({ ex1: 1 });
+  });
+
+  it('ignora registros de series que ya no están en el plan', () => {
+    expect(seriesDoneByExercise([{ series_id: 'fantasma' }], mapa)).toEqual({});
+  });
+
+  it('sin registros devuelve un objeto vacío', () => {
+    expect(seriesDoneByExercise([], mapa)).toEqual({});
   });
 });

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
-import BarbellHero from '@/components/BarbellHero';
+import PhoneFrame from '@/components/PhoneFrame';
+import WideShot from '@/components/WideShot';
 
 export default function LandingPage() {
   return (
@@ -11,11 +12,9 @@ export default function LandingPage() {
             <Logo />
           </a>
           <div className="nav-links">
-            <a href="#como-funciona">Cómo funciona</a>
-            <a href="#caracteristicas">Características</a>
+            <a href="#panel">Cómo funciona</a>
+            <a href="#app">La app de tu alumno</a>
             <a href="#precios">Precios</a>
-            <a href="#coach">Para coaches</a>
-            <a href="#descargar">Descargar</a>
           </div>
           <Link href="/login" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
             Acceso coach
@@ -23,131 +22,112 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* HERO */}
+      {/* PORTADA — le habla al coach, que es quien decide y paga */}
       <header className="hero">
         <div className="container hero-grid">
           <div>
-            <span className="hero-badge fade-up">Entrenamiento personalizado</span>
+            <span className="hero-badge fade-up">Para entrenadores</span>
             <h1 className="fade-up d1">
-              Tu plan.<br />
-              Tu progreso.<br />
-              <em>En serio.</em>
+              Deja la planilla.<br />
+              <em>No a tus alumnos.</em>
             </h1>
             <p className="sub fade-up d2">
-              Registra cada serie, sigue tu evolución semana a semana y entrena con un plan
-              diseñado por tu coach — no una rutina genérica de internet.
+              Arma los planes desde el computador. Mira quién entrenó y quién no, sin preguntar.
+              Tus alumnos registran cada serie en el teléfono y tú lo ves al instante.
             </p>
             <div className="hero-cta fade-up d3">
-              <a className="btn btn-primary" href="#descargar">Descargar la app</a>
-              <a className="btn btn-ghost" href="#como-funciona">Ver cómo funciona</a>
+              <a
+                className="btn btn-primary"
+                href="https://wa.me/56949684325?text=Hola%2C%20quiero%20ver%20una%20demo%20de%20EliteFitness"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Agendar una demo
+              </a>
+              <Link className="btn btn-ghost" href="/signup">Crear mi cuenta</Link>
             </div>
-            <div className="hero-checks fade-up d3">
-              <span>Historial completo</span>
-              <span>Funciona sin señal</span>
-              <span>Chat con tu coach</span>
+
+            <div className="hero-stats fade-up d3">
+              <div>
+                <strong>841</strong>
+                <span>ejercicios</span>
+              </div>
+              <div>
+                <strong>∞</strong>
+                <span>alumnos</span>
+              </div>
+              <div>
+                <strong className="mono">$4.990</strong>
+                <span>al mes</span>
+              </div>
             </div>
           </div>
 
           <div className="hero-visual fade-up d2">
-            <BarbellHero />
+            <PhoneFrame src="/capturas/hoy.png" alt="La pantalla de hoy en la app del alumno, con sus ejercicios y las series registradas" priority />
           </div>
         </div>
       </header>
 
-      {/* CÓMO FUNCIONA */}
-      <section className="section" id="como-funciona">
-        <div className="container">
-          <div className="section-head">
-            <span className="label accent">Cómo funciona</span>
-            <h2>De la invitación al primer PR</h2>
-            <p className="lead">Tres pasos y estás entrenando con seguimiento real.</p>
+      {/* PRUEBA 1 — el panel */}
+      <section className="section" id="panel">
+        <div className="container split-section">
+          <div>
+            <span className="label">El panel</span>
+            <h2>Sabe quién entrenó. Sin preguntar.</h2>
+            <p className="sub">
+              Tus alumnos aparecen separados entre los que necesitan atención y los que van al día.
+              El umbral se ajusta al plan de cada uno: quien entrena dos veces por semana no te
+              aparece como alerta por no entrenar un martes.
+            </p>
+            <ul className="ticks">
+              <li>Días entrenados de los planificados, por alumno</li>
+              <li>Cuándo entrenó por última vez</li>
+              <li>Las notas que te dejó en cada sesión</li>
+            </ul>
           </div>
-          <div className="steps">
-            <div className="step">
-              <div className="step-num">1</div>
-              <h3>Tu coach te invita</h3>
-              <p>Recibes tu acceso personal. Nada de registros abiertos: aquí entrenas acompañado desde el día uno.</p>
-            </div>
-            <div className="step">
-              <div className="step-num">2</div>
-              <h3>Entrenas con tu plan</h3>
-              <p>Días, ejercicios, series y objetivos definidos por tu coach. Registra peso y reps en segundos, incluso sin señal en el gimnasio.</p>
-            </div>
-            <div className="step">
-              <div className="step-num">3</div>
-              <h3>Ves tu progreso</h3>
-              <p>Gráficos de carga total, mejores marcas, calendario de entrenamientos y sugerencias de progresión automáticas.</p>
-            </div>
+          <div className="split-visual">
+            <WideShot src="/capturas/panel.png" alt="Lista de clientes del panel, con los que necesitan atención separados de los que van al día" width={1180} height={820} />
           </div>
         </div>
       </section>
 
-      {/* CARACTERÍSTICAS */}
-      <section className="section" id="caracteristicas">
+      {/* PRUEBA 2 — el editor */}
+      <section className="section">
+        <div className="container split-section reverse">
+          <div>
+            <span className="label">El editor</span>
+            <h2>Armas el plan una vez.</h2>
+            <p className="sub">
+              Desde el computador, con teclado y pantalla grande. Guarda un programa y reutilízalo
+              con todos los alumnos que quieras; cada cambio llega al instante a su teléfono.
+            </p>
+            <ul className="ticks">
+              <li>Biseries y triseries con un toque</li>
+              <li>Semanas independientes, con descarga</li>
+              <li>841 ejercicios en la biblioteca</li>
+            </ul>
+          </div>
+          <div className="split-visual">
+            <WideShot src="/capturas/editor.png" alt="Editor de plan con los días de la semana y la tabla de ejercicios de cada uno" width={1132} height={504} />
+          </div>
+        </div>
+      </section>
+
+      {/* PRUEBA 3 — lo que ve el alumno */}
+      <section className="section" id="app">
         <div className="container">
           <div className="section-head">
-            <span className="label accent">Por qué funciona</span>
-            <h2>Todo lo que necesitas para avanzar</h2>
-            <p className="lead">
-              Pensada junto a un entrenador real para que cada sesión cuente y nada se pierda.
+            <span className="label">La app de tu alumno</span>
+            <h2>Así te va a ver tu cliente.</h2>
+            <p className="sub">
+              Tu nombre, tu foto y tu Instagram dentro de la app que usa todos los días.
+              Registra sus series, ve su progreso y te escribe sin salir de ahí.
             </p>
           </div>
-          <div className="features">
-            <div className="feature">
-              <div className="ico">🏋️</div>
-              <h3>Planes por objetivo</h3>
-              <p>Tu coach arma tus días, ejercicios, series, tempo, descanso y RIR. Tú solo entrenas.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">📈</div>
-              <h3>Progreso real</h3>
-              <p>Cada peso y repetición queda registrado. Carga total por semana, tendencias y mejores marcas por ejercicio.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">🗓️</div>
-              <h3>Historial completo</h3>
-              <p>Calendario estilo anillos con cada sesión: toca un día y revisa exactamente qué levantaste.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">💬</div>
-              <h3>Conectado a tu coach</h3>
-              <p>Chat integrado con fotos y notas de voz, más notas por sesión para que nada se quede en el aire.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">⏱️</div>
-              <h3>Descanso y precisión</h3>
-              <p>Temporizador de descanso con aviso, RIR objetivo y sugerencias de progresión cuando completas el rango.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">📶</div>
-              <h3>Funciona sin señal</h3>
-              <p>Registra en el gimnasio aunque no haya internet: todo se sincroniza solo cuando vuelve la señal.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* COACH */}
-      <section className="section" id="coach">
-        <div className="container">
-          <div className="coach-band">
-            <div>
-              <span className="label accent">Para entrenadores</span>
-              <h2>Tu negocio, bajo control</h2>
-              <ul className="coach-list">
-                <li>Edita los planes de todos tus clientes desde el computador, con teclado y pantalla grande.</li>
-                <li>Monitorea el progreso por día del plan y detecta solapes de volumen por grupo muscular.</li>
-                <li>Lee las notas de cada sesión y responde por chat sin salir de la app.</li>
-                <li>Cada cambio llega al instante al teléfono de tu cliente.</li>
-              </ul>
-            </div>
-            <div className="coach-cta">
-              <span className="big">Panel web para coaches</span>
-              <span className="muted" style={{ fontSize: 14 }}>
-                Entra con las mismas credenciales de tu app.
-              </span>
-              <Link className="btn btn-primary" href="/login">Entrar al panel</Link>
-            </div>
+          <div className="shots-row">
+            <PhoneFrame src="/capturas/inicio.png" alt="Pantalla de inicio del alumno con sus días entrenados de la semana" />
+            <PhoneFrame src="/capturas/perfil.png" alt="Perfil del alumno mostrando la ficha de su entrenador" />
           </div>
         </div>
       </section>
@@ -156,11 +136,11 @@ export default function LandingPage() {
       <section className="section" id="precios">
         <div className="container">
           <div className="section-head">
-            <span className="label accent">Precios</span>
-            <h2>Para un entrenador o para todo un gimnasio</h2>
-            <p className="lead">
-              El precio escala con cuántos <em style={{ fontStyle: 'normal', color: 'var(--text)' }}>entrenadores</em> hay,
-              no con cuántos clientes tengan — clientes siempre ilimitados. Cancela cuando quieras.
+            <span className="label">Precios</span>
+            <h2>Clientes ilimitados, siempre.</h2>
+            <p className="sub">
+              El precio escala con cuántos entrenadores hay, no con cuántos clientes tengan.
+              Cancela cuando quieras.
             </p>
           </div>
 
@@ -249,48 +229,62 @@ export default function LandingPage() {
           </div>
           <div className="faq">
             <details>
-              <summary>¿Cómo consigo acceso a la app?</summary>
+              <summary>¿Qué pasa con los planes que ya tengo en Excel?</summary>
               <p>
-                Si eres entrenador, te registras directo en la sección de precios de arriba. Si
-                eres cliente, el acceso es por invitación de tu entrenador — pídesela a él.
+                Los armas una vez en el editor y quedan guardados como programas reutilizables.
+                Escríbenos por WhatsApp y te ayudamos a cargar los primeros.
               </p>
             </details>
             <details>
-              <summary>¿Funciona si el gimnasio no tiene señal?</summary>
+              <summary>¿Mis alumnos tienen que pagar algo?</summary>
               <p>
-                Sí. Puedes registrar tus series sin conexión: la app guarda todo en tu teléfono y lo
-                sube automáticamente cuando vuelve el internet.
+                No. Ellos entran gratis por tu invitación; el plan lo pagas tú, y son ilimitados.
               </p>
             </details>
             <details>
-              <summary>¿En qué teléfonos está disponible?</summary>
+              <summary>¿En qué teléfonos funciona?</summary>
               <p>
-                Hoy está disponible para iPhone (vía TestFlight). La versión para Android está en
-                camino.
+                Hoy en iPhone. La versión para Android está en camino. Tú administras todo desde
+                el panel web, que funciona en cualquier computador.
               </p>
             </details>
             <details>
-              <summary>¿Puedo ver cuánto he mejorado?</summary>
+              <summary>¿Qué pasa si me arrepiento?</summary>
               <p>
-                Cada ejercicio tiene su histórico: carga total por semana, tu mejor marca y el
-                detalle de cada serie que registraste, desde el primer día.
+                Cancelas cuando quieras, sin permanencia. Tus planes y el historial de tus alumnos
+                siguen ahí si vuelves.
               </p>
             </details>
           </div>
         </div>
       </section>
 
-      {/* CTA FINAL */}
-      <section className="final-cta" id="descargar">
+      {/* CIERRE — coach */}
+      <section className="final-cta">
         <div className="container">
-          <h2>Empieza <span className="accent">hoy</span></h2>
-          <p className="lead">
-            Pídele una invitación a tu coach y descarga la app para comenzar a registrar tu
-            progreso de verdad.
+          <h2>Quince minutos y lo ves funcionando.</h2>
+          <p className="sub">
+            Te mostramos el panel con un alumno de prueba y respondemos lo que quieras preguntar.
           </p>
-          <a className="btn btn-primary" href="mailto:hizocar@gmail.com?subject=Quiero%20entrenar%20con%20la%20app">
-            Solicitar acceso
+          <a
+            className="btn btn-primary"
+            href="https://wa.me/56949684325?text=Hola%2C%20quiero%20ver%20una%20demo%20de%20EliteFitness"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Agendar una demo
           </a>
+        </div>
+      </section>
+
+      {/* ALUMNOS — al final a propósito: no son quien decide */}
+      <section className="section" id="alumnos">
+        <div className="container student-note">
+          <span className="label">¿Eres alumno?</span>
+          <p className="sub">
+            Si tu entrenador te invitó, revisa tu correo: ahí está el enlace para crear tu
+            contraseña y descargar la app. Si no te llegó, pídeselo a él.
+          </p>
         </div>
       </section>
 
@@ -307,13 +301,14 @@ export default function LandingPage() {
             </div>
             <div className="footer-col">
               <h4>Producto</h4>
-              <a href="#como-funciona">Cómo funciona</a>
-              <a href="#caracteristicas">Características</a>
-              <a href="#descargar">Descargar</a>
+              <a href="#panel">Cómo funciona</a>
+              <a href="#app">La app de tu alumno</a>
+              <a href="#precios">Precios</a>
+              <a href="#alumnos">¿Eres alumno?</a>
             </div>
             <div className="footer-col">
               <h4>Coaches</h4>
-              <a href="#coach">Panel para coaches</a>
+              <a href="#panel">Panel para coaches</a>
               <Link href="/login">Iniciar sesión</Link>
             </div>
             <div className="footer-col">

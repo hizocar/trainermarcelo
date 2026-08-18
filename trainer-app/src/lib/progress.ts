@@ -164,3 +164,87 @@ export function energyPerformance(
     highDays: highs.length,
   };
 }
+
+// NOTA: `topSetByExercise` quedó sin consumidores cuando "Hoy" pasó a mostrar
+// un anillo de series por ejercicio en vez del peso levantado. Se conserva —con
+// sus tests— porque es el mismo criterio de "mejor serie" que usan `bestSet` y
+// `latestRecord`, y es lo que se necesitaría para volver a mostrar ese dato.
+export interface TopSetLog {
+  series_id: string;
+  weight: number;
+  reps: number;
+}
+
+/**
+ * La mejor serie registrada de cada ejercicio, para mostrarla en "Hoy" en los
+ * ejercicios ya completados.
+ *
+ * Usa el mismo `score` que `bestSet`: si dos pantallas de la app usaran
+ * criterios distintos para "la mejor serie", volveríamos a tener un alumno
+ * viendo dos números diferentes para lo mismo.
+ */
+export function topSetByExercise(
+  logs: TopSetLog[],
+  seriesToExercise: Record<string, string>,
+): Record<string, { weight: number; reps: number }> {
+  const mejores: Record<string, { weight: number; reps: number }> = {};
+  logs.forEach(l => {
+    const exId = seriesToExercise[l.series_id];
+    if (!exId) return; // registro de una serie que ya no está en el plan
+    const actual = mejores[exId];
+    if (!actual || score(l.weight, l.reps) > score(actual.weight, actual.reps)) {
+      mejores[exId] = { weight: l.weight, reps: l.reps };
+    }
+  });
+  return mejores;
+}
+
+export interface ExerciseRecord {
+  name: string;
+  unit: string;
+  best: { weight: number; reps: number; week: number };
+}
+
+/**
+ * El récord más reciente del alumno, para encabezar la pantalla de progreso.
+ *
+ * No se elige "la marca más pesada": comparar 1RM entre ejercicios distintos
+ * siempre daría sentadilla o peso muerto, y la pantalla mostraría el mismo
+ * número para siempre. El récord más reciente, en cambio, se mueve cuando el
+ * alumno progresa — que es lo que da ganas de mirarlo.
+ *
+ * Ante empate de semana gana la mayor fuerza estimada, con el mismo `score`
+ * que usan `bestSet` y `topSetByExercise`.
+ */
+export function latestRecord(records: ExerciseRecord[]): ExerciseRecord | null {
+  const conDatos = records.filter(r => r.best.week > 0);
+  if (conDatos.length === 0) return null;
+  return conDatos.reduce((mejor, cur) => {
+    if (cur.best.week !== mejor.best.week) return cur.best.week > mejor.best.week ? cur : mejor;
+    return score(cur.best.weight, cur.best.reps) > score(mejor.best.weight, mejor.best.reps)
+      ? cur
+      : mejor;
+  });
+}
+
+/**
+ * Cuántas series distintas lleva registradas cada ejercicio.
+ *
+ * Se cuentan `series_id` únicos, no registros: si el alumno corrige una serie
+ * ya guardada, sigue siendo una sola serie hecha. Sin esto, reeditar inflaría
+ * el conteo y un ejercicio de 3 series podría mostrar 5/3.
+ */
+export function seriesDoneByExercise(
+  logs: { series_id: string }[],
+  seriesToExercise: Record<string, string>,
+): Record<string, number> {
+  const porEjercicio: Record<string, Set<string>> = {};
+  logs.forEach(l => {
+    const exId = seriesToExercise[l.series_id];
+    if (!exId) return; // registro de una serie que ya no está en el plan
+    (porEjercicio[exId] ??= new Set()).add(l.series_id);
+  });
+  const conteo: Record<string, number> = {};
+  Object.entries(porEjercicio).forEach(([exId, set]) => { conteo[exId] = set.size; });
+  return conteo;
+}

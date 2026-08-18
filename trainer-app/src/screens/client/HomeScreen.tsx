@@ -9,20 +9,19 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { MoodLog } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
-import Card from '../../components/common/Card';
 import MuscleMap from '../../components/common/MuscleMap';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import SectionLabel from '../../components/common/SectionLabel';
+import StatHero from '../../components/common/StatHero';
+import DataRow from '../../components/common/DataRow';
+import MoodFace from '../../components/common/MoodFace';
+import TrendChart from '../../components/common/TrendChart';
 import { fetchFullPlan, fetchLogs, activeDays } from '../../lib/plan';
 import { showAlert } from '../../lib/alert';
 import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
-
-// escala de energía 1-10 (1 = muy cansado, 10 = con mucha energía)
-const ENERGY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-function energyColor(n: number): string {
-  if (n <= 3) return colors.danger;
-  if (n <= 6) return colors.textSecondary;
-  return colors.accent;
-}
+import {
+  MOOD_FACE_LEVELS, moodValueForFace, faceForMoodText, moodFaceLabel, moodChartPoints,
+} from '../../lib/mood';
 
 // fecha local YYYY-MM-DD (no UTC: a las 21:00 de Chile ya sería "mañana" en UTC)
 function todayLocal(): string {
@@ -36,26 +35,46 @@ export default function HomeScreen() {
 
   const [moods, setMoods] = useState<MoodLog[]>([]);
   const [savingMood, setSavingMood] = useState(false);
+  // el alumno puede arrepentirse: vuelve al selector aunque ya haya respondido
+  const [editingMood, setEditingMood] = useState(false);
+  // la consulta de ánimo falló: no sabemos si respondió, así que no preguntamos
+  const [moodFailed, setMoodFailed] = useState(false);
   const [groupSets, setGroupSets] = useState<Record<string, number>>({});
   const [weekDays, setWeekDays] = useState<{ id: string; day_number: number; name: string; total: number; done: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const currentWeek = getCurrentWeek();
   const today = todayLocal();
-  const todayRaw = moods.find(m => m.logged_date === today)?.mood ?? null;
-  const todayEnergy = todayRaw != null ? parseInt(todayRaw, 10) || null : null;
+  // los registros viejos siguen en escala 1-10 (hay 3, 7 y 9 guardados):
+  // se muestran con la cara más cercana, sin tocar el dato
+  const todayFace = faceForMoodText(moods.find(m => m.logged_date === today)?.mood);
+  const showMoodPicker = !moodFailed && (todayFace == null || editingMood);
 
   useFocusEffect(useCallback(() => { if (user?.id) fetchAll(); }, [user?.id]));
 
   async function fetchAll() {
-    // ánimo: últimos 7 días
-    const { data: moodData } = await supabase
+    // ánimo: últimos 13 días. No son 30 por el ancho del gráfico: con 30 puntos
+    // en ~294pt de ancho los círculos quedan a 10pt entre centros y miden 8pt,
+    // así que la línea se convierte en una oruga. Y son 13 y no 14 porque
+    // TrendChart etiqueta cada ceil(n/6) puntos y ADEMÁS siempre el último: con
+    // 14 eso da 0,3,6,9,12 y 13, y las dos últimas etiquetas se encinan. Con 13
+    // el último punto cae justo en la grilla (0,3,6,9,12).
+    const { data: moodData, error: moodError } = await supabase
       .from('mood_logs')
       .select('*')
       .eq('user_id', user!.id)
       .order('logged_date', { ascending: false })
-      .limit(7);
-    setMoods(moodData ?? []);
+      .limit(13);
+    // Tragarse este error no es cosmético: sin datos la pantalla concluye que
+    // el alumno NUNCA respondió, le ofrece el selector, y el upsert le pisa el
+    // registro real del día. Ante la duda, no se muestra el selector.
+    if (moodError) {
+      console.error('inicio: error cargando el ánimo', moodError);
+      setMoodFailed(true);
+    } else {
+      setMoodFailed(false);
+      setMoods(moodData ?? []);
+    }
 
     // plan completo en una sola consulta anidada
     const plan = await fetchFullPlan(user!.id);
@@ -88,8 +107,10 @@ export default function HomeScreen() {
     setLoading(false);
   }
 
-  async function saveMood(level: number) {
-    const mood = String(level);
+  // `value` sigue siendo la escala 1-10 de la base; las caras solo acotan qué
+  // valores puede mandar la app (2/4/6/8/10). Mismo upsert de siempre.
+  async function saveMood(value: number) {
+    const mood = String(value);
     if (!user) return;
     setSavingMood(true);
     const { error } = await supabase.from('mood_logs').upsert(
@@ -106,6 +127,7 @@ export default function HomeScreen() {
         { id: 'local', user_id: user.id, mood, logged_date: today, created_at: new Date().toISOString() },
         ...prev.filter(m => m.logged_date !== today),
       ]);
+      setEditingMood(false);
     }
   }
 
@@ -119,101 +141,143 @@ export default function HomeScreen() {
   const maxSets = Math.max(...groupRows.map(r => r.sets), 1);
   const totalSets = groupRows.reduce((a, r) => a + r.sets, 0);
 
-  const weekHistory = useMemo(
-    () => moods.filter(m => m.logged_date !== today).slice(0, 6).reverse(),
-    [moods, today],
-  );
+  // puntos del gráfico: salen de los `moods` ya cargados, sin consulta nueva
+  const moodPoints = useMemo(() => moodChartPoints(moods), [moods]);
+
+  const diasCompletos = weekDays.filter(d => d.total > 0 && d.done >= d.total).length;
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text style={styles.greeting}>{formatShortDate(new Date().toISOString()).toUpperCase()}</Text>
-          <Text style={styles.userName}>HOLA, {user?.name?.split(' ')[0].toUpperCase()}</Text>
-        </View>
+      <ScreenHeader
+        left={formatShortDate(new Date().toISOString()).toUpperCase()}
+        right={<Text style={styles.weekLabel}>SEMANA {currentWeek}</Text>}
+      />
 
-        {/* Encuesta diaria de energía */}
-        <Card style={styles.moodCard}>
-          <Text style={styles.moodTitle}>¿CÓMO TE SIENTES HOY?</Text>
-          <View style={styles.energyRow}>
-            {ENERGY_LEVELS.map(n => {
-              const active = todayEnergy === n;
-              return (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.energyBtn, active && { backgroundColor: energyColor(n), borderColor: energyColor(n) }]}
-                  onPress={() => saveMood(n)}
-                  disabled={savingMood}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.energyBtnText, active && styles.energyBtnTextActive]}>{n}</Text>
-                </TouchableOpacity>
-              );
-            })}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {weekDays.length > 0 && (
+          <View style={styles.hero}>
+            <StatHero
+              value={`${diasCompletos}`}
+              suffix={`/${weekDays.length}`}
+              label="DÍAS ENTRENADOS ESTA SEMANA"
+              font="display"
+              size={56}
+            />
+            <View style={styles.dayBars}>
+              {weekDays.map(d => (
+                <View
+                  key={d.id}
+                  style={[styles.dayBar, d.total > 0 && d.done >= d.total && styles.dayBarDone]}
+                />
+              ))}
+            </View>
           </View>
-          <View style={styles.energyLegend}>
-            <Text style={styles.energyLegendText}>1 · MUY CANSADO</Text>
-            {todayEnergy != null && (
-              <Text style={[styles.energyToday, { color: energyColor(todayEnergy) }]}>HOY: {todayEnergy}/10</Text>
-            )}
-            <Text style={styles.energyLegendText}>10 · MUCHA ENERGÍA</Text>
-          </View>
-          {weekHistory.length > 0 && (
-            <View style={styles.moodHistory}>
-              <Text style={styles.moodHistoryLabel}>DÍAS ANTERIORES</Text>
-              <View style={styles.moodHistoryRow}>
-                {weekHistory.map(m => {
-                  const n = parseInt(m.mood, 10) || 0;
+        )}
+
+        {/* Encuesta diaria de energía: se pregunta con caras, no con números.
+            Una vez respondida, el selector deja lugar al historial. */}
+        <View style={styles.moodBlock}>
+          {moodFailed ? (
+            <>
+              <SectionLabel style={styles.section}>¿CÓMO TE SIENTES HOY?</SectionLabel>
+              <Text style={styles.moodFailedText}>
+                No pudimos leer tu registro de hoy. Vuelve a entrar a esta pantalla en un
+                rato: preferimos no preguntarte de nuevo antes que pisar lo que ya respondiste.
+              </Text>
+            </>
+          ) : showMoodPicker ? (
+            <>
+              <View style={styles.moodChartHeader}>
+                <SectionLabel>¿CÓMO TE SIENTES HOY?</SectionLabel>
+                {/* del modo "cambiar" se tiene que poder salir sin responder:
+                    si lo tocó sin querer, no le quitamos el gráfico */}
+                {editingMood && todayFace != null && (
+                  <TouchableOpacity
+                    style={styles.moodChangeBtn}
+                    onPress={() => setEditingMood(false)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancelar y volver al gráfico"
+                  >
+                    <Text style={styles.moodChangeText}>CANCELAR</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.faceRow}>
+                {MOOD_FACE_LEVELS.map(level => {
+                  const active = todayFace === level;
                   return (
-                    <View key={m.logged_date} style={styles.moodHistoryItem}>
-                      <Text style={[styles.moodHistoryEnergy, { color: energyColor(n) }]}>{n}</Text>
-                      <Text style={styles.moodHistoryDate}>{m.logged_date.slice(8, 10)}/{m.logged_date.slice(5, 7)}</Text>
-                    </View>
+                    <TouchableOpacity
+                      key={level}
+                      style={styles.faceBtn}
+                      onPress={() => saveMood(moodValueForFace(level))}
+                      disabled={savingMood}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={moodFaceLabel(level)}
+                      accessibilityState={{ selected: active, disabled: savingMood }}
+                    >
+                      <MoodFace level={level} size={40} active={active} />
+                    </TouchableOpacity>
                   );
                 })}
               </View>
-            </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.moodChartHeader}>
+                <SectionLabel>TU ENERGÍA DÍA A DÍA</SectionLabel>
+                <TouchableOpacity
+                  style={styles.moodChangeBtn}
+                  onPress={() => setEditingMood(true)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar cómo te sientes hoy"
+                >
+                  <Text style={styles.moodChangeText}>CAMBIAR</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.moodTodayRow}>
+                <MoodFace level={todayFace!} size={28} />
+                <Text style={styles.moodTodayText}>HOY: {moodFaceLabel(todayFace!).toUpperCase()}</Text>
+              </View>
+              {/* fromZero + maxValue: en una escala de 1 a 10 el eje tiene que ir
+                  de 0 a 10 fijo. Sin piso, una diferencia de un punto parece un
+                  acantilado; sin techo, con un solo registro el punto se dibuja
+                  arriba del todo aunque sea un "muy cansado". */}
+              <TrendChart data={moodPoints} height={150} unit="/10" fromZero maxValue={10} />
+            </>
           )}
-        </Card>
+        </View>
 
         {/* Días entrenados vs pendientes */}
         {weekDays.length > 0 && (
-          <Card style={styles.weekCard}>
-            <Text style={styles.groupTitle}>MI SEMANA</Text>
-            <View style={styles.weekRow}>
-              {weekDays.map(d => {
-                const complete = d.done >= d.total;
-                const started = d.done > 0 && !complete;
-                return (
-                  <TouchableOpacity
-                    key={d.id}
-                    style={[styles.weekDayChip, complete && styles.weekDayChipDone, started && styles.weekDayChipStarted]}
-                    onPress={() => navigation.navigate('Today')}
-                    activeOpacity={0.7}
-                  >
-                    {complete ? (
-                      <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                    ) : started ? (
-                      <Text style={styles.weekDayCount}>{d.done}/{d.total}</Text>
-                    ) : (
-                      <Ionicons name="ellipse-outline" size={16} color={colors.textMuted} />
-                    )}
-                    <Text style={[styles.weekDayNum, complete && { color: colors.success }]}>DÍA {d.day_number}</Text>
-                    <Text style={styles.weekDayName} numberOfLines={1}>{d.name.toUpperCase()}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View>
+            <SectionLabel style={styles.section}>MI SEMANA</SectionLabel>
+            {weekDays.map((d, i) => {
+              const completo = d.total > 0 && d.done >= d.total;
+              return (
+                <DataRow
+                  key={d.id}
+                  label={d.name.toUpperCase()}
+                  meta={`DÍA ${d.day_number}`}
+                  value={`${d.done}/${d.total}`}
+                  state={completo ? 'done' : d.done > 0 ? 'active' : 'idle'}
+                  index={i}
+                  onPress={() => navigation.navigate('Today')}
+                />
+              );
+            })}
             <Text style={styles.weekSummary}>
-              {weekDays.filter(d => d.done >= d.total).length} de {weekDays.length} días completados esta semana
+              {diasCompletos} de {weekDays.length} días completados esta semana
             </Text>
-          </Card>
+          </View>
         )}
 
         {/* Series por grupo muscular (semana en curso) */}
-        <Card style={styles.groupCard}>
+        <View style={styles.groupBlock}>
           <View>
-            <Text style={styles.groupTitle}>SERIES POR GRUPO MUSCULAR</Text>
+            <SectionLabel style={styles.section}>SERIES POR GRUPO MUSCULAR</SectionLabel>
             <Text style={styles.groupWeek}>SPLIT SEMANAL</Text>
           </View>
           {loading ? (
@@ -238,7 +302,7 @@ export default function HomeScreen() {
               <Text style={styles.groupTotal}>{totalSets} series planificadas por semana</Text>
             </>
           )}
-        </Card>
+        </View>
 
         {/* Accesos rápidos */}
         <TouchableOpacity
@@ -267,47 +331,37 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
-  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.md },
-  greeting: { ...typography.label, letterSpacing: 3, color: colors.accent },
-  userName: { ...typography.display, fontSize: 30, marginTop: 2 },
+  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.lg },
+  weekLabel: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
 
-  moodCard: { gap: spacing.md },
-  moodTitle: { ...typography.h3, fontSize: 15 },
-  energyRow: { flexDirection: 'row', gap: 5 },
-  energyBtn: {
-    flex: 1, aspectRatio: 0.8, borderRadius: radius.sm,
-    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  energyBtnText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
-  energyBtnTextActive: { color: colors.background },
-  energyLegend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  energyLegendText: { ...typography.caption, fontSize: 9, letterSpacing: 1 },
-  energyToday: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-  moodHistory: { gap: spacing.xs },
-  moodHistoryLabel: { ...typography.label, fontSize: 9, letterSpacing: 2 },
-  moodHistoryRow: { flexDirection: 'row', gap: spacing.md },
-  moodHistoryItem: { alignItems: 'center', gap: 2 },
-  moodHistoryEnergy: { fontSize: 16, fontWeight: '900' },
-  moodHistoryDate: { ...typography.caption, fontSize: 9 },
+  hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm },
+  dayBars: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
+  dayBar: { width: 26, height: 4, borderRadius: radius.full, backgroundColor: colors.surface },
+  dayBarDone: { backgroundColor: colors.accent },
 
-  weekCard: { gap: spacing.sm },
-  weekRow: { flexDirection: 'row', gap: spacing.sm },
-  weekDayChip: {
-    flex: 1, alignItems: 'center', gap: 3,
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
-    paddingVertical: spacing.sm + 2, paddingHorizontal: 2,
+  section: { marginBottom: spacing.sm },
+
+  moodBlock: { gap: spacing.md },
+  // El mínimo táctil de Apple HIG es 44×44pt y el padding del padre NO agranda
+  // el área tocable del hijo: la altura va en el propio botón. Con cinco caras
+  // en fila sobra ancho, así que el flex:1 ya supera los 44pt horizontales.
+  faceRow: { flexDirection: 'row', gap: spacing.xs },
+  faceBtn: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  moodChartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // discreto pero tocable: 44pt de alto reales aunque el texto sea chico
+  moodChangeBtn: {
+    minHeight: 44, justifyContent: 'center',
+    paddingHorizontal: spacing.sm, marginRight: -spacing.sm,
   },
-  weekDayChipDone: { borderColor: colors.success + '88', backgroundColor: colors.success + '11' },
-  weekDayChipStarted: { borderColor: colors.accent + '66' },
-  weekDayCount: { fontSize: 13, fontWeight: '900', color: colors.accent },
-  weekDayNum: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5, color: colors.textPrimary },
-  weekDayName: { fontSize: 8, fontWeight: '700', letterSpacing: 0.3, color: colors.textMuted },
-  weekSummary: { ...typography.caption, fontSize: 10, textAlign: 'center' },
-  groupCard: { gap: spacing.sm },
-  groupTitle: { ...typography.h3, fontSize: 15 },
-  groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.accent, marginTop: 2 },
+  moodChangeText: { ...typography.label, fontSize: 10, color: colors.textSecondary },
+  moodFailedText: { ...typography.caption, lineHeight: 17 },
+  moodTodayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  moodTodayText: { ...typography.label, fontSize: 10, color: colors.textSecondary },
+
+  weekSummary: { ...typography.caption, fontSize: 9, color: colors.textMuted, textAlign: 'center', marginTop: spacing.sm },
+
+  groupBlock: { gap: spacing.sm },
+  groupWeek: { ...typography.label, fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, marginTop: 2 },
   groupEmpty: { ...typography.caption, textAlign: 'center', paddingVertical: spacing.md },
   groupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   groupName: { fontSize: 10.5, color: colors.textMuted, fontWeight: '800', letterSpacing: 0.3, width: 112 },

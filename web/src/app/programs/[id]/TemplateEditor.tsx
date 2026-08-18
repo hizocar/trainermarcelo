@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
+import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import type { PlanDay } from '@/lib/types';
 
 // Editor de un programa (plantilla sin cliente asignado). Es el mismo
@@ -25,13 +26,11 @@ let tmpCounter = 0;
 const tmpId = () => `tmp_${Date.now()}_${tmpCounter++}`;
 const isTmp = (id: string) => id.startsWith('tmp_');
 
-interface LibItem {
-  id: string;
-  name: string;
-  name_en: string | null;
-  muscle_group: string | null;
-  equipment: string | null;
-}
+// Tipo MIME propio para el arrastre de filas. Con 'text/plain' el navegador aplica
+// su comportamiento por defecto si la fila se suelta fuera de la tabla — por ejemplo
+// sobre el input del nombre del día — e inserta ahí el texto arrastrado. Un tipo
+// desconocido no tiene comportamiento por defecto: soltar afuera no escribe nada.
+const DRAG_MIME = 'application/x-elitefit-ex';
 
 interface EditSeries { id: string; series_number: number }
 interface EditExercise {
@@ -80,59 +79,10 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       ref_weight: e.ref_weight != null ? String(e.ref_weight) : '',
       rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
       target_rir: e.target_rir ?? '',
-      superseries_group: (e as any).superseries_group ?? '',
+      superseries_group: e.superseries_group ?? '',
       series: (e.exercise_series ?? []).map((s) => ({ id: s.id, series_number: s.series_number })),
     })),
   }));
-}
-
-function LibrarySearch({
-  onPick, onCreate,
-}: { onPick: (item: LibItem) => void; onCreate: (query: string) => void }) {
-  const supabase = createClient();
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<LibItem[]>([]);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function onChange(v: string) {
-    setQ(v);
-    if (timer.current) clearTimeout(timer.current);
-    const query = v.trim();
-    if (query.length < 2) { setResults([]); return; }
-    timer.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('exercise_library')
-        .select('id, name, name_en, muscle_group, equipment')
-        .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
-        .limit(6);
-      setResults((data ?? []) as LibItem[]);
-    }, 220);
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        className="ex-input"
-        value={q}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Buscar en la biblioteca…"
-        autoFocus
-      />
-      {q.trim().length >= 2 && (
-        <div className="lib-dropdown">
-          {results.map((r) => (
-            <button key={r.id} type="button" className="lib-item" onClick={() => onPick(r)}>
-              <span>{r.name}</span>
-              <small>{r.muscle_group}{r.equipment ? ` · ${r.equipment}` : ''}</small>
-            </button>
-          ))}
-          <button type="button" className="lib-item lib-create" onClick={() => onCreate(q.trim())}>
-            + Agregar “{q.trim()}” a la biblioteca
-          </button>
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function TemplateEditor({ templateId, initialDays }: { templateId: string; initialDays: PlanDay[] }) {
@@ -149,6 +99,13 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
 
   const [libForm, setLibForm] = useState<{ di: number; ei: number; name: string; nameEn: string; muscle: string; equipment: string } | null>(null);
   const [libSaving, setLibSaving] = useState(false);
+
+  // arrastre de filas: fila tomada y fila sobre la que se soltaría
+  const [drag, setDrag] = useState<{ di: number; ei: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ di: number; ei: number } | null>(null);
+  // asideros por ejercicio, para devolverles el foco tras mover con el teclado
+  const handleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [announcement, setAnnouncement] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
@@ -212,6 +169,71 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
       [list[ei], list[j]] = [list[j], list[ei]];
       return d;
     });
+  }
+
+  // mueve un ejercicio a otra posición del mismo día (el orden se persiste solo:
+  // al guardar, order_index sale de la posición en el arreglo)
+  function reorderExercise(di: number, from: number, to: number) {
+    const list = days[di].exercises;
+    if (from === to || to < 0 || to >= list.length) return;
+    mutate((d) => {
+      const l = d[di].exercises;
+      const [moved] = l.splice(from, 1);
+      l.splice(to, 0, moved);
+      return d;
+    });
+    setAnnouncement(`${list[from].name || 'Ejercicio'}, posición ${to + 1} de ${list.length}`);
+  }
+
+  function onHandleDragStart(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
+    setDrag({ di, ei });
+    e.dataTransfer.effectAllowed = 'move';
+    // el dataTransfer necesita datos (Firefox si no, no arrastra), pero con un tipo
+    // propio: soltar la fila fuera de la tabla no debe escribir nada en ningún campo
+    e.dataTransfer.setData(DRAG_MIME, String(ei));
+    // arrastrar la fila completa, no solo el asidero
+    const row = e.currentTarget.closest('tr');
+    if (row) e.dataTransfer.setDragImage(row, 12, 12);
+  }
+  function endDrag() { setDrag(null); setDropTarget(null); }
+
+  function onRowDragOver(di: number, ei: number, e: React.DragEvent<HTMLTableRowElement>) {
+    // Solo se reordena dentro del mismo día. El estado `drag` ya garantiza que el
+    // arrastre salió de un asidero nuestro; no se consulta dataTransfer.types acá
+    // porque Safari es irregular exponiendo tipos propios durante el dragover.
+    if (!drag || drag.di !== di) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dropTarget?.di !== di || dropTarget?.ei !== ei) setDropTarget({ di, ei });
+  }
+  // Sin esto el resalte queda pegado en la última fila sobrevolada al salir del tbody.
+  // Al pasar de una fila a otra, dragleave llega DESPUÉS del dragover de la nueva:
+  // por eso solo se limpia si el destino sigue siendo esta fila.
+  function onRowDragLeave(di: number, ei: number, e: React.DragEvent<HTMLTableRowElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setDropTarget((cur) => (cur?.di === di && cur.ei === ei ? null : cur));
+  }
+  function onRowDrop(di: number, ei: number, e: React.DragEvent<HTMLTableRowElement>) {
+    if (!drag || drag.di !== di) return;
+    e.preventDefault();
+    // el origen viaja en el dataTransfer con nuestro tipo; el estado es el respaldo
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    const from = raw === '' ? drag.ei : Number(raw);
+    if (Number.isInteger(from)) reorderExercise(di, from, ei);
+    endDrag();
+  }
+  // Teclado: el arrastre nativo no funciona con el dedo ni sin mouse.
+  function onHandleKeyDown(di: number, ei: number, e: React.KeyboardEvent) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault(); // que las flechas no hagan scroll de la página
+    const list = days[di].exercises;
+    const to = ei + (e.key === 'ArrowUp' ? -1 : 1);
+    if (to < 0 || to >= list.length) return;
+    const movedId = list[ei].id;
+    reorderExercise(di, ei, to);
+    // mover un nodo del DOM es quitarlo e insertarlo, y eso lo desenfoca en Chrome
+    // y Safari: sin esto la segunda flecha ya no movería nada
+    requestAnimationFrame(() => handleRefs.current[movedId]?.focus());
   }
 
   function changeSeries(di: number, ei: number, delta: number) {
@@ -446,6 +468,7 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
             <table className="ex-table">
               <thead>
                 <tr>
+                  <th aria-label="Orden"></th>
                   <th style={{ minWidth: 220 }}>Ejercicio</th>
                   <th style={{ minWidth: 120 }}>Músculo</th>
                   <th>Series</th>
@@ -460,7 +483,35 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
               </thead>
               <tbody>
                 {day.exercises.map((ex, ei) => (
-                  <tr key={ex.id}>
+                  <tr
+                    key={ex.id}
+                    className={[
+                      drag?.di === di && drag.ei === ei ? 'row-dragging' : '',
+                      // la línea va arriba o abajo del destino según la dirección: con
+                      // splice, arrastrar hacia abajo deja la fila DEBAJO del destino
+                      dropTarget?.di === di && dropTarget.ei === ei && drag && drag.ei !== ei
+                        ? (drag.ei > ei ? 'row-drop-above' : 'row-drop-below')
+                        : '',
+                    ].filter(Boolean).join(' ') || undefined}
+                    onDragOver={(e) => onRowDragOver(di, ei, e)}
+                    onDragLeave={(e) => onRowDragLeave(di, ei, e)}
+                    onDrop={(e) => onRowDrop(di, ei, e)}
+                  >
+                    <td className="drag-cell">
+                      <button
+                        type="button"
+                        className="drag-handle"
+                        draggable
+                        ref={(el) => { handleRefs.current[ex.id] = el; }}
+                        onDragStart={(e) => onHandleDragStart(di, ei, e)}
+                        onDragEnd={endDrag}
+                        onKeyDown={(e) => onHandleKeyDown(di, ei, e)}
+                        title="Arrastra para reordenar, o usa las flechas ↑ ↓ del teclado"
+                        aria-label={`Reordenar ${ex.name || 'ejercicio'} (${ei + 1} de ${day.exercises.length}): arrástralo, o muévelo con las flechas arriba y abajo del teclado`}
+                      >
+                        ⠿
+                      </button>
+                    </td>
                     <td>
                       {ex.library_id || !isTmp(ex.id) ? (
                         <div className="ex-name-locked" title="El nombre identifica el historial una vez asignado a un cliente.">
@@ -524,7 +575,7 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
                   </tr>
                 ))}
                 {day.exercises.length === 0 && (
-                  <tr><td colSpan={10} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
+                  <tr><td colSpan={11} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
                 )}
               </tbody>
             </table>
@@ -578,6 +629,9 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
           </div>
         </div>
       )}
+
+      {/* Anuncio para lectores de pantalla: sin esto, reordenar es mudo. */}
+      <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
 
       <div className="save-bar">
         {error && <span style={{ color: 'var(--danger)', fontSize: 13, marginRight: 'auto' }}>{error}</span>}

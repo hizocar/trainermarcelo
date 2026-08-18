@@ -10,9 +10,13 @@ import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import SectionLabel from '../../components/common/SectionLabel';
+import StatHero from '../../components/common/StatHero';
+import DataRow from '../../components/common/DataRow';
 import TrendChart from '../../components/common/TrendChart';
 import { getCurrentWeek } from '../../lib/weeks';
-import { energyPerformance, bestSet } from '../../lib/progress';
+import { energyPerformance, bestSet, latestRecord } from '../../lib/progress';
 import { resolveActiveWeek, PlanWeek } from '../../lib/plan';
 import HistoryScreen from './HistoryScreen';
 
@@ -212,8 +216,6 @@ export default function ProgressScreen() {
   }, [closedLogs, logs, exercises, seriesExMap, planDays]);
 
   // agrupado por día del plan (Torso 1, Pierna, ...) en el orden del plan
-  const toneOf = (d: number | null): 'up' | 'flat' | 'down' =>
-    d == null ? 'flat' : d > 1 ? 'up' : d < -1 ? 'down' : 'flat';
   const byDay = useMemo(() => {
     return planDays
       .map(day => ({ day, rows: progress.filter(p => p.exercise.day_id === day.id) }))
@@ -249,44 +251,34 @@ export default function ProgressScreen() {
   }, [weeklyVolume]);
 
   const hasData = closedLogs.length > 0;
-  const comparable = improving.length + steady.length + declining.length;
 
   const fmtDelta = (d: number) => `${d > 0 ? '+' : ''}${Math.round(d)}%`;
 
-  function renderRow(p: ExProgress, tone: 'up' | 'flat' | 'down') {
-    const toneColor = tone === 'up' ? colors.success : tone === 'down' ? colors.danger : colors.textMuted;
+  // récord más reciente del alumno, para el héroe de la pestaña "evolución"
+  const record = latestRecord(
+    progress.map(p => ({ name: p.exercise.name, unit: p.exercise.unit, best: p.best })),
+  );
+
+  function renderRow(p: ExProgress, index: number) {
     return (
-      <Card key={p.exercise.id} style={styles.exRow}>
-        <View style={styles.exRowHeader}>
-          <View style={styles.exRowInfo}>
-            <Text style={styles.exRowName} numberOfLines={1}>{p.exercise.name}</Text>
-            <Text style={styles.exRowMeta}>
-              Mejor: {p.best.weight}{p.exercise.unit} × {p.best.reps} (S{p.best.week})
-            </Text>
-          </View>
-          {p.delta != null && (
-            <View style={[styles.deltaBadge, { borderColor: toneColor }]}>
-              <Ionicons
-                name={tone === 'up' ? 'trending-up' : tone === 'down' ? 'trending-down' : 'remove'}
-                size={13} color={toneColor}
-              />
-              <Text style={[styles.deltaText, { color: toneColor }]}>{fmtDelta(p.delta)}</Text>
-            </View>
-          )}
-        </View>
-      </Card>
+      <DataRow
+        key={p.exercise.id}
+        label={p.exercise.name}
+        meta={
+          p.best.week > 0
+            ? `MEJOR ${p.best.weight}${p.exercise.unit} × ${p.best.reps} · S${p.best.week}`
+            : 'SIN REGISTROS'
+        }
+        value={p.delta != null ? fmtDelta(p.delta) : '—'}
+        index={index}
+      />
     );
   }
 
   return (
     <View style={styles.container}>
       {isCoachView && (
-        <View style={styles.navHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
-            <Text style={styles.backText}>ATRÁS</Text>
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader left="ATRÁS" onBack={() => navigation.goBack()} />
       )}
 
       <View style={styles.headerBlock}>
@@ -326,37 +318,50 @@ export default function ProgressScreen() {
           </Card>
         ) : (
           <>
-            {/* Resumen de evolución */}
-            <Card style={styles.summaryCard}>
-              <View style={styles.summaryTop}>
-                <View style={styles.summaryStat}>
-                  <Text style={[styles.summaryValue, { color: colors.success }]}>{improving.length}</Text>
-                  <Text style={styles.summaryLabel}>MEJORANDO</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryStat}>
-                  <Text style={styles.summaryValue}>{steady.length}</Text>
-                  <Text style={styles.summaryLabel}>MANTENIENDO</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryStat}>
-                  <Text style={[styles.summaryValue, { color: colors.danger }]}>{declining.length}</Text>
-                  <Text style={styles.summaryLabel}>POR MEJORAR</Text>
+            {/* Récord más reciente: el único héroe de la pestaña de evolución */}
+            {record && (
+              <View style={styles.hero}>
+                <SectionLabel>{`RÉCORD MÁS RECIENTE · ${record.name.toUpperCase()}`}</SectionLabel>
+                <View style={styles.heroStat}>
+                  <StatHero
+                    value={`${record.best.weight}`}
+                    unit={record.unit}
+                    suffix={`×${record.best.reps}`}
+                    label={`CONSEGUIDO EN LA SEMANA ${record.best.week}`}
+                    font="mono"
+                    size={46}
+                  />
                 </View>
               </View>
+            )}
 
-              {comparable > 0 && (
-                <View style={styles.summaryBarTrack}>
-                  {improving.length > 0 && <View style={[styles.summaryBarSeg, { flex: improving.length, backgroundColor: colors.success }]} />}
-                  {steady.length > 0 && <View style={[styles.summaryBarSeg, { flex: steady.length, backgroundColor: colors.textMuted }]} />}
-                  {declining.length > 0 && <View style={[styles.summaryBarSeg, { flex: declining.length, backgroundColor: colors.danger }]} />}
-                </View>
-              )}
+            {/* Resumen de evolución: sin tarjeta ni colores, solo la cifra.
+                La barra de proporciones que había antes vivía lejos de estos
+                tres contadores (en la tarjeta de volumen) y sin etiquetas —
+                al lado de ellos es pura redundancia, así que se elimina: el
+                dato ya está dicho tres veces con números. */}
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryStat}>
+                <Text style={styles.summaryValue}>{improving.length}</Text>
+                <Text style={styles.summaryLabel}>MEJORANDO</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryStat}>
+                <Text style={styles.summaryValue}>{steady.length}</Text>
+                <Text style={styles.summaryLabel}>MANTENIENDO</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryStat}>
+                <Text style={styles.summaryValue}>{declining.length}</Text>
+                <Text style={styles.summaryLabel}>POR MEJORAR</Text>
+              </View>
+            </View>
 
+            <Card style={styles.volumeCard}>
               {volDelta != null && (
                 <Text style={styles.volLine}>
                   Volumen{volDay ? ` DÍA ${planDays.find(d => d.id === volDay)?.day_number}` : ''} S{weeklyVolume[weeklyVolume.length - 1].week}:{' '}
-                  <Text style={{ color: volDelta >= 0 ? colors.success : colors.danger, fontWeight: '800' }}>
+                  <Text style={styles.volLineDelta}>
                     {fmtDelta(volDelta)}
                   </Text>{' '}
                   vs S{weeklyVolume[weeklyVolume.length - 2].week}
@@ -368,6 +373,7 @@ export default function ProgressScreen() {
                 <TouchableOpacity
                   style={[styles.volDayChip, volDay == null && styles.volDayChipActive]}
                   onPress={() => setVolDay(null)}
+                  hitSlop={{ top: 14, bottom: 14 }}
                 >
                   <Text style={[styles.volDayChipText, volDay == null && styles.volDayChipTextActive]}>TODO</Text>
                 </TouchableOpacity>
@@ -376,6 +382,7 @@ export default function ProgressScreen() {
                     key={d.id}
                     style={[styles.volDayChip, volDay === d.id && styles.volDayChipActive]}
                     onPress={() => setVolDay(volDay === d.id ? null : d.id)}
+                    hitSlop={{ top: 14, bottom: 14 }}
                   >
                     <Text style={[styles.volDayChipText, volDay === d.id && styles.volDayChipTextActive]}>
                       DÍA {d.day_number} · {d.name.toUpperCase()}
@@ -404,7 +411,7 @@ export default function ProgressScreen() {
               <Card highlight style={styles.energyCard}>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="flash" size={14} color={colors.accent} />
-                  <Text style={[styles.sectionLabel, { color: colors.accent }]}>ENERGÍA Y RENDIMIENTO</Text>
+                  <SectionLabel style={{ color: colors.accent }}>ENERGÍA Y RENDIMIENTO</SectionLabel>
                 </View>
                 <Text style={styles.energyHeadline}>
                   {energyStats.deltaPct > 0
@@ -415,13 +422,13 @@ export default function ProgressScreen() {
                 </Text>
                 <View style={styles.energyCompare}>
                   <View style={styles.energyCol}>
-                    <Text style={[styles.energyVal, { color: colors.danger }]}>
+                    <Text style={[styles.energyVal, { color: colors.textMuted }]}>
                       {energyStats.low.toLocaleString()}
                     </Text>
                     <Text style={styles.energyColLabel}>ENERGÍA BAJA (1-4)</Text>
                     <Text style={styles.energyDays}>{energyStats.lowDays} día{energyStats.lowDays > 1 ? 's' : ''}</Text>
                   </View>
-                  <View style={styles.summaryDivider} />
+                  <View style={styles.energyDivider} />
                   <View style={styles.energyCol}>
                     <Text style={[styles.energyVal, { color: colors.accent }]}>
                       {energyStats.high.toLocaleString()}
@@ -438,12 +445,14 @@ export default function ProgressScreen() {
               <>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="calendar-outline" size={14} color={colors.accent} />
-                  <Text style={[styles.sectionLabel, { color: colors.accent }]}>PROGRESO POR DÍA</Text>
+                  <SectionLabel style={{ color: colors.accent }}>PROGRESO POR DÍA</SectionLabel>
                 </View>
                 {byDay.map(({ day, rows }) => (
                   <View key={day.id} style={styles.dayGroup}>
                     <Text style={styles.dayGroupTitle}>DÍA {day.day_number} · {day.name.toUpperCase()}</Text>
-                    {rows.map(p => renderRow(p, toneOf(p.delta)))}
+                    <View>
+                      {rows.map((p, i) => renderRow(p, i))}
+                    </View>
                   </View>
                 ))}
               </>
@@ -455,20 +464,24 @@ export default function ProgressScreen() {
             {improving.length > 0 && (
               <>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="trending-up" size={14} color={colors.success} />
-                  <Text style={[styles.sectionLabel, { color: colors.success }]}>MEJORANDO</Text>
+                  <Ionicons name="trending-up" size={14} color={colors.textPrimary} />
+                  <SectionLabel style={{ color: colors.textPrimary }}>MEJORANDO</SectionLabel>
                 </View>
-                {improving.map(p => renderRow(p, 'up'))}
+                <View>
+                  {improving.map((p, i) => renderRow(p, i))}
+                </View>
               </>
             )}
 
             {declining.length > 0 && (
               <>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="trending-down" size={14} color={colors.danger} />
-                  <Text style={[styles.sectionLabel, { color: colors.danger }]}>POR MEJORAR</Text>
+                  <Ionicons name="trending-down" size={14} color={colors.textMuted} />
+                  <SectionLabel>POR MEJORAR</SectionLabel>
                 </View>
-                {declining.map(p => renderRow(p, 'down'))}
+                <View>
+                  {declining.map((p, i) => renderRow(p, i))}
+                </View>
               </>
             )}
 
@@ -476,9 +489,11 @@ export default function ProgressScreen() {
               <>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="remove" size={14} color={colors.textMuted} />
-                  <Text style={styles.sectionLabel}>MANTENIENDO</Text>
+                  <SectionLabel>MANTENIENDO</SectionLabel>
                 </View>
-                {steady.map(p => renderRow(p, 'flat'))}
+                <View>
+                  {steady.map((p, i) => renderRow(p, i))}
+                </View>
               </>
             )}
 
@@ -486,7 +501,7 @@ export default function ProgressScreen() {
               <>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="hourglass-outline" size={14} color={colors.textMuted} />
-                  <Text style={styles.sectionLabel}>AÚN SIN COMPARACIÓN</Text>
+                  <SectionLabel>AÚN SIN COMPARACIÓN</SectionLabel>
                 </View>
                 <Text style={styles.noHistoryText}>
                   {noHistory.map(p => p.exercise.name).join(' · ')}
@@ -506,9 +521,6 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
-  navHeader: { paddingHorizontal: spacing.xl, marginBottom: spacing.sm },
-  backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
   headerBlock: { paddingHorizontal: spacing.xl, gap: spacing.sm, marginBottom: spacing.sm },
   segment: {
@@ -516,25 +528,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: radius.full,
     borderWidth: 1, borderColor: colors.border, padding: 3,
   },
-  segmentBtn: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.full },
+  // minHeight: 44 para cumplir con Apple HIG (mínimo 44×44pt para controles táctiles):
+  // el padding del padre (segment) no amplía el área táctil real del hijo.
+  segmentBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: spacing.sm, borderRadius: radius.full },
   segmentBtnActive: { backgroundColor: colors.accent },
   segmentText: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5, color: colors.textMuted },
   segmentTextActive: { color: colors.background },
   headerLabel: { ...typography.label, letterSpacing: 3, color: colors.textMuted },
   headerName: { ...typography.display, fontSize: 30 },
 
-  summaryCard: { gap: spacing.md, marginBottom: spacing.sm },
-  summaryTop: { flexDirection: 'row', alignItems: 'center' },
-  summaryStat: { flex: 1, alignItems: 'center', gap: 2 },
-  summaryValue: { fontFamily: fonts.mono, fontSize: 26, color: colors.textPrimary },
-  summaryLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, color: colors.textMuted },
-  summaryDivider: { width: 1, height: 32, backgroundColor: colors.border },
-  summaryBarTrack: {
-    flexDirection: 'row', height: 6, borderRadius: radius.full,
-    overflow: 'hidden', gap: 2,
+  hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm },
+  heroStat: { marginTop: spacing.xs },
+
+  summaryRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border,
+    marginBottom: spacing.md,
   },
-  summaryBarSeg: { height: '100%', borderRadius: radius.full },
+  summaryStat: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm + 2 },
+  summaryValue: { fontFamily: fonts.display, fontSize: 22, color: colors.textPrimary },
+  summaryLabel: { fontSize: 8, letterSpacing: 1.5, color: colors.textMuted },
+  summaryDivider: { width: 1, backgroundColor: colors.border },
+
+  volumeCard: { gap: spacing.md, marginBottom: spacing.sm },
   volLine: { ...typography.caption, textAlign: 'center' },
+  volLineDelta: { color: colors.textPrimary, fontWeight: '800' },
   currentWeekNote: { ...typography.caption, fontSize: 10, textAlign: 'center', fontStyle: 'italic' },
   volDayChips: { gap: spacing.xs + 2 },
   volDayChip: {
@@ -550,7 +568,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
     marginTop: spacing.md,
   },
-  sectionLabel: { ...typography.label, letterSpacing: 2 },
   dayGroup: { gap: spacing.sm, marginTop: spacing.xs },
   dayGroupTitle: { ...typography.label, fontSize: 11, letterSpacing: 1.5, color: colors.textSecondary },
   rankingDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.lg },
@@ -563,18 +580,7 @@ const styles = StyleSheet.create({
   energyColLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
   energyDays: { fontSize: 9, color: colors.textMuted },
   energyFoot: { ...typography.caption, fontSize: 10, textAlign: 'center', fontStyle: 'italic' },
-
-  exRow: { gap: 0 },
-  exRowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  exRowInfo: { flex: 1 },
-  exRowName: { ...typography.h3, fontSize: 15 },
-  exRowMeta: { ...typography.monoSm, fontSize: 11, marginTop: 2 },
-  deltaBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderRadius: radius.full,
-    paddingHorizontal: spacing.sm, paddingVertical: 3,
-  },
-  deltaText: { ...typography.mono, fontSize: 12, fontWeight: undefined },
+  energyDivider: { width: 1, height: 32, backgroundColor: colors.border },
 
   noHistoryText: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
   noHistoryHint: { ...typography.caption, fontSize: 10, fontStyle: 'italic' },

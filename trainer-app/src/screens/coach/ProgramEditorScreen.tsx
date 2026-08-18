@@ -8,9 +8,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, typography } from '../../theme';
+import { MUSCLE_GROUPS } from '../../lib/muscles';
 import Card from '../../components/common/Card';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
+import { parseRepsRange, formatRepsRange } from '../../lib/reps';
+import {
+  chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel, normalizeGroups,
+} from '../../lib/superseries';
 
 // Editor de un Programa (plantilla sin cliente asignado): mismo modelo de
 // edición que PlanEditorScreen, pero sobre program_template_* — y sin
@@ -18,24 +23,8 @@ import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 // quitar algo acá lo borra de verdad. Ver también TemplateEditor.tsx (web),
 // que cubre exactamente el mismo alcance.
 
-const REPS_OPTIONS = ['4-6', '6-8', '8-10', '8-12', '10-12', '12-15', '10-15'];
 const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
 const RIR_OPTIONS = ['0', '0-1', '1-2', '2-3', '3+'];
-const MUSCLE_GROUPS = [
-  'Pecho', 'Espalda alta', 'Espalda baja',
-  'Hombro anterior', 'Hombro medial', 'Hombro posterior',
-  'Bíceps', 'Tríceps', 'Antebrazos',
-  'Cuádriceps', 'Isquiotibiales', 'Aductor',
-  'Glúteo mayor', 'Glúteo medio', 'Glúteo menor',
-  'Gastrocnemios', 'Core',
-];
-
-const GROUP_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#22c55e', '#ef4444'];
-function groupColor(group: string) {
-  let h = 0;
-  for (let i = 0; i < group.length; i++) h = (h * 31 + group.charCodeAt(i)) >>> 0;
-  return GROUP_COLORS[h % GROUP_COLORS.length];
-}
 
 interface TplExercise {
   id: string; day_id: string; name: string; name_en: string | null; library_id: string | null;
@@ -67,10 +56,10 @@ export default function ProgramEditorScreen() {
   const [showExModal, setShowExModal] = useState(false);
   const [targetDayId, setTargetDayId] = useState('');
   const [exName, setExName] = useState('');
-  const [exReps, setExReps] = useState('8-12');
+  const [exRepsFrom, setExRepsFrom] = useState('');
+  const [exRepsTo, setExRepsTo] = useState('');
   const [exUnit, setExUnit] = useState<'kg' | 'lb'>('kg');
   const [exRefWeight, setExRefWeight] = useState('');
-  const [exSuperseries, setExSuperseries] = useState('');
   const [exSeries, setExSeries] = useState('3');
   const [exNotes, setExNotes] = useState('');
   const [exMuscle, setExMuscle] = useState('');
@@ -81,6 +70,26 @@ export default function ProgramEditorScreen() {
   const [suggestions, setSuggestions] = useState<{ id: string; name: string; name_en: string | null; muscle_group: string; equipment: string | null }[]>([]);
   const [exLibrary, setExLibrary] = useState<{ name_en: string | null; library_id: string | null }>({ name_en: null, library_id: null });
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // El objetivo de reps tal como vino de la base, y si el coach tocó los campos.
+  // Un texto legado ("al fallo") se muestra entero en "desde"; si no lo edita,
+  // se vuelve a guardar tal cual en vez de reescribirlo desde el formulario.
+  const [repsOriginal, setRepsOriginal] = useState<string | null>(null);
+  const [repsTocadas, setRepsTocadas] = useState(false);
+
+  // Etiqueta de grupo tal como está guardada en la base (id → superseries_group).
+  // Es la referencia de `persistGroups`: al cargar se normaliza solo lo que se
+  // muestra, así que compararse con la lista en pantalla dejaba sin escribir
+  // justo las filas que la normalización limpió.
+  const grupoEnBase = React.useRef<Map<string, string | null>>(new Map());
+  // Guarda de concurrencia: los handlers leen `days` del closure y
+  // `persistGroups` reemplaza la lista completa del día. Dos toques rápidos en
+  // botones distintos calcularían sobre estado viejo —`nextGroupLabel` podría
+  // devolver la misma letra a dos pares distintos—, así que mientras hay una
+  // persistencia corriendo se ignoran los toques.
+  const enVuelo = React.useRef<Promise<void> | null>(null);
+  // el ref es la guarda real (síncrona); este estado es solo para que el coach
+  // VEA que los controles están inactivos en vez de sentir que no responden
+  const [operando, setOperando] = useState(false);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -99,11 +108,24 @@ export default function ProgramEditorScreen() {
     const { data: daysData } = await supabase
       .from('program_template_days').select('*').eq('template_id', templateId).order('day_number');
     const daysWithEx: TplDay[] = [];
+    // se guarda la lista CRUDA (antes de normalizar) en `grupoEnBase`: es lo
+    // que hay realmente en la base, y contra eso compara `persistGroups`.
+    const base = new Map<string, string | null>();
     for (const d of (daysData ?? [])) {
       const { data: exData } = await supabase
         .from('program_template_exercises').select('*').eq('day_id', d.id).order('order_index');
-      daysWithEx.push({ ...d, exercises: exData ?? [] });
+      for (const e of ((exData ?? []) as TplExercise[])) {
+        base.set(e.id, e.superseries_group ?? null);
+      }
+      // se normaliza solo lo que se muestra: una etiqueta huérfana —de un
+      // guardado que quedó a medias, o de programas viejos— dibujaría una
+      // píldora de grupo sobre un ejercicio suelto. No se escribe nada al
+      // cargar: reescribir los datos del coach a sus espaldas sería peor
+      // que el bug. La limpieza se guarda junto con la primera acción real
+      // del coach.
+      daysWithEx.push({ ...d, exercises: normalizeGroups(exData ?? []) });
     }
+    grupoEnBase.current = base;
     setDays(daysWithEx);
     setLoading(false);
   }
@@ -162,8 +184,9 @@ export default function ProgramEditorScreen() {
 
   function openAddExercise(dayId: string) {
     setTargetDayId(dayId);
-    setExName(''); setExReps('8-12'); setExUnit('kg');
-    setExRefWeight(''); setExSuperseries(''); setExSeries('3');
+    setExName(''); setExRepsFrom(''); setExRepsTo(''); setExUnit('kg');
+    setRepsOriginal(null); setRepsTocadas(false);
+    setExRefWeight(''); setExSeries('3');
     setExNotes(''); setExMuscle('');
     setExTempo(''); setExRest(null); setExTargetRir('');
     setExLibrary({ name_en: null, library_id: null });
@@ -175,10 +198,16 @@ export default function ProgramEditorScreen() {
     setTargetDayId(ex.day_id);
     setExSeries('3'); // el número real de series se sincroniza al guardar
     setExName(ex.name);
-    setExReps(ex.reps_objective);
+    const rango = parseRepsRange(ex.reps_objective);
+    setExRepsFrom(rango.from);
+    setExRepsTo(rango.to);
+    // se conserva el objetivo original: si el coach no toca los campos de reps
+    // (por ejemplo, entra solo a cambiar las notas) se vuelve a guardar tal
+    // cual. Un texto legado como "al fallo" no se pierde ni se trunca.
+    setRepsOriginal(ex.reps_objective ?? null);
+    setRepsTocadas(false);
     setExUnit(ex.unit);
     setExRefWeight(ex.ref_weight?.toString() ?? '');
-    setExSuperseries(ex.superseries_group ?? '');
     setExNotes(ex.notes ?? '');
     setExMuscle(ex.muscle_group ?? '');
     setExTempo(ex.tempo ?? ''); setExRest(ex.rest_seconds ?? null); setExTargetRir(ex.target_rir ?? '');
@@ -223,6 +252,12 @@ export default function ProgramEditorScreen() {
     }
     setSaving(true);
     const seriesCount = parseInt(exSeries) || 3;
+    // si el coach no tocó los campos de reps, se reescribe el objetivo original
+    // sin pasarlo por el formulario: los campos son numéricos y un valor legado
+    // ("al fallo") podría volver truncado desde el TextInput.
+    const repsObjetivo = !repsTocadas && repsOriginal !== null
+      ? repsOriginal
+      : formatRepsRange(exRepsFrom, exRepsTo);
     const fields = {
       notes: exNotes.trim() || null,
       muscle_group: exMuscle || null,
@@ -231,13 +266,14 @@ export default function ProgramEditorScreen() {
       tempo: exTempo.trim() || null,
       rest_seconds: exRest,
       target_rir: exTargetRir || null,
-      reps_objective: exReps,
+      reps_objective: repsObjetivo,
       unit: exUnit,
       ref_weight: exRefWeight ? parseFloat(exRefWeight) : null,
-      superseries_group: exSuperseries.trim() || null,
     };
 
     if (editingEx) {
+      // la agrupación se maneja desde la lista (⛓ UNIR / SACAR): editar otros
+      // campos del ejercicio no debe pisar `superseries_group`
       const { data, error } = await supabase.from('program_template_exercises')
         .update(fields).eq('id', editingEx.id).select().single();
       if (error) { setSaving(false); showAlert('Error al guardar', error.message); return; }
@@ -265,13 +301,18 @@ export default function ProgramEditorScreen() {
       const day = days.find(d => d.id === targetDayId)!;
       const orderIndex = day.exercises.length;
       const { data: exData, error } = await supabase.from('program_template_exercises').insert({
-        day_id: targetDayId, name: exName.trim(), order_index: orderIndex, ...fields,
+        day_id: targetDayId, name: exName.trim(), order_index: orderIndex,
+        // nace suelto: se encadena después desde la lista, con ⛓ UNIR.
+        // Explícito para no depender del valor por omisión de la columna.
+        superseries_group: null,
+        ...fields,
       }).select().single();
       if (error) { setSaving(false); showAlert('Error al guardar', error.message); return; }
       if (exData) {
         await supabase.from('program_template_series').insert(
           Array.from({ length: seriesCount }, (_, i) => ({ exercise_id: exData.id, series_number: i + 1 })),
         );
+        grupoEnBase.current.set(exData.id, exData.superseries_group ?? null);
         setDays(prev => prev.map(d => d.id === targetDayId ? { ...d, exercises: [...d.exercises, exData] } : d));
       }
     }
@@ -282,9 +323,102 @@ export default function ProgramEditorScreen() {
 
   function deleteExercise(ex: TplExercise) {
     showConfirm('Quitar ejercicio', `"${ex.name}" se quitará del programa.`, async () => {
-      await supabase.from('program_template_exercises').delete().eq('id', ex.id);
+      const { error } = await supabase.from('program_template_exercises').delete().eq('id', ex.id);
+      if (error) {
+        showAlert('Error', 'No se pudo quitar el ejercicio: ' + error.message);
+        return;
+      }
+      grupoEnBase.current.delete(ex.id);
+      const day = days.find(d => d.id === ex.day_id);
       setDays(prev => prev.map(d => ({ ...d, exercises: d.exercises.filter(e => e.id !== ex.id) })));
+      // quitar es el productor principal de etiquetas huérfanas: sacar un
+      // ejercicio de una biserie deja al superviviente con la etiqueta puesta
+      // en la base. Se re-normaliza y se guarda la limpieza.
+      if (day) {
+        const restante = day.exercises.filter(e => e.id !== ex.id);
+        await persistGroups(day.id, normalizeGroups(restante));
+      }
     }, 'Quitar');
+  }
+
+  // Encadenar no reordena: solo cambia `superseries_group` de los ejercicios
+  // afectados. Por eso acá nunca se toca `order_index`.
+  //
+  // Qué filas se escriben se decide contra `grupoEnBase` —lo que hay guardado—
+  // y no contra la lista en pantalla: al cargar se normaliza solo en memoria,
+  // así que compararse con ese snapshot dejaba sin escribir justo las filas que
+  // la normalización limpió. La letra se reciclaba sobre una etiqueta que
+  // seguía viva en la base, y el alumno terminaba con una triserie que el coach
+  // nunca armó. Así la limpieza viaja junto con la primera acción real del
+  // coach: al cargar no se escribe nada, pero en cuanto encadena algo la base
+  // queda igual a lo que él ve.
+  async function persistirGrupos(dayId: string, despues: TplExercise[]) {
+    // El orden de este lote importa y no es cosmético: primero las limpiezas
+    // (`null`) y después las asignaciones. Escrito en el orden de la lista, una
+    // etiqueta huérfana que quede DESPUÉS del par recién encadenado hace que la
+    // base pase por un estado real de triserie ['A','A','A'] antes de
+    // limpiarla; si justo esa última escritura falla, queda así, y el programa
+    // se asigna con una agrupación que el coach nunca armó. Limpiando primero,
+    // el peor caso deja MENOS ejercicios agrupados de los que corresponde — el
+    // lado seguro. No reordenar esto.
+    const cambiados = despues
+      .filter(e => e.superseries_group !== (grupoEnBase.current.get(e.id) ?? null))
+      .sort((a, b) => Number(a.superseries_group !== null) - Number(b.superseries_group !== null));
+    setDays(prev => prev.map(d => (d.id === dayId ? { ...d, exercises: despues } : d)));
+    for (const e of cambiados) {
+      const { error } = await supabase
+        .from('program_template_exercises')
+        .update({ superseries_group: e.superseries_group })
+        .eq('id', e.id);
+      if (error) {
+        // no se revierte a ciegas: acá pueden cambiar varias filas de una vez
+        // (una triserie encadena tres) y, si el lote falla a la mitad, parte ya
+        // quedó escrita. Volver al estado previo mostraría una agrupación que
+        // la base no tiene, y dejar el estado optimista, una que sí tiene a
+        // medias. Se recarga desde la base: lo que se ve es lo que hay guardado.
+        showAlert('Error', 'No se pudo guardar la agrupación: ' + error.message);
+        await fetchTemplate();
+        return;
+      }
+      grupoEnBase.current.set(e.id, e.superseries_group);
+    }
+  }
+
+  // Envoltorio con la guarda de concurrencia: mientras esta promesa esté viva,
+  // los handlers de ⛓ UNIR / SACAR / ✕ ignoran los toques.
+  async function persistGroups(dayId: string, despues: TplExercise[]) {
+    const tarea = persistirGrupos(dayId, despues);
+    enVuelo.current = tarea;
+    setOperando(true);
+    try {
+      await tarea;
+    } finally {
+      if (enVuelo.current === tarea) {
+        enVuelo.current = null;
+        setOperando(false);
+      }
+    }
+  }
+
+  function chainExercise(dayId: string, exerciseId: string) {
+    if (enVuelo.current) return;
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    persistGroups(dayId, chainWith(day.exercises, exerciseId));
+  }
+
+  function unchainExercise(dayId: string, exerciseId: string) {
+    if (enVuelo.current) return;
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    persistGroups(dayId, unchain(day.exercises, exerciseId));
+  }
+
+  function dissolveExerciseGroup(dayId: string, label: string) {
+    if (enVuelo.current) return;
+    const day = days.find(d => d.id === dayId);
+    if (!day) return;
+    persistGroups(dayId, dissolveGroup(day.exercises, label));
   }
 
   async function openAssign() {
@@ -394,14 +528,71 @@ export default function ProgramEditorScreen() {
               </View>
             </View>
 
-            {day.exercises.map(ex => {
-              const color = ex.superseries_group ? groupColor(ex.superseries_group) : null;
-              return (
-                <Card key={ex.id} style={color ? { ...styles.exCard, borderLeftWidth: 3, borderLeftColor: color } : styles.exCard}>
+            {day.exercises.map((ex, idx) => (
+              <React.Fragment key={ex.id}>
+                {(() => {
+                  if (idx === 0) return null;
+                  const anterior = day.exercises[idx - 1];
+                  const mismoGrupo =
+                    !!ex.superseries_group && ex.superseries_group === anterior.superseries_group;
+                  if (mismoGrupo) return null;
+                  return (
+                    <TouchableOpacity
+                      style={operando ? [styles.chainBtn, styles.controlInactivo] : styles.chainBtn}
+                      onPress={() => chainExercise(day.id, ex.id)}
+                      disabled={operando}
+                      hitSlop={{ top: 8, bottom: 8, left: 20, right: 20 }}
+                    >
+                      <View style={styles.chainLine} />
+                      <Text style={styles.chainText}>⛓ UNIR</Text>
+                      <View style={styles.chainLine} />
+                    </TouchableOpacity>
+                  );
+                })()}
+                <Card
+                  style={ex.superseries_group
+                    ? {
+                        ...styles.exCard,
+                        borderColor: colorForLabel(ex.superseries_group),
+                        borderWidth: 1.5,
+                      }
+                    : styles.exCard}
+                >
                   <View style={styles.exRow}>
                     <View style={styles.exInfo}>
                       {ex.superseries_group && (
-                        <Text style={[styles.superTag, { color: color! }]}>🔗 {ex.superseries_group}</Text>
+                        <View style={styles.superRow}>
+                          {/* tocar la etiqueta deshace el grupo entero; "SACAR"
+                              saca solo este ejercicio */}
+                          <TouchableOpacity
+                            onPress={() => dissolveExerciseGroup(day.id, ex.superseries_group!)}
+                            disabled={operando}
+                            // 16 arriba y abajo, no 12: la píldora mide ~15pt de
+                            // alto y el hitSlop es lo único que la lleva a 44pt
+                            hitSlop={{ top: 16, bottom: 16, left: 8, right: 8 }}
+                            style={[
+                              styles.superTag,
+                              { backgroundColor: colorForLabel(ex.superseries_group) },
+                              operando && styles.controlInactivo,
+                            ]}
+                          >
+                            <Text style={styles.superTagText}>
+                              ⛓ {groupNameFor(
+                                day.exercises.filter(e => e.superseries_group === ex.superseries_group).length,
+                                ex.superseries_group,
+                              )} ✕
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => unchainExercise(day.id, ex.id)}
+                            disabled={operando}
+                            style={operando ? styles.controlInactivo : undefined}
+                            // ídem: el texto mide ~11pt, con 18 de hitSlop llega a 44pt
+                            hitSlop={{ top: 18, bottom: 18, left: 12, right: 12 }}
+                          >
+                            <Text style={styles.superUnchain}>SACAR</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
                       <Text style={styles.exName}>{ex.name}</Text>
                       <Text style={styles.exMeta}>
@@ -419,8 +610,8 @@ export default function ProgramEditorScreen() {
                     </View>
                   </View>
                 </Card>
-              );
-            })}
+              </React.Fragment>
+            ))}
 
             {day.exercises.length === 0 && (
               <TouchableOpacity style={styles.addFirstEx} onPress={() => openAddExercise(day.id)}>
@@ -521,15 +712,6 @@ export default function ProgramEditorScreen() {
               </>
             )}
 
-            <Text style={styles.inputLabel}>BISERIE / TRISERIE (opcional)</Text>
-            <TextInput
-              style={styles.input}
-              value={exSuperseries}
-              onChangeText={setExSuperseries}
-              placeholder="ej: A — mismo texto = encadenados"
-              placeholderTextColor={colors.textMuted}
-            />
-
             <Text style={styles.inputLabel}>GRUPO MUSCULAR</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
               {MUSCLE_GROUPS.map(g => (
@@ -540,13 +722,30 @@ export default function ProgramEditorScreen() {
             </ScrollView>
 
             <Text style={styles.inputLabel}>OBJETIVO DE REPS</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.repsPicker}>
-              {REPS_OPTIONS.map(r => (
-                <TouchableOpacity key={r} style={[styles.repsOption, exReps === r && styles.repsOptionActive]} onPress={() => setExReps(r)}>
-                  <Text style={[styles.repsOptionText, exReps === r && styles.repsOptionTextActive]}>{r}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.repsRow}>
+              <TextInput
+                style={styles.repsInput}
+                value={exRepsFrom}
+                onChangeText={v => { setExRepsFrom(v); setRepsTocadas(true); }}
+                keyboardType="number-pad"
+                placeholder="desde"
+                placeholderTextColor={colors.textMuted}
+                // 24 y no 3: acá también cae el objetivo legado escrito a mano
+                // ("al fallo"), y en iOS `maxLength` recorta el valor puesto por
+                // JS, no solo lo que se teclea.
+                maxLength={24}
+              />
+              <Text style={styles.repsDash}>a</Text>
+              <TextInput
+                style={styles.repsInput}
+                value={exRepsTo}
+                onChangeText={v => { setExRepsTo(v); setRepsTocadas(true); }}
+                keyboardType="number-pad"
+                placeholder="hasta"
+                placeholderTextColor={colors.textMuted}
+                maxLength={24}
+              />
+            </View>
 
             <Text style={styles.inputLabel}>UNIDAD</Text>
             <View style={styles.unitPicker}>
@@ -683,7 +882,22 @@ const styles = StyleSheet.create({
   exCard: {},
   exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   exInfo: { flex: 1 },
-  superTag: { ...typography.caption, marginBottom: 2, fontWeight: '800' },
+  superRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 3 },
+  superTag: { borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  superTagText: { fontSize: 8, fontWeight: '900', letterSpacing: 1, color: colors.background },
+  superUnchain: { fontSize: 8, fontWeight: '800', letterSpacing: 1, color: colors.textMuted },
+  // el minHeight va en el propio TouchableOpacity: en React Native el padding
+  // del contenedor padre no amplía el área táctil de un hijo
+  chainBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    minHeight: 44, paddingHorizontal: spacing.md,
+  },
+  chainLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  chainText: { fontSize: 9, letterSpacing: 1.5, fontWeight: '800', color: colors.textMuted },
+  // se aplica mientras hay una agrupación guardándose: los controles quedan
+  // inactivos y tienen que verse inactivos, si no el coach toca y cree que el
+  // botón está roto. Solo opacidad: nada de spinners ni cambios de layout.
+  controlInactivo: { opacity: 0.4 },
   exName: { ...typography.h3 },
   exMeta: { ...typography.caption, marginTop: 2 },
   exActions: { flexDirection: 'row', gap: spacing.sm },
@@ -723,6 +937,17 @@ const styles = StyleSheet.create({
   repsOptionActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   repsOptionText: { ...typography.caption, color: colors.textMuted, fontWeight: '700' },
   repsOptionTextActive: { color: colors.background },
+  repsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  repsInput: {
+    // colors.card (no surface) porque el modal ya es surface: el campo tiene
+    // que despegarse del fondo, igual que el resto de los inputs
+    flex: 1, backgroundColor: colors.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingVertical: spacing.md - 4, paddingHorizontal: spacing.md,
+    fontSize: 15, color: colors.textPrimary, textAlign: 'center',
+    minHeight: 44, // área táctil real del campo, no la del contenedor
+  },
+  repsDash: { fontSize: 11, color: colors.textMuted },
   unitPicker: { flexDirection: 'row', gap: spacing.sm },
   unitOption: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   unitOptionActive: { backgroundColor: colors.accent, borderColor: colors.accent },

@@ -65,6 +65,7 @@ export default async function ClientPlanPage({
           exercises (
             id, day_id, name, name_en, library_id, muscle_group, reps_objective, unit,
             ref_weight, order_index, rest_seconds, target_rir, tempo, notes, archived,
+            superseries_group,
             exercise_series ( id, exercise_id, series_number )
           )
         `)

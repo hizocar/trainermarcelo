@@ -49,7 +49,9 @@ export interface Exercise {
   id: string;
   day_id: string;
   name: string;
-  superseries_group?: string;
+  // la columna es texto anulable: Supabase devuelve null cuando el ejercicio
+  // está suelto, y encadenar/desencadenar escribe null explícitamente
+  superseries_group?: string | null;
   reps_objective: string;
   unit: 'kg' | 'lb';
   ref_weight?: number;
