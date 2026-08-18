@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, typography } from '../../theme';
+import { MUSCLE_GROUPS } from '../../lib/muscles';
 import Card from '../../components/common/Card';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
@@ -24,14 +25,6 @@ import {
 
 const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
 const RIR_OPTIONS = ['0', '0-1', '1-2', '2-3', '3+'];
-const MUSCLE_GROUPS = [
-  'Pecho', 'Espalda alta', 'Espalda baja',
-  'Hombro anterior', 'Hombro medial', 'Hombro posterior',
-  'Bíceps', 'Tríceps', 'Antebrazos',
-  'Cuádriceps', 'Isquiotibiales', 'Aductor',
-  'Glúteo mayor', 'Glúteo medio', 'Glúteo menor',
-  'Gastrocnemios', 'Core',
-];
 
 interface TplExercise {
   id: string; day_id: string; name: string; name_en: string | null; library_id: string | null;
