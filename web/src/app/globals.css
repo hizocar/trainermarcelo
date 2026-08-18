@@ -269,6 +269,36 @@ a {
   font-weight: 900;
 }
 
+/* ── Cifras de la portada ────────────────────────────── */
+.hero-stats {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-top: 26px;
+  max-width: 420px;
+}
+.hero-stats > div {
+  flex: 1;
+  text-align: center;
+  padding: 14px 0;
+}
+.hero-stats > div + div { border-left: 1px solid var(--border); }
+.hero-stats strong {
+  display: block;
+  font-family: var(--font-display), sans-serif;
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--text);
+}
+.hero-stats .mono { font-family: var(--font-mono), monospace; font-size: 22px; }
+.hero-stats span {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 /* entrada animada */
 .fade-up {
   animation: fadeUp 0.7s ease both;

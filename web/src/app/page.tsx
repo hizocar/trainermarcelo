@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
-import BarbellHero from '@/components/BarbellHero';
+import PhoneFrame from '@/components/PhoneFrame';
 
 export default function LandingPage() {
   return (
@@ -11,11 +11,9 @@ export default function LandingPage() {
             <Logo />
           </a>
           <div className="nav-links">
-            <a href="#como-funciona">Cómo funciona</a>
-            <a href="#caracteristicas">Características</a>
+            <a href="#panel">Cómo funciona</a>
+            <a href="#app">La app de tu alumno</a>
             <a href="#precios">Precios</a>
-            <a href="#coach">Para coaches</a>
-            <a href="#descargar">Descargar</a>
           </div>
           <Link href="/login" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
             Acceso coach
@@ -23,33 +21,49 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* HERO */}
+      {/* PORTADA — le habla al coach, que es quien decide y paga */}
       <header className="hero">
         <div className="container hero-grid">
           <div>
-            <span className="hero-badge fade-up">Entrenamiento personalizado</span>
+            <span className="hero-badge fade-up">Para entrenadores</span>
             <h1 className="fade-up d1">
-              Tu plan.<br />
-              Tu progreso.<br />
-              <em>En serio.</em>
+              Deja la planilla.<br />
+              <em>No a tus alumnos.</em>
             </h1>
             <p className="sub fade-up d2">
-              Registra cada serie, sigue tu evolución semana a semana y entrena con un plan
-              diseñado por tu coach — no una rutina genérica de internet.
+              Arma los planes desde el computador. Mira quién entrenó y quién no, sin preguntar.
+              Tus alumnos registran cada serie en el teléfono y tú lo ves al instante.
             </p>
             <div className="hero-cta fade-up d3">
-              <a className="btn btn-primary" href="#descargar">Descargar la app</a>
-              <a className="btn btn-ghost" href="#como-funciona">Ver cómo funciona</a>
+              <a
+                className="btn btn-primary"
+                href="https://wa.me/56949684325?text=Hola%2C%20quiero%20ver%20una%20demo%20de%20EliteFitness"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Agendar una demo
+              </a>
+              <Link className="btn btn-ghost" href="/signup">Crear mi cuenta</Link>
             </div>
-            <div className="hero-checks fade-up d3">
-              <span>Historial completo</span>
-              <span>Funciona sin señal</span>
-              <span>Chat con tu coach</span>
+
+            <div className="hero-stats fade-up d3">
+              <div>
+                <strong>841</strong>
+                <span>ejercicios</span>
+              </div>
+              <div>
+                <strong>∞</strong>
+                <span>alumnos</span>
+              </div>
+              <div>
+                <strong className="mono">$4.990</strong>
+                <span>al mes</span>
+              </div>
             </div>
           </div>
 
           <div className="hero-visual fade-up d2">
-            <BarbellHero />
+            <PhoneFrame src="/capturas/hoy.png" alt="La pantalla de hoy en la app del alumno, con sus ejercicios y las series registradas" priority />
           </div>
         </div>
       </header>
