@@ -13,7 +13,9 @@ Dos entradas nuevas:
 - **Alumnos que buscan coach.** Hoy no existen en el producto: se entra solo por invitación de un entrenador.
 - **Coaches que buscan clientes.** Hoy llegan con su cartera hecha; la app les sirve para atenderla, no para crecerla.
 
-**El incentivo:** al coach que consigue clientes a través de la plataforma se le regala **un mes de uso de la app** por cada uno (o según la regla que se defina).
+**El incentivo:** al coach que consigue su **primer** alumno a través de la plataforma se le regala **un mes de uso de la app**. Una sola vez, no por cada alumno.
+
+**El alumno nunca paga suscripción.** Se le ayuda a encontrar coach y se le ofrece la app; quien paga sigue siendo el entrenador.
 
 ## Por qué encaja
 
@@ -27,7 +29,7 @@ Dos entradas nuevas:
 
 **1. El huevo y la gallina.** Sin alumnos buscando, ningún coach se registra para conseguirlos; sin coaches visibles, ningún alumno busca. Los marketplaces se mueren ahí. Hay que decidir por qué lado se parte, y probablemente sea **el de la demanda**: seis coaches beta ya existen, alumnos buscando todavía no.
 
-**2. La atribución, que es lo que puede romper el negocio.** ¿Cómo se sabe que un alumno llegó *por la plataforma* y no era un cliente que el coach ya tenía? Sin una regla clara, cualquier coach registra a sus alumnos de siempre como "conseguidos aquí" y acumula meses gratis. No es mala fe necesariamente: es lo que ocurre cuando la regla es ambigua. Hay que definirlo antes de prometer nada.
+**2. La atribución, acotada por la regla de "un solo mes".** ¿Cómo se sabe que un alumno llegó *por la plataforma* y no era un cliente que el coach ya tenía? La decisión de regalar **un mes por el primer alumno, una sola vez**, convierte esto de un agujero abierto en un riesgo con techo: lo máximo que puede costar una trampa es un mes por coach, para siempre. A esta escala se puede verificar a mano y no hace falta construir un sistema de atribución antes de lanzar. Habrá que construirlo si el volumen crece.
 
 **3. Contradice una decisión que se acaba de tomar.** La landing se rediseñó el 2026-08-18 para hablarle **solo al coach**, con el argumento explícito de que el alumno no puede registrarse ni paga. Esta idea convierte al alumno en un usuario que **sí** se registra por su cuenta. No es un impedimento, pero la página habría que volver a pensarla — y sería la segunda vez en poco tiempo.
 
@@ -35,14 +37,43 @@ Dos entradas nuevas:
 
 **5. Qué se le muestra al alumno.** Un buscador necesita algo por lo que filtrar: ubicación, presencial o remoto, especialidad, precio, disponibilidad. Nada de eso existe hoy en la ficha del coach.
 
-## Lo que habría que construir (estimación gruesa, sin diseñar)
+## El camino, por etapas
 
-- Registro de alumno **sin invitación**, que hoy no existe.
-- Perfil público del coach, a partir de la ficha que ya existe.
-- Buscador con filtros, y por lo tanto los campos para filtrar.
-- Un mecanismo de contacto y de aceptación: el coach debe poder decir que no.
-- Atribución y el crédito de meses gratis, ligado a la suscripción.
+Ordenado por **riesgo, no por dificultad**: primero se prueba lo que puede hacer fracasar todo, que es si aparecen alumnos buscando coach. Esa pregunta no necesita código.
+
+### Etapa 0 — Confirmar que hay demanda (sin construir nada)
+
+Marcelo y los coaches beta publican en sus redes que se puede pedir coach a través de EliteFitness. El interesado escribe al WhatsApp que **ya está** en la página. La conexión se hace a mano.
+
+**Qué se aprende:** si escribe alguien. Es la única pregunta que importa en esta etapa, y construir un buscador antes de responderla es apostar.
+
+**Qué cuesta:** nada de desarrollo. Una publicación y responder mensajes.
+
+**Cuándo pasar a la etapa 1:** cuando haya suficientes solicitudes como para que responder a mano moleste.
+
+### Etapa 1 — Perfil público del coach y un formulario
+
+- La ficha del coach que ya existe dentro de la app se publica como página pública (`/coach/marcelo-herrera`), para que se pueda compartir por Instagram o WhatsApp.
+- Un formulario de "busco coach" en la web, que deja los datos y avisa.
+- El emparejamiento sigue siendo **a mano**.
+
+**Qué se aprende:** qué buscan los alumnos, con sus palabras. Eso define los filtros de la etapa 2, en vez de inventarlos.
+
+### Etapa 2 — El alumno se registra solo y busca
+
+- Registro de alumno **sin invitación**, que hoy no existe: es el cambio más grande, porque toda la app asume que un alumno tiene coach.
+- Un listado de coaches con los filtros que la etapa 1 haya demostrado que importan.
+- Solicitud de contacto, con el coach pudiendo aceptar o rechazar.
+- **Qué ve un alumno sin coach al entrar a la app**, que hoy es una pantalla que no existe.
+
+### Etapa 3 — El incentivo automático
+
+- Marcar de dónde vino cada alumno.
+- Aplicar el mes gratis al primer alumno conseguido, una sola vez por coach.
+- Reflejarlo en la suscripción.
+
+Antes de esta etapa el incentivo se aplica **a mano**, que con la regla de "un solo mes" es perfectamente viable.
 
 ## Lo que NO se decide acá
 
-Este documento **registra la idea**, no la diseña. Cuando se decida construirla, corresponde una sesión de diseño propia: es un cambio de modelo de negocio, no una funcionalidad más — y las preguntas 1, 2 y 4 de arriba deberían responderse antes de escribir una línea de código.
+Este documento **registra la idea y su orden**, no la diseña. Cada etapa a partir de la 1 merece su propia sesión de diseño. La 2 en particular toca supuestos profundos del producto —que todo alumno tiene coach— y no debería empezarse sin haber pasado por la 0 y la 1.
