@@ -109,7 +109,7 @@ export default function LandingPage() {
             </ul>
           </div>
           <div className="split-visual">
-            <WideShot src="/capturas/editor.png" alt="Editor de plan con los días de la semana y la tabla de ejercicios de cada uno" width={1132} height={971} />
+            <WideShot src="/capturas/editor.png" alt="Editor de plan con los días de la semana y la tabla de ejercicios de cada uno" width={1132} height={504} />
           </div>
         </div>
       </section>
