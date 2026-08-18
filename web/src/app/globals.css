@@ -1112,7 +1112,6 @@ a {
   font-size: 14px;
   line-height: 1;
   cursor: grab;
-  touch-action: none;
 }
 .drag-handle:hover {
   background: var(--surface);
@@ -1129,12 +1128,29 @@ a {
 .ex-table tr.row-dragging {
   opacity: 0.4;
 }
-.ex-table tr.row-drop-target td {
+/* La línea marca dónde queda la fila: arriba del destino si sube, abajo si baja. */
+.ex-table tr.row-drop-above td {
   border-top: 2px solid var(--accent);
+}
+.ex-table tr.row-drop-below td {
+  border-bottom: 2px solid var(--accent);
 }
 .ex-table td.drag-cell {
   width: 34px;
   padding-right: 0;
+}
+
+/* Solo para lectores de pantalla (anuncio del reordenamiento). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .ex-name-locked {
