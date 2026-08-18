@@ -1,10 +1,11 @@
 import type { Slug } from 'react-native-body-highlighter';
 
-// Los grupos musculares del producto, en un solo lugar. Estaban duplicados
-// literalmente en PlanEditorScreen y ProgramEditorScreen, y el mapa muscular
-// tenía su propia traducción con nombres que no coincidían ("Gemelos" por
-// "Gastrocnemios", "Aductores" por "Aductor"): cinco grupos se dibujaban en
-// blanco sin que nada avisara. El test de este módulo impide que vuelva a pasar.
+// Los grupos musculares del producto, en un solo lugar. La lista estaba
+// duplicada literalmente en PlanEditorScreen y ProgramEditorScreen; se extrajo
+// acá junto con su traducción a las zonas del muñeco (`SLUG_POR_GRUPO`), con
+// tests que fallan si ambas listas se desalinean. Verificado contra la base:
+// los 841 ejercicios de la biblioteca usan 16 grupos distintos y los planes
+// reales usan 12, todos dentro de estos 17 — no hay etiquetas huérfanas hoy.
 export const MUSCLE_GROUPS = [
   'Pecho', 'Espalda alta', 'Espalda baja',
   'Hombro anterior', 'Hombro medial', 'Hombro posterior',

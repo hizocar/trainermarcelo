@@ -372,7 +372,13 @@ export default function WorkoutLogScreen() {
             {showImage && (
               <>
                 {exercise.muscle_group && (
-                  <MuscleMap height={172} highlights={{ [exercise.muscle_group]: 1 }} />
+                  <>
+                    {/* el mapa funde las 3 cabezas de hombro y los 3 glúteos en una
+                        sola zona: sin este texto, el alumno no puede distinguir cuál
+                        de los tres está trabajando */}
+                    <Text style={styles.muscleGroupLabel}>{exercise.muscle_group.toUpperCase()}</Text>
+                    <MuscleMap height={172} highlights={{ [exercise.muscle_group]: 1 }} />
+                  </>
                 )}
                 {exercise.image_url && (
                   <Image source={{ uri: exercise.image_url }} style={styles.exampleImage} resizeMode="cover" />
@@ -694,6 +700,7 @@ const styles = StyleSheet.create({
   exampleCard: { gap: spacing.sm, marginBottom: spacing.sm },
   exampleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   exampleTitle: { ...typography.label, color: colors.accent, letterSpacing: 2 },
+  muscleGroupLabel: { ...typography.label, textAlign: 'center' },
   exampleImage: {
     width: '100%',
     height: 200,

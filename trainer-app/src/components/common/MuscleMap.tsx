@@ -16,17 +16,20 @@ interface Props {
 }
 
 // Cuatro escalones de brillo: el músculo más trabajado llega al gris claro del
-// sistema. No hay color porque no lo hay en ninguna parte de la app.
-const ESCALA = ['#3A4048', '#5B636D', '#8A929B', colors.accent] as const;
+// sistema. No hay color porque no lo hay en ninguna parte de la app. Los tres
+// grises intermedios (`#3A4048`, `#5B636D`, `#8A929B`) no están en `colors.*`
+// a propósito: son escalones de una rampa de intensidad construida para esta
+// escala de 4 pasos, no tokens semánticos reutilizables en el resto de la app.
+export const ESCALA = ['#3A4048', '#5B636D', '#8A929B', colors.accent] as const;
 
-/** 0..1 → índice 1..4 de la escala. 0 o menos = sin resaltar. */
-function nivel(intensidad: number): number {
-  if (intensidad <= 0) return 0;
+/** 0..1 → índice 1..4 de la escala. 0, negativo o NaN = sin resaltar. */
+export function nivel(intensidad: number): number {
+  if (!(intensidad > 0)) return 0; // cubre <= 0 y NaN (NaN > 0 es false)
   return Math.min(ESCALA.length, Math.max(1, Math.ceil(intensidad * ESCALA.length)));
 }
 
 /** Traduce nuestros grupos a las zonas de la librería, quedándose con el nivel más alto. */
-function aPartesDelCuerpo(highlights: Record<string, number>): ExtendedBodyPart[] {
+export function aPartesDelCuerpo(highlights: Record<string, number>): ExtendedBodyPart[] {
   const porSlug: Record<string, number> = {};
   Object.entries(highlights).forEach(([grupo, intensidad]) => {
     const slug = SLUG_POR_GRUPO[grupo as MuscleGroup];
@@ -45,35 +48,35 @@ function aPartesDelCuerpo(highlights: Record<string, number>): ExtendedBodyPart[
 export default function MuscleMap({ highlights, height = 180, showLabels = true }: Props) {
   // la librería dibuja a 400×200 por unidad de escala
   const scale = height / 400;
-  const data = React.useMemo(() => aPartesDelCuerpo(highlights), [highlights]);
+  // sin useMemo: los llamadores pasan `highlights` inline en el JSX, así que
+  // la identidad cambia en cada render y la memoización nunca acertaría.
+  const data = aPartesDelCuerpo(highlights);
 
   return (
-    <View>
-      <View style={styles.cuerpos}>
-        <View style={styles.cuerpo}>
-          <Body
-            data={data}
-            side="front"
-            gender="male"
-            scale={scale}
-            colors={[...ESCALA]}
-            border={colors.borderLight}
-            defaultFill={colors.surface}
-          />
-          {showLabels ? <Text style={styles.etiqueta}>FRONTAL</Text> : null}
-        </View>
-        <View style={styles.cuerpo}>
-          <Body
-            data={data}
-            side="back"
-            gender="male"
-            scale={scale}
-            colors={[...ESCALA]}
-            border={colors.borderLight}
-            defaultFill={colors.surface}
-          />
-          {showLabels ? <Text style={styles.etiqueta}>POSTERIOR</Text> : null}
-        </View>
+    <View style={styles.cuerpos}>
+      <View style={styles.cuerpo}>
+        <Body
+          data={data}
+          side="front"
+          gender="male"
+          scale={scale}
+          colors={[...ESCALA]}
+          border={colors.borderLight}
+          defaultFill={colors.surface}
+        />
+        {showLabels ? <Text style={styles.etiqueta}>FRONTAL</Text> : null}
+      </View>
+      <View style={styles.cuerpo}>
+        <Body
+          data={data}
+          side="back"
+          gender="male"
+          scale={scale}
+          colors={[...ESCALA]}
+          border={colors.borderLight}
+          defaultFill={colors.surface}
+        />
+        {showLabels ? <Text style={styles.etiqueta}>POSTERIOR</Text> : null}
       </View>
     </View>
   );
