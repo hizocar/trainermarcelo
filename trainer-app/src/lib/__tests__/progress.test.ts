@@ -1,7 +1,7 @@
 import {
   score, oneRepMax, splitClosedWeeks, toneOf, weeklyDelta,
   repTopOf, suggestProgression, platesPerSide, energyPerformance, bestSet,
-  topSetByExercise, latestRecord,
+  topSetByExercise, latestRecord, seriesDoneByExercise,
 } from '../progress';
 
 describe('score / oneRepMax', () => {
@@ -231,5 +231,28 @@ describe('latestRecord', () => {
     const dominadas = { name: 'Dominadas', unit: 'kg', best: { weight: 0, reps: 12, week: 9 } };
     const prensa = { name: 'Prensa', unit: 'kg', best: { weight: 200, reps: 10, week: 3 } };
     expect(latestRecord([dominadas, prensa])).toEqual(dominadas);
+  });
+});
+
+describe('seriesDoneByExercise', () => {
+  const mapa = { s1: 'ex1', s2: 'ex1', s3: 'ex1', s4: 'ex2' };
+
+  it('cuenta las series registradas de cada ejercicio', () => {
+    const logs = [{ series_id: 's1' }, { series_id: 's2' }, { series_id: 's4' }];
+    expect(seriesDoneByExercise(logs, mapa)).toEqual({ ex1: 2, ex2: 1 });
+  });
+
+  it('reeditar una serie no la cuenta dos veces', () => {
+    // corregir una serie ya guardada deja dos registros de la misma series_id
+    const logs = [{ series_id: 's1' }, { series_id: 's1' }];
+    expect(seriesDoneByExercise(logs, mapa)).toEqual({ ex1: 1 });
+  });
+
+  it('ignora registros de series que ya no están en el plan', () => {
+    expect(seriesDoneByExercise([{ series_id: 'fantasma' }], mapa)).toEqual({});
+  });
+
+  it('sin registros devuelve un objeto vacío', () => {
+    expect(seriesDoneByExercise([], mapa)).toEqual({});
   });
 });

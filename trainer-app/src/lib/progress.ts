@@ -165,6 +165,10 @@ export function energyPerformance(
   };
 }
 
+// NOTA: `topSetByExercise` quedó sin consumidores cuando "Hoy" pasó a mostrar
+// un anillo de series por ejercicio en vez del peso levantado. Se conserva —con
+// sus tests— porque es el mismo criterio de "mejor serie" que usan `bestSet` y
+// `latestRecord`, y es lo que se necesitaría para volver a mostrar ese dato.
 export interface TopSetLog {
   series_id: string;
   weight: number;
@@ -221,4 +225,26 @@ export function latestRecord(records: ExerciseRecord[]): ExerciseRecord | null {
       ? cur
       : mejor;
   });
+}
+
+/**
+ * Cuántas series distintas lleva registradas cada ejercicio.
+ *
+ * Se cuentan `series_id` únicos, no registros: si el alumno corrige una serie
+ * ya guardada, sigue siendo una sola serie hecha. Sin esto, reeditar inflaría
+ * el conteo y un ejercicio de 3 series podría mostrar 5/3.
+ */
+export function seriesDoneByExercise(
+  logs: { series_id: string }[],
+  seriesToExercise: Record<string, string>,
+): Record<string, number> {
+  const porEjercicio: Record<string, Set<string>> = {};
+  logs.forEach(l => {
+    const exId = seriesToExercise[l.series_id];
+    if (!exId) return; // registro de una serie que ya no está en el plan
+    (porEjercicio[exId] ??= new Set()).add(l.series_id);
+  });
+  const conteo: Record<string, number> = {};
+  Object.entries(porEjercicio).forEach(([exId, set]) => { conteo[exId] = set.size; });
+  return conteo;
 }

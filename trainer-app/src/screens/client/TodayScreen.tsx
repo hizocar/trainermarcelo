@@ -15,8 +15,8 @@ import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
 import ProgressRing from '../../components/common/ProgressRing';
 import ExerciseRow, { RowState } from '../../components/client/ExerciseRow';
-import { topSetByExercise } from '../../lib/progress';
-import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
+import { seriesDoneByExercise } from '../../lib/progress';
+import { WEEK_DAYS, WEEK_DAYS_SHORT, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
 import { CARDIO_TYPES, CardioLog, fetchCardioLogs, addCardioLog, deleteCardioLog } from '../../lib/cardio';
@@ -40,7 +40,7 @@ export default function TodayScreen() {
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
   // la mejor serie registrada por ejercicio, para mostrarla en las filas ya hechas
-  const [topSets, setTopSets] = useState<Record<string, { weight: number; reps: number }>>({});
+  const [seriesDone, setSeriesDone] = useState<Record<string, number>>({});
   const [phase, setPhase] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
@@ -136,7 +136,7 @@ export default function TodayScreen() {
       Object.entries(seriesToExercise).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
     );
     setLoggedExercises(doneEx);
-    setTopSets(topSetByExercise(logs, seriesToExercise));
+    setSeriesDone(seriesDoneByExercise(logs, seriesToExercise));
 
     const status: Record<string, { total: number; done: number }> = {};
     list.forEach(d => {
@@ -316,7 +316,7 @@ export default function TodayScreen() {
                     <View style={styles.todayDot} />
                   ) : null}
                   <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
-                    DÍA {day.day_number}
+                    {day.week_day != null ? WEEK_DAYS_SHORT[day.week_day].toUpperCase() : `DÍA ${day.day_number}`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -372,7 +372,7 @@ export default function TodayScreen() {
                           exercise={ex}
                           state={rowState(ex.id)}
                           index={rowIndex}
-                          topSet={topSets[ex.id]}
+                          seriesDone={seriesDone[ex.id] ?? 0}
                           onPress={() => navigation.navigate('WorkoutLog', {
                             exercise: ex,
                             week: selectedWeek,
@@ -580,7 +580,9 @@ const styles = StyleSheet.create({
   },
   dayPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   dayPillDone: { borderColor: colors.borderLight },
-  dayPillText: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: colors.textMuted },
+  // 9px en textMuted sobre el fondo negro era ilegible en el teléfono: el
+  // texto de las píldoras sube de tamaño y de brillo
+  dayPillText: { fontSize: 12, letterSpacing: 1, fontWeight: '800', color: colors.textSecondary },
   dayPillTextActive: { color: colors.background },
   // marcadores en línea, no flotando en la esquina: en una píldora de 19px de
   // alto una insignia absoluta se sale del borde y Android la recorta

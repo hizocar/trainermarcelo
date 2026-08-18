@@ -20,8 +20,10 @@ interface Props {
   total: number;
   /** diámetro en px */
   size?: number;
-  /** texto bajo el número, en mayúsculas */
+  /** texto bajo el número, en mayúsculas. Vacío = sin etiqueta */
   label?: string;
+  /** al completarse, mostrar un ✓ en vez de "3/3" */
+  tickWhenComplete?: boolean;
 }
 
 /**
@@ -33,10 +35,14 @@ interface Props {
  * cuánto se llena — y el número del centro dice explícitamente lo que el
  * color diría.
  */
-export default function ProgressRing({ done, total, size = 132, label = 'EJERCICIOS' }: Props) {
+export default function ProgressRing({
+  done, total, size = 132, label = 'EJERCICIOS', tickWhenComplete = false,
+}: Props) {
   const reduced = useReducedMotion();
 
-  const STROKE = 9;
+  // el grosor acompaña al diámetro: 9px en el anillo héroe de 132, y algo
+  // proporcionalmente fino en los anillos chicos de cada ejercicio
+  const STROKE = Math.max(3, Math.round(size * 0.068));
   const radius = (size - STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
   const ratio = total > 0 ? Math.min(done / total, 1) : 0;
@@ -79,10 +85,15 @@ export default function ProgressRing({ done, total, size = 132, label = 'EJERCIC
         />
       </Svg>
       <View style={styles.center} pointerEvents="none">
-        <Animated.Text style={[styles.value, valueStyle]}>
-          {done}/{total}
-        </Animated.Text>
-        <Text style={styles.label}>{label}</Text>
+        {tickWhenComplete && total > 0 && done >= total ? (
+          // completo: un visto vale más que "3/3"
+          <Animated.Text style={[styles.value, { fontSize: size * 0.34 }, valueStyle]}>✓</Animated.Text>
+        ) : (
+          <Animated.Text style={[styles.value, { fontSize: size * 0.24 }, valueStyle]}>
+            {done}/{total}
+          </Animated.Text>
+        )}
+        {label ? <Text style={styles.label}>{label}</Text> : null}
       </View>
     </View>
   );
