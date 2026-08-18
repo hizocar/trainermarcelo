@@ -616,6 +616,13 @@ a {
   font-size: 17px;
 }
 
+.student-note {
+  border-top: 1px solid var(--border);
+  padding-top: 26px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
 /* Footer */
 .footer {
   border-top: 1px solid var(--border);

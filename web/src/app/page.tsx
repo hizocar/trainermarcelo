@@ -135,11 +135,11 @@ export default function LandingPage() {
       <section className="section" id="precios">
         <div className="container">
           <div className="section-head">
-            <span className="label accent">Precios</span>
-            <h2>Para un entrenador o para todo un gimnasio</h2>
-            <p className="lead">
-              El precio escala con cuántos <em style={{ fontStyle: 'normal', color: 'var(--text)' }}>entrenadores</em> hay,
-              no con cuántos clientes tengan — clientes siempre ilimitados. Cancela cuando quieras.
+            <span className="label">Precios</span>
+            <h2>Clientes ilimitados, siempre.</h2>
+            <p className="sub">
+              El precio escala con cuántos entrenadores hay, no con cuántos clientes tengan.
+              Cancela cuando quieras.
             </p>
           </div>
 
@@ -228,48 +228,62 @@ export default function LandingPage() {
           </div>
           <div className="faq">
             <details>
-              <summary>¿Cómo consigo acceso a la app?</summary>
+              <summary>¿Qué pasa con los planes que ya tengo en Excel?</summary>
               <p>
-                Si eres entrenador, te registras directo en la sección de precios de arriba. Si
-                eres cliente, el acceso es por invitación de tu entrenador — pídesela a él.
+                Los armas una vez en el editor y quedan guardados como programas reutilizables.
+                Escríbenos por WhatsApp y te ayudamos a cargar los primeros.
               </p>
             </details>
             <details>
-              <summary>¿Funciona si el gimnasio no tiene señal?</summary>
+              <summary>¿Mis alumnos tienen que pagar algo?</summary>
               <p>
-                Sí. Puedes registrar tus series sin conexión: la app guarda todo en tu teléfono y lo
-                sube automáticamente cuando vuelve el internet.
+                No. Ellos entran gratis por tu invitación; el plan lo pagas tú, y son ilimitados.
               </p>
             </details>
             <details>
-              <summary>¿En qué teléfonos está disponible?</summary>
+              <summary>¿En qué teléfonos funciona?</summary>
               <p>
-                Hoy está disponible para iPhone (vía TestFlight). La versión para Android está en
-                camino.
+                Hoy en iPhone. La versión para Android está en camino. Tú administras todo desde
+                el panel web, que funciona en cualquier computador.
               </p>
             </details>
             <details>
-              <summary>¿Puedo ver cuánto he mejorado?</summary>
+              <summary>¿Qué pasa si me arrepiento?</summary>
               <p>
-                Cada ejercicio tiene su histórico: carga total por semana, tu mejor marca y el
-                detalle de cada serie que registraste, desde el primer día.
+                Cancelas cuando quieras, sin permanencia. Tus planes y el historial de tus alumnos
+                siguen ahí si vuelves.
               </p>
             </details>
           </div>
         </div>
       </section>
 
-      {/* CTA FINAL */}
-      <section className="final-cta" id="descargar">
+      {/* CIERRE — coach */}
+      <section className="final-cta">
         <div className="container">
-          <h2>Empieza <span className="accent">hoy</span></h2>
-          <p className="lead">
-            Pídele una invitación a tu coach y descarga la app para comenzar a registrar tu
-            progreso de verdad.
+          <h2>Quince minutos y lo ves funcionando.</h2>
+          <p className="sub">
+            Te mostramos el panel con un alumno de prueba y respondemos lo que quieras preguntar.
           </p>
-          <a className="btn btn-primary" href="mailto:hizocar@gmail.com?subject=Quiero%20entrenar%20con%20la%20app">
-            Solicitar acceso
+          <a
+            className="btn btn-primary"
+            href="https://wa.me/56949684325?text=Hola%2C%20quiero%20ver%20una%20demo%20de%20EliteFitness"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Agendar una demo
           </a>
+        </div>
+      </section>
+
+      {/* ALUMNOS — al final a propósito: no son quien decide */}
+      <section className="section" id="alumnos">
+        <div className="container student-note">
+          <span className="label">¿Eres alumno?</span>
+          <p className="sub">
+            Si tu entrenador te invitó, revisa tu correo: ahí está el enlace para crear tu
+            contraseña y descargar la app. Si no te llegó, pídeselo a él.
+          </p>
         </div>
       </section>
 
@@ -286,13 +300,14 @@ export default function LandingPage() {
             </div>
             <div className="footer-col">
               <h4>Producto</h4>
-              <a href="#como-funciona">Cómo funciona</a>
-              <a href="#caracteristicas">Características</a>
-              <a href="#descargar">Descargar</a>
+              <a href="#panel">Cómo funciona</a>
+              <a href="#app">La app de tu alumno</a>
+              <a href="#precios">Precios</a>
+              <a href="#alumnos">¿Eres alumno?</a>
             </div>
             <div className="footer-col">
               <h4>Coaches</h4>
-              <a href="#coach">Panel para coaches</a>
+              <a href="#panel">Panel para coaches</a>
               <Link href="/login">Iniciar sesión</Link>
             </div>
             <div className="footer-col">
