@@ -14,7 +14,7 @@ import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
 import ProgressRing from '../../components/common/ProgressRing';
-import ExerciseRow, { RowState } from '../../components/client/ExerciseRow';
+import ExerciseRow from '../../components/client/ExerciseRow';
 import { seriesDoneByExercise } from '../../lib/progress';
 import { WEEK_DAYS, WEEK_DAYS_SHORT, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
@@ -227,10 +227,6 @@ export default function TodayScreen() {
   const nextWeek = currentWeek + 1;
   const daysToNext = daysUntilWeek(nextWeek);
 
-  // el primer ejercicio sin registrar es "el siguiente"; el resto, pendientes
-  const nextExerciseId = exercises.find(e => !loggedExercises.has(e.id))?.id ?? null;
-  const rowState = (exId: string): RowState =>
-    loggedExercises.has(exId) ? 'done' : exId === nextExerciseId ? 'next' : 'pending';
 
   return (
     <View style={styles.container}>
@@ -394,7 +390,7 @@ export default function TodayScreen() {
                         <ExerciseRow
                           key={ex.id}
                           exercise={ex}
-                          state={rowState(ex.id)}
+                          done={loggedExercises.has(ex.id)}
                           index={rowIndex}
                           seriesDone={seriesDone[ex.id] ?? 0}
                           onPress={() => navigation.navigate('WorkoutLog', {
@@ -598,7 +594,11 @@ const styles = StyleSheet.create({
   dayTabsScroll: { flexGrow: 0, marginBottom: spacing.sm },
   dayTabs: { paddingHorizontal: spacing.xl, gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.sm },
   dayPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    // minHeight explícito en vez de depender del alto del texto: sin esto, el
+    // alto de línea de la fuente decide el de la píldora y el texto se ve
+    // recortado. Con 34 también queda cerca del mínimo táctil sin verse pesada.
+    minHeight: 34,
     paddingHorizontal: spacing.sm + 3, paddingVertical: 4,
     borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
   },
@@ -606,7 +606,12 @@ const styles = StyleSheet.create({
   dayPillDone: { borderColor: colors.borderLight },
   // 9px en textMuted sobre el fondo negro era ilegible en el teléfono: el
   // texto de las píldoras sube de tamaño y de brillo
-  dayPillText: { fontSize: 12, letterSpacing: 1, fontWeight: '800', color: colors.textSecondary },
+  // lineHeight e includeFontPadding explícitos: sin ellos cada plataforma
+  // decide el alto de línea y las mayúsculas con acento (MIÉ) se recortan
+  dayPillText: {
+    fontSize: 12, lineHeight: 18, letterSpacing: 1, fontWeight: '800',
+    color: colors.textSecondary, includeFontPadding: false, textAlignVertical: 'center',
+  },
   dayPillTextActive: { color: colors.background },
   // marcadores en línea, no flotando en la esquina: en una píldora de 19px de
   // alto una insignia absoluta se sale del borde y Android la recorta

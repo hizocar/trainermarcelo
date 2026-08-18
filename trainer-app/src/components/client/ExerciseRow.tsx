@@ -9,11 +9,10 @@ import ProgressRing from '../common/ProgressRing';
 import { colors, spacing } from '../../theme';
 import { DURATION, rowDelay, EASING_OUT } from '../../lib/motion';
 
-export type RowState = 'done' | 'next' | 'pending';
-
 interface Props {
   exercise: PlanExercise;
-  state: RowState;
+  /** todas sus series registradas */
+  done: boolean;
   /** posición en la lista, para escalonar la entrada */
   index: number;
   /** series ya registradas de este ejercicio */
@@ -32,7 +31,7 @@ interface Props {
  *   next    → blanco puro, más grande, etiquetado SIGUIENTE
  *   pending → gris medio
  */
-export default function ExerciseRow({ exercise, state, index, seriesDone, onPress }: Props) {
+export default function ExerciseRow({ exercise, done, index, seriesDone, onPress }: Props) {
   const reduced = useReducedMotion();
 
   const opacity = useSharedValue(reduced ? 1 : 0);
@@ -49,8 +48,7 @@ export default function ExerciseRow({ exercise, state, index, seriesDone, onPres
     translateY.value = withDelay(delay, withSpring(0, EASING_OUT));
   }, [index, reduced]);
 
-  const isDone = state === 'done';
-  const isNext = state === 'next';
+  const isDone = done;
 
   // El atenuado de "hecho" va DENTRO del estilo animado a propósito: al aplanar
   // [styles.rowDone, animStyle] ganaba el último, y animStyle termina con
@@ -67,10 +65,11 @@ export default function ExerciseRow({ exercise, state, index, seriesDone, onPres
     <Animated.View style={[styles.row, animStyle]}>
       <TouchableOpacity style={styles.touch} onPress={onPress} activeOpacity={0.6}>
         <View style={styles.info}>
-          {/* solo el nombre: el conteo de series lo dice el anillo, y repetirlo
-              en texto era justo el ruido que este rediseño vino a sacar */}
-          <Text style={[styles.name, isNext && styles.nameNext]} numberOfLines={2}>
-            {exercise.name}
+          {/* Solo el nombre, en mayúsculas y todos con el mismo peso. El
+              conteo de series lo dice el anillo de la derecha, que también
+              deja ver cuál toca: resaltar uno solo competía con esa señal. */}
+          <Text style={styles.name} numberOfLines={2}>
+            {exercise.name.toUpperCase()}
           </Text>
         </View>
         <ProgressRing
@@ -89,6 +88,5 @@ const styles = StyleSheet.create({
   row: { borderTopWidth: 1, borderTopColor: colors.border },
   touch: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md - 4 },
   info: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  nameNext: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  name: { fontSize: 15, fontWeight: '800', letterSpacing: 0.5, color: colors.textPrimary },
 });
