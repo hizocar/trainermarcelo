@@ -60,6 +60,19 @@ Hay dos preguntas distintas y conviene no confundirlas, porque llevan a decision
 
 Un coach que no renueva **no significa que el canal falle**: significa que la app no lo convenció. Meter ambas cosas en una sola cifra —"cuántos siguieron pagando"— lleva a cerrar un canal que estaba funcionando por un problema que vive en el producto.
 
+## La dependencia de las tiendas
+
+**Estado al 2026-08-18, verificado:** la app **no está publicada en ninguna App Store** (se consultó Chile, Estados Unidos, México, Argentina y España: cero resultados). Existe solo en TestFlight. En Android nunca se ha compilado: hay identificador e icono, pero no hay `versionCode` ni cuenta de Google Play conectada.
+
+Esto **no bloquea todo por igual**, y conviene no confundirlo:
+
+- **La campaña de registro de coaches no necesita la tienda.** El coach trabaja desde el panel web, sin instalar nada. Publicar, registrar entrenadores y poblar la base se puede hacer hoy.
+- **La llegada del alumno sí la necesita.** El alumno solo tiene la app —no hay panel web para él— y a un desconocido no se le puede pedir que instale TestFlight, cree una cuenta beta y acepte una compilación que caduca a los 90 días. El embudo se rompería justo cuando funciona.
+
+**Conclusión:** enviar la app a revisión de la App Store es el camino más largo y no depende de ninguna otra etapa, así que debería empezar **en paralelo con la etapa 0**, no después.
+
+**Android es un proyecto aparte**, no un paso más: primera compilación, cuenta de Google Play y, si la cuenta de desarrollador es personal, la prueba cerrada de 12 testers durante 14 días que Google exige antes de publicar. Verificar ese requisito temprano, porque agrega semanas.
+
 ## El camino, por etapas
 
 Ordenado por **riesgo, no por dificultad**: primero se prueba lo que puede hacer fracasar todo, que es si aparecen alumnos buscando coach. Esa pregunta no necesita código.
