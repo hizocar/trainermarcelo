@@ -1194,3 +1194,22 @@ a {
 @media (max-width: 720px) {
   .phone-shot { width: 60vw; max-width: 300px; }
 }
+
+/* ── Capturas del panel (apaisadas) ──────────────────── */
+.wide-frame {
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.wide-shot {
+  display: block;
+  width: 560px;
+  max-width: 100%;
+  height: auto;
+  border-radius: 9px;
+}
+@media (max-width: 720px) {
+  .wide-shot { width: 92vw; }
+}

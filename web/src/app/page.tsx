@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import PhoneFrame from '@/components/PhoneFrame';
+import WideShot from '@/components/WideShot';
 
 export default function LandingPage() {
   return (
@@ -86,7 +87,7 @@ export default function LandingPage() {
             </ul>
           </div>
           <div className="split-visual">
-            <PhoneFrame src="/capturas/historial.png" alt="Calendario de un alumno con los días entrenados marcados" />
+            <WideShot src="/capturas/panel.png" alt="Lista de clientes del panel, con los que necesitan atención separados de los que van al día" width={1180} height={820} />
           </div>
         </div>
       </section>
@@ -108,7 +109,7 @@ export default function LandingPage() {
             </ul>
           </div>
           <div className="split-visual">
-            <PhoneFrame src="/capturas/evolucion.png" alt="Pantalla de evolución con la carga por semana de un alumno" />
+            <WideShot src="/capturas/editor.png" alt="Editor de plan con los días de la semana y la tabla de ejercicios de cada uno" width={1132} height={971} />
           </div>
         </div>
       </section>
