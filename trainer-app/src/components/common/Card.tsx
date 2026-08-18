@@ -15,7 +15,9 @@ export default function Card({ children, style, highlight }: Props) {
     <LinearGradient
       colors={
         highlight
-          ? ['rgba(200,255,0,0.08)', 'rgba(200,255,0,0.02)']
+          // el destacado se marca con brillo, no con color: el verde lima era
+          // del sistema anterior al monocromo
+          ? ['rgba(216,217,215,0.07)', 'rgba(216,217,215,0.02)']
           : [colors.cardElevated, colors.card]
       }
       start={{ x: 0, y: 0 }}

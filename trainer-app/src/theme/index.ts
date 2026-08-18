@@ -92,9 +92,10 @@ export const cardShadow = Platform.select({
   },
 });
 
-// resplandor lima para elementos destacados (CTA, valores clave)
+// resplandor para elementos destacados (CTA, valores clave). Es gris, no lima:
+// el sistema es monocromo y la jerarquía se construye con brillo.
 export const accentGlow = Platform.select({
-  web: { boxShadow: '0 4px 22px rgba(200, 255, 0, 0.28)' } as object,
+  web: { boxShadow: '0 4px 22px rgba(216, 217, 215, 0.18)' } as object,
   default: {
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
