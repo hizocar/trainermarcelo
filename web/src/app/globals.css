@@ -1256,3 +1256,21 @@ a {
     padding: 60px 0;
   }
 }
+
+/* ── Capturas de la app ──────────────────────────────── */
+.phone-frame {
+  border: 1px solid var(--border-light);
+  border-radius: 22px;
+  padding: 5px;
+  background: var(--surface);
+  width: fit-content;
+}
+.phone-shot {
+  display: block;
+  width: 300px;
+  height: auto;
+  border-radius: 17px;
+}
+@media (max-width: 720px) {
+  .phone-shot { width: 60vw; max-width: 300px; }
+}
