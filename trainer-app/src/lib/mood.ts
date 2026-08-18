@@ -33,15 +33,19 @@ export function moodValueForFace(level: MoodFaceLevel): number {
 }
 
 /**
- * Valor guardado (1-10) → cara más cercana. Los valores impares antiguos caen
- * en la cara más cercana y los empates (3, 5, 7, 9) se resuelven hacia arriba,
- * que es lo que hace Math.round. Fuera de rango se recorta a los extremos;
- * un valor no numérico devuelve null (mejor no dibujar nada que mentir).
+ * Valor guardado (1-10) → cara más cercana. Los impares antiguos quedan justo
+ * entre dos caras y el empate se resuelve HACIA ABAJO: un 7 se muestra como la
+ * cara 3 ("normal"), no como la 4 ("con energía"). Si alguien registró que
+ * andaba a medias, redondear hacia arriba le quita importancia a lo que sintió;
+ * el error tiene que caer del lado que no lo minimiza. De ahí el `ceil(x - 0.5)`
+ * en vez de `Math.round`, que empata hacia arriba.
+ * Fuera de rango se recorta a los extremos; un valor no numérico devuelve null
+ * (mejor no dibujar nada que mentir).
  */
 export function faceForMoodValue(value: number): MoodFaceLevel | null {
   if (!Number.isFinite(value)) return null;
   const clamped = Math.min(MOOD_MAX, Math.max(MOOD_MIN, value));
-  const face = Math.min(5, Math.max(1, Math.round(clamped / 2)));
+  const face = Math.min(5, Math.max(1, Math.ceil(clamped / 2 - 0.5)));
   return face as MoodFaceLevel;
 }
 

@@ -38,12 +38,12 @@ describe('faceForMoodValue', () => {
     });
   });
 
-  it('lleva los impares históricos a la cara más cercana (empate hacia arriba)', () => {
+  it('lleva los impares históricos a la cara de abajo (el empate no minimiza el cansancio)', () => {
     expect(faceForMoodValue(1)).toBe(1);
-    expect(faceForMoodValue(3)).toBe(2);
-    expect(faceForMoodValue(5)).toBe(3);
-    expect(faceForMoodValue(7)).toBe(4);
-    expect(faceForMoodValue(9)).toBe(5);
+    expect(faceForMoodValue(3)).toBe(1);
+    expect(faceForMoodValue(5)).toBe(2);
+    expect(faceForMoodValue(7)).toBe(3);
+    expect(faceForMoodValue(9)).toBe(4);
   });
 
   it('recorta los valores fuera de rango a los extremos', () => {
@@ -61,7 +61,7 @@ describe('faceForMoodValue', () => {
 
 describe('faceForMoodText', () => {
   it('lee el texto que guarda la base', () => {
-    expect(faceForMoodText('7')).toBe(4);
+    expect(faceForMoodText('7')).toBe(3);
     expect(faceForMoodText('10')).toBe(5);
   });
 

@@ -51,13 +51,16 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { if (user?.id) fetchAll(); }, [user?.id]));
 
   async function fetchAll() {
-    // ánimo: últimos 7 días
+    // ánimo: últimos 14 días. No son 30 por el ancho del gráfico: con 30 puntos
+    // en ~294pt de ancho los círculos quedan a 10pt entre centros y miden 8pt,
+    // así que la línea se convierte en una oruga. Con 14 quedan a ~22pt y se
+    // leen uno por uno.
     const { data: moodData } = await supabase
       .from('mood_logs')
       .select('*')
       .eq('user_id', user!.id)
       .order('logged_date', { ascending: false })
-      .limit(7);
+      .limit(14);
     setMoods(moodData ?? []);
 
     // plan completo en una sola consulta anidada
