@@ -17,7 +17,15 @@ Dos entradas nuevas:
 
 **El alumno nunca paga suscripción.** Se le ayuda a encontrar coach y se le ofrece la app; quien paga sigue siendo el entrenador.
 
-**El alumno que se registra sin coach ve solo el marketplace.** Buscar entrenador es su app hasta que consiga uno; el resto —plan, registro de series, progreso— aparece cuando un coach lo toma. El mes gratis del coach se activa al contactar a ese primer alumno, y es **una sola vez por coach**, no uno por cada alumno.
+**El marketplace vive en la web, no en la app** (decidido el 2026-08-18, corrige una decisión anterior). El alumno que busca coach lo hace desde el navegador; recién cuando un entrenador lo toma entra a la app, que sigue siendo lo que es hoy: la herramienta de entrenamiento, no un directorio.
+
+Esto tiene tres consecuencias buenas:
+
+- **No depende de las tiendas.** Se puede probar si el marketplace se puebla mientras Apple revisa la app, en vez de después.
+- **Desaparece el problema del alumno huérfano.** Nadie entra a la app sin coach, así que no hay que inventarle una pantalla ni rediseñar la navegación.
+- **La app no se contamina.** Sigue siendo un complemento con un propósito claro, en vez de cargar con un directorio que no le corresponde.
+
+El mes gratis del coach se activa al tomar a su primer alumno del marketplace, y es **una sola vez por coach**, no uno por cada alumno.
 
 **Para qué sirve realmente:** darle visibilidad a la app. No es una línea de ingresos —el alumno no paga y el coach recibe un descuento— sino un **canal de captación**: cada alumno que busca coach es alguien que conoce el producto, y cada coach que consigue un cliente por acá tiene una razón para quedarse.
 
