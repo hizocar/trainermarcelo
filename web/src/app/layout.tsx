@@ -8,17 +8,18 @@ const mono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '600'], variab
 
 export const metadata: Metadata = {
   title: {
-    default: 'EliteFitness · Entrenamiento personalizado',
+    default: 'EliteFitness · Software para entrenadores',
     template: '%s · EliteFitness',
   },
+  // Le habla al coach, igual que la portada: es él quien decide y paga.
   description:
-    'Entrena con un plan diseñado por tu coach, registra cada serie y mira tu progreso semana a semana. App de entrenamiento personalizado con seguimiento real.',
+    'Arma los planes de tus alumnos desde el computador y mira quién entrenó y quién no, sin preguntar. Clientes ilimitados desde $4.990 al mes.',
   applicationName: 'EliteFitness',
-  keywords: ['entrenamiento personalizado', 'coach', 'gimnasio', 'progreso', 'plan de entrenamiento', 'fitness'],
+  keywords: ['software para entrenadores', 'app para personal trainer', 'planes de entrenamiento', 'gestión de clientes', 'coach', 'gimnasio'],
   openGraph: {
-    title: 'EliteFitness · Entrenamiento personalizado',
+    title: 'Deja la planilla. No a tus alumnos.',
     description:
-      'Tu plan. Tu progreso. En serio. Registra cada serie y entrena con un plan hecho para ti por tu coach.',
+      'Arma los planes desde el computador, mira quién entrenó sin preguntar y deja que tus alumnos registren cada serie en el teléfono.',
     type: 'website',
     locale: 'es_CL',
     siteName: 'EliteFitness',
