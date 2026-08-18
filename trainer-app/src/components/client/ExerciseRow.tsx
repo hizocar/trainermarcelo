@@ -6,7 +6,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { PlanExercise } from '../../lib/plan';
 import ProgressRing from '../common/ProgressRing';
-import { colors, spacing, fonts } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { DURATION, rowDelay, EASING_OUT } from '../../lib/motion';
 
 export type RowState = 'done' | 'next' | 'pending';
@@ -28,7 +28,7 @@ interface Props {
  *
  * Tres estados con peso visual muy distinto — que todo pesara lo mismo era
  * exactamente el problema del diseño anterior:
- *   done    → atenuado, muestra lo que levantó
+ *   done    → atenuado, con las series registradas en el anillo
  *   next    → blanco puro, más grande, etiquetado SIGUIENTE
  *   pending → gris medio
  */
@@ -76,7 +76,7 @@ export default function ExerciseRow({ exercise, state, index, seriesDone, onPres
         <ProgressRing
           done={seriesDone}
           total={series}
-          size={38}
+          size={48}
           label=""
           tickWhenComplete
         />

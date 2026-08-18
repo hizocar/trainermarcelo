@@ -30,6 +30,18 @@ const PHASE_INFO: Record<string, { label: string; color: string }> = {
   descarga: { label: 'DESCARGA', color: colors.textMuted },
 };
 
+// `week_day` es un int sin restricción en la base: un valor fuera de 0-6
+// (o null) daría `undefined` en WEEK_DAYS[_SHORT] y `.toUpperCase()` lanzaría.
+// Estas dos ayudan a caer siempre en el fallback "DÍA N" / "Día N".
+const isValidWeekDay = (weekDay: number | null | undefined): weekDay is number =>
+  weekDay != null && weekDay >= 0 && weekDay <= 6;
+
+const weekDayShortLabel = (day: TrainingDay): string =>
+  isValidWeekDay(day.week_day) ? WEEK_DAYS_SHORT[day.week_day].toUpperCase() : `DÍA ${day.day_number}`;
+
+const weekDayLongLabel = (day: TrainingDay): string =>
+  isValidWeekDay(day.week_day) ? WEEK_DAYS[day.week_day] : `Día ${day.day_number}`;
+
 export default function TodayScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
@@ -131,12 +143,21 @@ export default function TodayScreen() {
     seriesToExercise: Record<string, string>,
     isCurrentWeek: boolean,
   ) {
-    const loggedSeries = new Set(logs.map(l => l.series_id));
+    const seriesDoneMap = seriesDoneByExercise(logs, seriesToExercise);
+    setSeriesDone(seriesDoneMap);
+
+    // Un ejercicio está "hecho" cuando TODAS sus series están registradas —
+    // el mismo criterio que ya usa el anillo de la fila. Antes bastaba UNA
+    // sola serie, y eso desincronizaba la fila atenuada, el anillo héroe y
+    // "SIGUIENTE" respecto del anillo de cada fila, que sí exigía todas.
+    const totalSeriesByExercise: Record<string, number> = {};
+    list.forEach(d => d.exercises.forEach(e => { totalSeriesByExercise[e.id] = e.exercise_series.length; }));
     const doneEx = new Set(
-      Object.entries(seriesToExercise).filter(([sid]) => loggedSeries.has(sid)).map(([, exId]) => exId),
+      Object.entries(totalSeriesByExercise)
+        .filter(([exId, total]) => total > 0 && (seriesDoneMap[exId] ?? 0) >= total)
+        .map(([exId]) => exId),
     );
     setLoggedExercises(doneEx);
-    setSeriesDone(seriesDoneByExercise(logs, seriesToExercise));
 
     const status: Record<string, { total: number; done: number }> = {};
     list.forEach(d => {
@@ -307,6 +328,9 @@ export default function TodayScreen() {
                   style={[styles.dayPill, active && styles.dayPillActive, complete && !active && styles.dayPillDone]}
                   onPress={() => selectDay(day)}
                   activeOpacity={0.7}
+                  // la píldora mide ~24pt de alto; hitSlop la lleva al mínimo
+                  // táctil de 44pt sin tocar su aspecto
+                  hitSlop={{ top: 10, bottom: 10 }}
                 >
                   {complete ? (
                     <View style={styles.tabBadge}>
@@ -316,7 +340,7 @@ export default function TodayScreen() {
                     <View style={styles.todayDot} />
                   ) : null}
                   <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
-                    {day.week_day != null ? WEEK_DAYS_SHORT[day.week_day].toUpperCase() : `DÍA ${day.day_number}`}
+                    {weekDayShortLabel(day)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -422,7 +446,7 @@ export default function TodayScreen() {
               <Card style={styles.noExCard}>
                 <Text style={styles.noExTitle}>SIN EJERCICIOS</Text>
                 <Text style={styles.noExText}>
-                  Tu coach aún no ha agregado ejercicios para el {selectedDay.week_day != null ? WEEK_DAYS[selectedDay.week_day] : `Día ${selectedDay.day_number}`}.
+                  Tu coach aún no ha agregado ejercicios para el {weekDayLongLabel(selectedDay)}.
                 </Text>
               </Card>
             )}
