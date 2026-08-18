@@ -46,6 +46,10 @@ export default function TodayScreen() {
   const [days, setDays] = useState<PlanDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<PlanDay | null>(null);
   const selectedIdRef = React.useRef<string | null>(null);
+  // Días completos de la vuelta anterior de applyWeek — solo así pickSelectedDayId
+  // distingue "se acaba de completar" (avanza) de "se eligió para revisar un
+  // día viejo ya completo" (se respeta). Ver src/lib/selectedDay.ts.
+  const previousCompletedIdsRef = React.useRef<Set<string>>(new Set());
   const [exercises, setExercises] = useState<PlanExercise[]>([]);
   const [loggedExercises, setLoggedExercises] = useState<Set<string>>(new Set());
   const [dayStatus, setDayStatus] = useState<Record<string, { total: number; done: number }>>({});
@@ -176,14 +180,18 @@ export default function TodayScreen() {
     }
 
     // selección: conservar la elección manual solo mientras ese día no esté
-    // completo; si ya se completó, saltar al siguiente incompleto (ver
-    // pickSelectedDayId en lib/selectedDay.ts).
+    // completo; si ACABA de completarse, saltar al siguiente incompleto. Si
+    // el día seleccionado ya venía completo de la vuelta anterior (el alumno
+    // lo eligió para revisarlo), se respeta y no se mueve — ver
+    // pickSelectedDayId en lib/selectedDay.ts.
     const completedIds = new Set(
       list.filter(d => (status[d.id]?.total ?? 0) > 0 && status[d.id].done >= status[d.id].total).map(d => d.id),
     );
-    const selectedId = pickSelectedDayId(list, completedIds, selectedIdRef.current, todayWeekDay);
+    const previousSelectionWasComplete = !!selectedIdRef.current && previousCompletedIdsRef.current.has(selectedIdRef.current);
+    const selectedId = pickSelectedDayId(list, completedIds, selectedIdRef.current, todayWeekDay, previousSelectionWasComplete);
     const selected = list.find(d => d.id === selectedId) ?? null;
     selectedIdRef.current = selected?.id ?? null;
+    previousCompletedIdsRef.current = completedIds;
     setSelectedDay(selected);
     setExercises(selected?.exercises ?? []);
     if (selected) loadNote(selected.id);
