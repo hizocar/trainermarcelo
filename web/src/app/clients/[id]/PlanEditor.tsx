@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
+import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import type { PlanDay } from '@/lib/types';
 
 const WEEKDAYS = ['—', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -20,14 +21,6 @@ const MUSCLE_GROUPS = [
 let tmpCounter = 0;
 const tmpId = () => `tmp_${Date.now()}_${tmpCounter++}`;
 const isTmp = (id: string) => id.startsWith('tmp_');
-
-interface LibItem {
-  id: string;
-  name: string;
-  name_en: string | null;
-  muscle_group: string | null;
-  equipment: string | null;
-}
 
 interface EditSeries { id: string; series_number: number }
 interface EditExercise {
@@ -82,56 +75,6 @@ function toEditModel(days: PlanDay[]): EditDay[] {
   }));
 }
 
-/** Buscador contra exercise_library: la única forma de nombrar un ejercicio nuevo. */
-function LibrarySearch({
-  onPick, onCreate,
-}: { onPick: (item: LibItem) => void; onCreate: (query: string) => void }) {
-  const supabase = createClient();
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<LibItem[]>([]);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function onChange(v: string) {
-    setQ(v);
-    if (timer.current) clearTimeout(timer.current);
-    const query = v.trim();
-    if (query.length < 2) { setResults([]); return; }
-    timer.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('exercise_library')
-        .select('id, name, name_en, muscle_group, equipment')
-        .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
-        .limit(6);
-      setResults((data ?? []) as LibItem[]);
-    }, 220);
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        className="ex-input"
-        value={q}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Buscar en la biblioteca…"
-        autoFocus
-      />
-      {q.trim().length >= 2 && (
-        <div className="lib-dropdown">
-          {results.map((r) => (
-            <button key={r.id} type="button" className="lib-item" onClick={() => onPick(r)}>
-              <span>{r.name}</span>
-              <small>{r.muscle_group}{r.equipment ? ` · ${r.equipment}` : ''}</small>
-            </button>
-          ))}
-          <button type="button" className="lib-item lib-create" onClick={() => onCreate(q.trim())}>
-            + Agregar “{q.trim()}” a la biblioteca
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function PlanEditor({ planId, planWeekId, initialDays }: { planId: string; planWeekId: string; initialDays: PlanDay[] }) {
   const supabase = createClient();
   const [days, setDays] = useState<EditDay[]>(() => toEditModel(initialDays));
@@ -147,6 +90,10 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
   // formulario "agregar a biblioteca": { di, ei } de la fila que lo abrió
   const [libForm, setLibForm] = useState<{ di: number; ei: number; name: string; nameEn: string; muscle: string; equipment: string } | null>(null);
   const [libSaving, setLibSaving] = useState(false);
+
+  // arrastre de filas: fila tomada y fila sobre la que se soltaría
+  const [drag, setDrag] = useState<{ di: number; ei: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ di: number; ei: number } | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
@@ -212,6 +159,48 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
       [list[ei], list[j]] = [list[j], list[ei]];
       return d;
     });
+  }
+
+  // mueve un ejercicio a otra posición del mismo día (el orden se persiste solo:
+  // al guardar, order_index sale de la posición en el arreglo)
+  function reorderExercise(di: number, from: number, to: number) {
+    if (from === to) return;
+    mutate((d) => {
+      const list = d[di].exercises;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return d;
+    });
+  }
+
+  function onHandleDragStart(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
+    setDrag({ di, ei });
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox no inicia el arrastre si no hay datos en el dataTransfer
+    e.dataTransfer.setData('text/plain', String(ei));
+    // arrastrar la fila completa, no solo el asidero
+    const row = e.currentTarget.closest('tr');
+    if (row) e.dataTransfer.setDragImage(row, 12, 12);
+  }
+  function endDrag() { setDrag(null); setDropTarget(null); }
+
+  function onRowDragOver(di: number, ei: number, e: React.DragEvent<HTMLTableRowElement>) {
+    if (!drag || drag.di !== di) return; // solo se reordena dentro del mismo día
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dropTarget?.di !== di || dropTarget?.ei !== ei) setDropTarget({ di, ei });
+  }
+  function onRowDrop(di: number, ei: number, e: React.DragEvent<HTMLTableRowElement>) {
+    if (!drag || drag.di !== di) return;
+    e.preventDefault();
+    reorderExercise(di, drag.ei, ei);
+    endDrag();
+  }
+  // Teclado: el arrastre nativo no funciona con el dedo ni sin mouse.
+  function onHandleKeyDown(di: number, ei: number, e: React.KeyboardEvent) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    moveExercise(di, ei, e.key === 'ArrowUp' ? -1 : 1);
   }
 
   function changeSeries(di: number, ei: number, delta: number) {
@@ -458,6 +447,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
             <table className="ex-table">
               <thead>
                 <tr>
+                  <th aria-label="Orden"></th>
                   <th style={{ minWidth: 220 }}>Ejercicio</th>
                   <th style={{ minWidth: 120 }}>Músculo</th>
                   <th>Series</th>
@@ -472,7 +462,29 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
               </thead>
               <tbody>
                 {day.exercises.map((ex, ei) => (
-                  <tr key={ex.id}>
+                  <tr
+                    key={ex.id}
+                    className={[
+                      drag?.di === di && drag.ei === ei ? 'row-dragging' : '',
+                      dropTarget?.di === di && dropTarget.ei === ei && drag?.ei !== ei ? 'row-drop-target' : '',
+                    ].filter(Boolean).join(' ') || undefined}
+                    onDragOver={(e) => onRowDragOver(di, ei, e)}
+                    onDrop={(e) => onRowDrop(di, ei, e)}
+                  >
+                    <td className="drag-cell">
+                      <button
+                        type="button"
+                        className="drag-handle"
+                        draggable
+                        onDragStart={(e) => onHandleDragStart(di, ei, e)}
+                        onDragEnd={endDrag}
+                        onKeyDown={(e) => onHandleKeyDown(di, ei, e)}
+                        title="Arrastra para reordenar, o usa las flechas ↑ ↓ del teclado"
+                        aria-label={`Reordenar ${ex.name || 'ejercicio'} (${ei + 1} de ${day.exercises.length}): arrástralo, o muévelo con las flechas arriba y abajo del teclado`}
+                      >
+                        ⠿
+                      </button>
+                    </td>
                     <td>
                       {ex.library_id || !isTmp(ex.id) ? (
                         <div className="ex-name-locked" title="El nombre identifica el historial. Para cambiar el ejercicio, quítalo y agrega otro.">
@@ -536,7 +548,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                   </tr>
                 ))}
                 {day.exercises.length === 0 && (
-                  <tr><td colSpan={10} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
+                  <tr><td colSpan={11} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
                 )}
               </tbody>
             </table>

@@ -1056,16 +1056,17 @@ a {
 }
 
 /* biblioteca de ejercicios */
+/* Va en un portal a document.body: position fixed y coordenadas de viewport
+   calculadas desde el input. Adentro de la tabla quedaba recortado por el
+   contenedor con overflow-x: auto. z-index bajo el modal (90). */
 .lib-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
   min-width: 280px;
-  z-index: 50;
+  z-index: 80;
   background: var(--card-elevated);
   border: 1px solid var(--border-light);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-y: auto;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
 }
 .lib-item {
@@ -1096,6 +1097,46 @@ a {
   font-weight: 700;
   border-bottom: none;
 }
+/* Asidero para reordenar ejercicios: arrastre nativo del navegador con el mouse
+   y flechas ↑ ↓ con el teclado (el arrastre nativo no responde al dedo). */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 30px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.drag-handle:hover {
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+.drag-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  color: var(--text);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.ex-table tr.row-dragging {
+  opacity: 0.4;
+}
+.ex-table tr.row-drop-target td {
+  border-top: 2px solid var(--accent);
+}
+.ex-table td.drag-cell {
+  width: 34px;
+  padding-right: 0;
+}
+
 .ex-name-locked {
   display: flex;
   align-items: center;
