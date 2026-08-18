@@ -68,100 +68,65 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* CÓMO FUNCIONA */}
-      <section className="section" id="como-funciona">
-        <div className="container">
-          <div className="section-head">
-            <span className="label accent">Cómo funciona</span>
-            <h2>De la invitación al primer PR</h2>
-            <p className="lead">Tres pasos y estás entrenando con seguimiento real.</p>
+      {/* PRUEBA 1 — el panel */}
+      <section className="section" id="panel">
+        <div className="container split-section">
+          <div>
+            <span className="label">El panel</span>
+            <h2>Sabe quién entrenó. Sin preguntar.</h2>
+            <p className="sub">
+              Tus alumnos aparecen separados entre los que necesitan atención y los que van al día.
+              El umbral se ajusta al plan de cada uno: quien entrena dos veces por semana no te
+              aparece como alerta por no entrenar un martes.
+            </p>
+            <ul className="ticks">
+              <li>Días entrenados de los planificados, por alumno</li>
+              <li>Cuándo entrenó por última vez</li>
+              <li>Las notas que te dejó en cada sesión</li>
+            </ul>
           </div>
-          <div className="steps">
-            <div className="step">
-              <div className="step-num">1</div>
-              <h3>Tu coach te invita</h3>
-              <p>Recibes tu acceso personal. Nada de registros abiertos: aquí entrenas acompañado desde el día uno.</p>
-            </div>
-            <div className="step">
-              <div className="step-num">2</div>
-              <h3>Entrenas con tu plan</h3>
-              <p>Días, ejercicios, series y objetivos definidos por tu coach. Registra peso y reps en segundos, incluso sin señal en el gimnasio.</p>
-            </div>
-            <div className="step">
-              <div className="step-num">3</div>
-              <h3>Ves tu progreso</h3>
-              <p>Gráficos de carga total, mejores marcas, calendario de entrenamientos y sugerencias de progresión automáticas.</p>
-            </div>
+          <div className="split-visual">
+            <PhoneFrame src="/capturas/historial.png" alt="Calendario de un alumno con los días entrenados marcados" />
           </div>
         </div>
       </section>
 
-      {/* CARACTERÍSTICAS */}
-      <section className="section" id="caracteristicas">
+      {/* PRUEBA 2 — el editor */}
+      <section className="section">
+        <div className="container split-section reverse">
+          <div>
+            <span className="label">El editor</span>
+            <h2>Armas el plan una vez.</h2>
+            <p className="sub">
+              Desde el computador, con teclado y pantalla grande. Guarda un programa y reutilízalo
+              con todos los alumnos que quieras; cada cambio llega al instante a su teléfono.
+            </p>
+            <ul className="ticks">
+              <li>Biseries y triseries con un toque</li>
+              <li>Semanas independientes, con descarga</li>
+              <li>841 ejercicios en la biblioteca</li>
+            </ul>
+          </div>
+          <div className="split-visual">
+            <PhoneFrame src="/capturas/evolucion.png" alt="Pantalla de evolución con la carga por semana de un alumno" />
+          </div>
+        </div>
+      </section>
+
+      {/* PRUEBA 3 — lo que ve el alumno */}
+      <section className="section" id="app">
         <div className="container">
           <div className="section-head">
-            <span className="label accent">Por qué funciona</span>
-            <h2>Todo lo que necesitas para avanzar</h2>
-            <p className="lead">
-              Pensada junto a un entrenador real para que cada sesión cuente y nada se pierda.
+            <span className="label">La app de tu alumno</span>
+            <h2>Así te va a ver tu cliente.</h2>
+            <p className="sub">
+              Tu nombre, tu foto y tu Instagram dentro de la app que usa todos los días.
+              Registra sus series, ve su progreso y te escribe sin salir de ahí.
             </p>
           </div>
-          <div className="features">
-            <div className="feature">
-              <div className="ico">🏋️</div>
-              <h3>Planes por objetivo</h3>
-              <p>Tu coach arma tus días, ejercicios, series, tempo, descanso y RIR. Tú solo entrenas.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">📈</div>
-              <h3>Progreso real</h3>
-              <p>Cada peso y repetición queda registrado. Carga total por semana, tendencias y mejores marcas por ejercicio.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">🗓️</div>
-              <h3>Historial completo</h3>
-              <p>Calendario estilo anillos con cada sesión: toca un día y revisa exactamente qué levantaste.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">💬</div>
-              <h3>Conectado a tu coach</h3>
-              <p>Chat integrado con fotos y notas de voz, más notas por sesión para que nada se quede en el aire.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">⏱️</div>
-              <h3>Descanso y precisión</h3>
-              <p>Temporizador de descanso con aviso, RIR objetivo y sugerencias de progresión cuando completas el rango.</p>
-            </div>
-            <div className="feature">
-              <div className="ico">📶</div>
-              <h3>Funciona sin señal</h3>
-              <p>Registra en el gimnasio aunque no haya internet: todo se sincroniza solo cuando vuelve la señal.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* COACH */}
-      <section className="section" id="coach">
-        <div className="container">
-          <div className="coach-band">
-            <div>
-              <span className="label accent">Para entrenadores</span>
-              <h2>Tu negocio, bajo control</h2>
-              <ul className="coach-list">
-                <li>Edita los planes de todos tus clientes desde el computador, con teclado y pantalla grande.</li>
-                <li>Monitorea el progreso por día del plan y detecta solapes de volumen por grupo muscular.</li>
-                <li>Lee las notas de cada sesión y responde por chat sin salir de la app.</li>
-                <li>Cada cambio llega al instante al teléfono de tu cliente.</li>
-              </ul>
-            </div>
-            <div className="coach-cta">
-              <span className="big">Panel web para coaches</span>
-              <span className="muted" style={{ fontSize: 14 }}>
-                Entra con las mismas credenciales de tu app.
-              </span>
-              <Link className="btn btn-primary" href="/login">Entrar al panel</Link>
-            </div>
+          <div className="shots-row">
+            <PhoneFrame src="/capturas/inicio.png" alt="Pantalla de inicio del alumno con sus días entrenados de la semana" />
+            <PhoneFrame src="/capturas/perfil.png" alt="Perfil del alumno mostrando la ficha de su entrenador" />
           </div>
         </div>
       </section>

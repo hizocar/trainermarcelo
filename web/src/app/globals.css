@@ -397,148 +397,39 @@ a {
   font-size: 17px;
 }
 
-/* Pasos */
-.steps {
+/* ── Secciones con captura al lado ───────────────────── */
+.split-section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  counter-reset: step;
+  grid-template-columns: 1fr auto;
+  gap: 48px;
+  align-items: center;
 }
-.step {
+.split-section.reverse > *:first-child { order: 2; }
+.split-visual { display: flex; justify-content: center; }
+.ticks { list-style: none; padding: 0; margin: 20px 0 0; }
+.ticks li {
   position: relative;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 30px 26px 26px;
-  overflow: hidden;
+  padding: 9px 0 9px 22px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 14px;
 }
-.step::after {
-  counter-increment: step;
-  content: '0' counter(step);
+.ticks li::before {
+  content: '✓';
   position: absolute;
-  top: 12px;
-  right: 18px;
-  font-family: var(--font-display), sans-serif;
-  font-size: 54px;
-  line-height: 1;
-  color: var(--surface);
-  -webkit-text-stroke: 1px var(--border-light);
+  left: 0;
+  color: var(--text-muted);
 }
-.step-num {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: #00030d;
+.shots-row {
   display: flex;
-  align-items: center;
+  gap: 28px;
   justify-content: center;
-  font-weight: 900;
-  font-size: 17px;
-  margin-bottom: 18px;
+  flex-wrap: wrap;
+  margin-top: 32px;
 }
-.step h3 {
-  font-size: 18px;
-  margin-bottom: 8px;
-}
-.step p {
-  color: var(--text-secondary);
-  font-size: 14px;
-  position: relative;
-  z-index: 1;
-}
-
-/* Features */
-.features {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-}
-.feature {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 28px 26px;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.25s ease;
-}
-.feature:hover {
-  transform: translateY(-4px);
-  border-color: rgba(216, 217, 215, 0.45);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-}
-.feature .ico {
-  width: 46px;
-  height: 46px;
-  border-radius: 13px;
-  background: var(--accent-soft);
-  border: 1px solid rgba(216, 217, 215, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 21px;
-  margin-bottom: 18px;
-}
-.feature h3 {
-  font-size: 17px;
-  margin-bottom: 7px;
-}
-.feature p {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-/* Banda coach */
-.coach-band {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(115deg, var(--accent-soft), rgba(216, 217, 215, 0.02) 55%, transparent);
-  border: 1px solid rgba(216, 217, 215, 0.18);
-  border-radius: 28px;
-  padding: 52px;
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 40px;
-  align-items: center;
-}
-.coach-band h2 {
-  margin: 10px 0 14px;
-}
-.coach-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 22px;
-}
-.coach-list li {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  color: var(--text-secondary);
-  font-size: 15px;
-}
-.coach-list li::before {
-  content: '→';
-  color: var(--accent);
-  font-weight: 900;
-  flex-shrink: 0;
-}
-.coach-cta {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  align-items: stretch;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 30px;
-  text-align: center;
-}
-.coach-cta .big {
-  font-family: var(--font-display), sans-serif;
-  font-size: 24px;
-  text-transform: uppercase;
-  line-height: 1.05;
+@media (max-width: 720px) {
+  .split-section { grid-template-columns: 1fr; gap: 28px; }
+  .split-section.reverse > *:first-child { order: 0; }
 }
 
 /* ── Precios ─────────────────────────────────────────── */
@@ -1270,14 +1161,6 @@ a {
   .barbell-hero {
     max-width: 340px;
     gap: 20px;
-  }
-  .steps,
-  .features {
-    grid-template-columns: 1fr;
-  }
-  .coach-band {
-    grid-template-columns: 1fr;
-    padding: 34px 26px;
   }
   .nav-links {
     display: none;
