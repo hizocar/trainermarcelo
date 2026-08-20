@@ -74,3 +74,22 @@ $$;
 revoke execute on function public.update_my_profile(text,text,text[],text[],text,boolean) from public;
 grant execute on function public.update_my_profile(text,text,text[],text[],text,boolean)
   to authenticated;
+
+-- ---------- Cifras del canal (cola de aprobación) ----------
+
+-- coach_requests y request_applications no tienen política de lectura para
+-- nadie —eso es lo que protege el teléfono del alumno—, así que un
+-- count: 'exact' del cliente sobre esas tablas siempre da cero. Esta vista
+-- es la única forma de mostrar las cifras, y por eso su WHERE es la
+-- autorización, igual que en pending_coaches: sin sesión de admin, ninguna
+-- fila sale de acá.
+create or replace view public.marketplace_stats
+with (security_invoker = false) as
+select
+  (select count(*) from public.coach_requests)                         as solicitudes,
+  (select count(*) from public.request_applications)                   as postulaciones,
+  (select count(*) from public.coach_requests where status = 'matched') as tomadas
+where exists (select 1 from public.users me
+              where me.id = auth.uid() and me.is_platform_admin);
+
+grant select on public.marketplace_stats to authenticated;
