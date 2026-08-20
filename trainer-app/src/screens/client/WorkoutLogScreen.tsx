@@ -254,6 +254,14 @@ export default function WorkoutLogScreen() {
   }
 
   function updateEntry(index: number, field: 'weight' | 'reps' | 'rir', value: string) {
+    // permitir solo dígitos y un separador decimal (punto o coma)
+    const clean = value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/, '$1');
+    const aplicar = (extra?: Partial<SeriesEntry>) =>
+      setEntries(prev => prev.map((x, i) => i === index
+        ? { ...x, [field]: clean, saved: false, ...extra }
+        : x
+      ));
+
     const e = entries[index];
     if (necesitaConfirmar({ esPropio, yaRegistrada: e.yaRegistrada, desbloqueada: e.desbloqueada })) {
       const cur = currentLogRef.current[e.series.id];
@@ -264,18 +272,25 @@ export default function WorkoutLogScreen() {
           weight: cur?.weight ?? 0,
           reps: cur?.reps ?? 0,
         }),
-        () => setEntries(prev => prev.map((x, i) => i === index ? { ...x, desbloqueada: true } : x)),
+        // Al confirmar se aplica TAMBIÉN la tecla que disparó la confirmación:
+        // si solo se desbloqueara, el campo volvería al valor viejo y el coach
+        // tendría que teclear de nuevo con el alumno esperando.
+        () => aplicar({ desbloqueada: true }),
         'Reemplazar',
       );
       return;
     }
 
-    // permitir solo dígitos y un separador decimal (punto o coma)
-    const clean = value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/, '$1');
-    setEntries(prev => prev.map((e, i) => i === index
-      ? { ...e, [field]: clean, saved: false }
-      : e
-    ));
+    aplicar();
+  }
+
+  /** ¿Esta serie es del alumno y el coach todavía no confirmó pisarla? */
+  function pendienteDeConfirmar(e: SeriesEntry) {
+    return necesitaConfirmar({
+      esPropio,
+      yaRegistrada: e.yaRegistrada,
+      desbloqueada: e.desbloqueada,
+    });
   }
 
   const toNum = (s: string) => {
@@ -299,7 +314,12 @@ export default function WorkoutLogScreen() {
     const list = entriesRef.current;
     const toSave = list
       .map((e, i) => ({ i, e, weightNum: toNum(e.weight), repsNum: toNum(e.reps) }))
-      .filter(({ e, weightNum, repsNum }) => !e.saved && weightNum != null && repsNum != null);
+      // `pendienteDeConfirmar` no debería filtrar nada acá (una serie del alumno
+      // sin confirmar nunca queda `saved: false`), pero la regla se escribe en
+      // TODOS los caminos de escritura: es la única que protege el registro del
+      // alumno de que se lo pisen sin querer.
+      .filter(({ e, weightNum, repsNum }) =>
+        !e.saved && weightNum != null && repsNum != null && !pendienteDeConfirmar(e));
     if (toSave.length === 0) return;
 
     for (const { i, e, weightNum, repsNum } of toSave) {
@@ -340,11 +360,20 @@ export default function WorkoutLogScreen() {
 
   function applySuggestion() {
     if (!suggestion) return;
-    setEntries(prev => prev.map((e, i) => ({ ...e, weight: String(suggestion[i]), saved: false })));
+    // Las series del alumno que el coach todavía no confirmó reemplazar se
+    // dejan como están: la sugerencia no es una confirmación.
+    setEntries(prev => prev.map((e, i) => pendienteDeConfirmar(e)
+      ? e
+      : { ...e, weight: String(suggestion[i]), saved: false }));
   }
 
   async function saveAll() {
+    // Las series que ya venían registradas llegan PRELLENADAS desde currentMap:
+    // sin este filtro, guardar reescribía las series 1-3 del alumno con la fecha
+    // de hoy y el entrenamiento saltaba de día en el calendario del coach,
+    // aunque los números no cambiaran.
     const toSave = entries
+      .filter(e => !pendienteDeConfirmar(e))
       .map(e => ({ ...e, weightNum: toNum(e.weight), repsNum: toNum(e.reps), rirNum: e.rir === '' ? null : Math.min(9, Math.round(toNum(e.rir) ?? 0)) }))
       .filter(e => e.weightNum != null && e.repsNum != null);
     if (toSave.length === 0) {
