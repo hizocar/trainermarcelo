@@ -73,63 +73,58 @@ export async function loadCoachDashboard(
   ((weeks ?? []) as PlanWeek[]).forEach((w) => {
     weeksByPlan.set(w.plan_id, [...(weeksByPlan.get(w.plan_id) ?? []), w]);
   });
-  // Se resuelve la semana en curso Y la anterior. NO simplificar esto a una
-  // sola: los registros que se piden más abajo cubren DOS semanas, y en un
-  // plan multi-semana (v17) las series de la semana pasada viven en otra
-  // plan_week. Si no se cargan sus días, ese registro no se puede atribuir a
-  // nadie y un alumno que entrenó la semana pasada aparece como "sin
-  // registros en 2 semanas". Son 2 ids por plan, tamaño fijo: la lista no
-  // crece con el número de series.
+  // Se resuelve SOLO la semana en curso: es lo único que hace falta para saber
+  // qué está planificado y qué se cumplió. La atribución de los registros ya
+  // no pasa por acá — cada registro trae su plan, más abajo.
   const activeWeekByPlan = new Map<string, string>();
-  const prevWeekByPlan = new Map<string, string>();
   planIds.forEach((planId) => {
-    const weeksOfPlan = weeksByPlan.get(planId) ?? [];
-    const active = resolveActiveWeek(weeksOfPlan, currentWeek);
+    const active = resolveActiveWeek(weeksByPlan.get(planId) ?? [], currentWeek);
     if (active) activeWeekByPlan.set(planId, active.id);
-    const previa = resolveActiveWeek(weeksOfPlan, currentWeek - 1);
-    if (previa) prevWeekByPlan.set(planId, previa.id);
   });
 
   // 3) días de esas semanas, con sus ejercicios y series
   const activeWeekIds = Array.from(activeWeekByPlan.values());
-  const activeWeekIdSet = new Set(activeWeekIds);
-  const weekIdsToLoad = Array.from(new Set([...activeWeekIds, ...prevWeekByPlan.values()]));
-  const { data: days, error: daysError } = weekIdsToLoad.length
+  const { data: days, error: daysError } = activeWeekIds.length
     ? await supabase
         .from('training_days')
         .select('id, plan_id, plan_week_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
-        .in('plan_week_id', weekIdsToLoad)
+        .in('plan_week_id', activeWeekIds)
     : { data: [], error: null };
   if (daysError) throw new Error(`No se pudieron cargar los días de entrenamiento: ${daysError.message}`);
 
   // 4) registros de las 2 últimas semanas. Sin filtro por alumno: RLS los
   // acota a los planes de los alumnos de este coach.
+  //
+  // El plan de cada registro viene EN LA MISMA CONSULTA, subiendo por las
+  // claves foráneas. No es un `.in(series_id, ...)`: la lista de filtros sigue
+  // sin crecer con el número de series del plan.
   const { data: logs, error: logsError } = await supabase
     .from('workout_logs')
-    .select('series_id, logged_at, week_number')
+    .select(
+      'series_id, logged_at, week_number, ' +
+      'exercise_series ( exercises ( training_days ( plan_id ) ) )',
+    )
     .in('week_number', [currentWeek - 1, currentWeek]);
 
   // Un fallo acá NO puede disfrazarse de "nadie entrenó": se propaga.
   if (logsError) throw new Error(`No se pudieron cargar los registros: ${logsError.message}`);
 
-  // series_id -> plan, SIN filtrar: para saber de quién es un registro da lo
-  // mismo que su día esté archivado o se llame "libre". Se arma aparte de
-  // `dayBySeries` justamente para que el filtro de abajo no le quite
-  // entrenamientos a la fecha de "última vez que entrenó".
-  const planBySeries = new Map<string, string>();
-  ((days ?? []) as any[]).forEach((d) => {
-    (d.exercises ?? []).forEach((e: any) => {
-      (e.exercise_series ?? []).forEach((s: any) => planBySeries.set(s.id, d.plan_id));
-    });
-  });
+  // De quién es un registro: se sube por serie -> ejercicio -> día hasta el
+  // plan, con lo que vino en la MISMA consulta. Antes esto se cruzaba contra
+  // los días de las plan_weeks activas y "la última vez que entrenó" quedaba
+  // atada a qué semanas estuvieran activas o archivadas.
+  //
+  // PostgREST devuelve el embebido de una relación a-uno como objeto, pero
+  // según la versión puede llegar envuelto en un arreglo: se aceptan las dos.
+  const unwrap = (v: any) => (Array.isArray(v) ? v[0] : v);
+  const planIdDelLog = (l: any): string =>
+    unwrap(unwrap(unwrap(l.exercise_series)?.exercises)?.training_days)?.plan_id ?? '';
 
-  // series_id -> día planificado
-  // Lo planificado y lo cumplido son SIEMPRE de la semana en curso: acá los
-  // días de la semana anterior se descartan (solo estaban para atribuir).
+  // series_id -> día planificado. Todos los días cargados son de la semana en
+  // curso: lo planificado y lo cumplido son SIEMPRE de esta semana.
   const dayBySeries = new Map<string, { dayId: string; planId: string; weekDay: number | null }>();
   const plannedByPlan = new Map<string, number[]>();
   ((days ?? []) as any[])
-    .filter((d) => activeWeekIdSet.has(d.plan_week_id))
     .filter((d) => !d.archived && !d.name.toLowerCase().includes('libre'))
     .forEach((d) => {
       if (d.week_day != null) {
@@ -151,7 +146,7 @@ export async function loadCoachDashboard(
     if (l.logged_at) {
       // De quién es el registro sale del plan de la serie, no de quién lo
       // tecleó: un registro que anotó el coach igual es del alumno.
-      const clienteId = clientByPlan.get(planBySeries.get(l.series_id) ?? '');
+      const clienteId = clientByPlan.get(planIdDelLog(l));
       if (clienteId) {
         const key = santiagoDayKey(new Date(l.logged_at));
         const prev = lastTrainedByClient.get(clienteId);
