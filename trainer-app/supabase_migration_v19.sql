@@ -76,12 +76,16 @@ returns boolean language sql stable security definer set search_path = public as
   );
 $$;
 
+revoke execute on function public.is_marketplace_coach(uuid) from public, anon;
+
 create or replace function public.coach_sub_status(p_uid uuid)
 returns text language sql stable security definer set search_path = public as $$
   select g.subscription_status
   from public.users u join public.gyms g on g.id = u.gym_id
   where u.id = p_uid;
 $$;
+
+revoke execute on function public.coach_sub_status(uuid) from public, anon;
 
 -- ---------- Vistas ----------
 
@@ -192,6 +196,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.create_request(text,text,text,text,text,text,text) from public;
 grant execute on function public.create_request(text,text,text,text,text,text,text)
   to anon, authenticated;
 
@@ -241,6 +246,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.apply_to_request(uuid) from public, anon;
 grant execute on function public.apply_to_request(uuid) to authenticated;
 
 create or replace function public.claim_request(p_request_id uuid)
@@ -273,6 +279,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.claim_request(uuid) from public, anon;
 grant execute on function public.claim_request(uuid) to authenticated;
 
 create or replace function public.approve_coach(p_coach_id uuid, p_slug text)
@@ -305,6 +312,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.approve_coach(uuid, text) from public, anon;
 grant execute on function public.approve_coach(uuid, text) to authenticated;
 
 create or replace function public.reject_coach(p_coach_id uuid)
@@ -319,4 +327,5 @@ begin
 end;
 $$;
 
+revoke execute on function public.reject_coach(uuid) from public, anon;
 grant execute on function public.reject_coach(uuid) to authenticated;
