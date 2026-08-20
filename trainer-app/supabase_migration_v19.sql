@@ -19,7 +19,10 @@ create table if not exists public.coach_requests (
   availability      text,
   status            text not null default 'open'
                     check (status in ('open','matched','closed','expired')),
-  matched_coach_id  uuid references public.users(id),
+  -- set null: sin esto, borrar un coach que tomó una solicitud falla con un
+  -- error de clave foránea. La solicitud ya está cerrada; quién la tomó es
+  -- historia, no una referencia que valga bloquear un delete.
+  matched_coach_id  uuid references public.users(id) on delete set null,
   created_at        timestamptz not null default now(),
   expires_at        timestamptz not null default now() + interval '21 days'
 );
@@ -270,12 +273,23 @@ begin
 
   select u.gym_id into v_gym from public.users u where u.id = v_coach;
 
-  -- El mes de regalo: una sola vez por gimnasio, no por alumno.
+  -- El mes de regalo: una sola vez por gimnasio, no por alumno, y SOLO para el
+  -- gimnasio que está de verdad en el marketplace. free_month_used = false es
+  -- el valor por defecto de todos los gimnasios que ya existen: acotado solo
+  -- por ahí, un coach de plan Solo o Growth que paga por Flow y marca "Lo
+  -- tomé" se llevaba free_month_ends_at y un mes después quedaba encerrado.
+  -- El estado propio 'free_month' —en vez de reutilizar 'active'— hace que
+  -- cualquier pago real que ponga 'active' gane por construcción, sin depender
+  -- de que el webhook de Flow, que vive fuera de este repositorio, limpie la
+  -- fecha. Y no toca a un gimnasio en past_due: la solicitud se cierra igual,
+  -- solo no hay regalo.
   update public.gyms
      set free_month_used = true,
-         subscription_status = 'active',
+         subscription_status = 'free_month',
          free_month_ends_at = now() + interval '1 month'
-   where id = v_gym and free_month_used = false;
+   where id = v_gym
+     and free_month_used = false
+     and subscription_status = 'marketplace';
 end;
 $$;
 
@@ -309,6 +323,12 @@ begin
   update public.users
      set marketplace_status = 'approved', slug = v_slug
    where id = p_coach_id and role = 'coach';
+
+  -- Aprobar un id que no es coach no puede "tener éxito" sin hacer nada.
+  -- Mismo criterio que update_my_profile en v20 y que claim_request acá.
+  if not found then
+    raise exception 'coach no encontrado' using errcode = 'P0002';
+  end if;
 end;
 $$;
 
