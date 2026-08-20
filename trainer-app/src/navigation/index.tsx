@@ -207,6 +207,7 @@ export default function AppNavigator() {
             <Stack.Screen name="PlanEditor" component={PlanEditorScreen} />
             <Stack.Screen name="WeekManager" component={WeekManagerScreen} />
             <Stack.Screen name="ClientWeek" component={ClientWeekScreen} />
+            <Stack.Screen name="WorkoutLog" component={WorkoutLogScreen} />
             <Stack.Screen name="ClientCalendar" component={ClientCalendarScreen} />
             <Stack.Screen name="Programs" component={ProgramsListScreen} />
             <Stack.Screen name="ProgramEditor" component={ProgramEditorScreen} />
