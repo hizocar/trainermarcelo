@@ -1,6 +1,6 @@
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase-server';
+import { requireCoach } from '@/lib/guard';
 import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
@@ -17,17 +17,11 @@ export default async function ClientWeekPage({
 }: { params: Promise<{ id: string }>; searchParams: Promise<{ week?: string }> }) {
   const { id } = await params;
   const { week: weekParam } = await searchParams;
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, userId } = await requireCoach();
 
   const { data: client } = await supabase
     .from('users').select('id, name, coach_id').eq('id', id).maybeSingle();
-  if (!client || (client as AppUser).coach_id !== user.id) notFound();
+  if (!client || (client as AppUser).coach_id !== userId) notFound();
 
   const currentWeek = santiagoCurrentWeek();
   const week = Math.max(1, parseInt(weekParam ?? '', 10) || currentWeek);

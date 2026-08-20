@@ -1,6 +1,6 @@
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase-server';
+import { requireCoach } from '@/lib/guard';
 import type { PlanDay } from '@/lib/types';
 import TemplateEditor from './TemplateEditor';
 import AssignTemplateToClients from './AssignTemplateToClients';
@@ -12,13 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProgramEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, userId } = await requireCoach();
 
   const { data: template } = await supabase
     .from('program_templates')
@@ -26,7 +20,7 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
     .eq('id', id)
     .maybeSingle();
 
-  if (!template || template.coach_id !== user.id) notFound();
+  if (!template || template.coach_id !== userId) notFound();
 
   const { data: days } = await supabase
     .from('program_template_days')
@@ -64,7 +58,7 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
     .from('users')
     .select('id, name, email')
     .eq('role', 'client')
-    .eq('coach_id', user.id)
+    .eq('coach_id', userId)
     .order('name');
 
   return (
