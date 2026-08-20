@@ -24,6 +24,18 @@ export default async function MarketplacePage() {
     .order('applied_at', { ascending: false });
   if (miasError) throw miasError;
 
+  // El componente ya oculta el WhatsApp en el render cuando la solicitud no
+  // está abierta, pero Next.js serializa igual todos los props del client
+  // component en el payload inicial (flight data): si no vaciamos el campo
+  // acá, el número de una solicitud cerrada (incluida una que ganó otro
+  // coach) queda recuperable con "ver código fuente" aunque la UI no lo
+  // muestre. El dato tiene que dejar de viajar del servidor, no solo
+  // esconderse al pintar.
+  const misAplicaciones: MyApplication[] = (mias ?? []).map((a) => ({
+    ...a,
+    whatsapp: a.status === 'open' ? a.whatsapp : null,
+  })) as MyApplication[];
+
   const pendiente = me.marketplace_status === 'pending';
 
   return (
@@ -50,7 +62,7 @@ export default async function MarketplacePage() {
         <RequestList initial={(data ?? []) as OpenRequest[]} />
       </div>
 
-      <MyApplications initial={(mias ?? []) as MyApplication[]} />
+      <MyApplications initial={misAplicaciones} />
     </main>
   );
 }

@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 
 export type MyApplication = {
-  request_id: string; name: string; whatsapp: string; comuna: string;
+  // null cuando la solicitud ya no está abierta: page.tsx la vacía antes de
+  // enviar el payload al cliente, no la escondemos solo en el render.
+  request_id: string; name: string; whatsapp: string | null; comuna: string;
   modality: string; goal: string; availability: string | null;
   applied_at: string; status: string;
 };
@@ -52,9 +54,11 @@ export default function MyApplications({ initial }: { initial: MyApplication[] }
 
             {a.status === 'open' ? (
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                <a className="btn btn-ghost"
-                   href={`https://wa.me/${a.whatsapp.replace('+', '')}`}
-                   target="_blank" rel="noopener noreferrer">WHATSAPP</a>
+                {a.whatsapp && (
+                  <a className="btn btn-ghost"
+                     href={`https://wa.me/${a.whatsapp.replace('+', '')}`}
+                     target="_blank" rel="noopener noreferrer">WHATSAPP</a>
+                )}
                 <button className="btn btn-primary" disabled={busy === a.request_id}
                         onClick={() => claim(a.request_id, a.name)}>
                   {busy === a.request_id ? 'CERRANDO…' : 'LO TOMÉ'}
