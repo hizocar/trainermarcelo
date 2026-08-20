@@ -115,9 +115,11 @@ export default function RequestForm() {
       </div>
 
       {/* Honeypot: fuera de pantalla y fuera del recorrido del teclado. Un
-          humano no lo ve; un bot que rellena todo lo llena y queda rechazado. */}
+          humano no lo ve; un bot que rellena todo lo llena y queda rechazado.
+          name="xfield" es deliberadamente sin significado para que los gestores
+          de contraseñas no lo reconozcan; no cambiar a un nombre "real". */}
       <input value={trap} onChange={(e) => setTrap(e.target.value)}
-             name="url" tabIndex={-1} autoComplete="off" aria-hidden="true"
+             name="xfield" tabIndex={-1} autoComplete="off" aria-hidden="true"
              style={{ position: 'absolute', left: '-9999px', width: 1, height: 1 }} />
 
       {error && <div className="form-error">{error}</div>}
