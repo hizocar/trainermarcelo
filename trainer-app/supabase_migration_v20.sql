@@ -57,6 +57,13 @@ begin
          modality = p_modality,
          accepting_clients = coalesce(p_accepting, true)
    where id = auth.uid() and role = 'coach';
+
+  -- Si quien llama está autenticado pero no es coach, el where no afecta
+  -- ninguna fila y sin este chequeo la función "tendría éxito" sin cambiar
+  -- nada. Falla explícito, como claim_request con su `if not found`.
+  if not found then
+    raise exception 'no autorizado' using errcode = '42501';
+  end if;
 end;
 $$;
 

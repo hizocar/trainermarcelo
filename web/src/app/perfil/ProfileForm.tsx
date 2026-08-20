@@ -9,6 +9,12 @@ export type Profile = {
   modality: string | null; accepting_clients: boolean;
 };
 
+// Deben coincidir con los topes que exige update_my_profile en
+// supabase_migration_v20.sql ("demasiadas etiquetas"). Si divergen, el
+// coach vuelve a poder escribir algo que el cliente aprueba y el SQL rechaza.
+const MAX_ESPECIALIDADES = 6;
+const MAX_COMUNAS = 10;
+
 const lista = (s: string) =>
   s.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -20,17 +26,39 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
   const [modality, setModality] = useState(initial.modality ?? 'ambas');
   const [accepting, setAccepting] = useState(initial.accepting_clients);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const especialidadesCount = lista(specialties).length;
+  const comunasCount = lista(comunas).length;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+
+    if (especialidadesCount > MAX_ESPECIALIDADES) {
+      setErrorMsg(`Máximo ${MAX_ESPECIALIDADES} especialidades. Tienes ${especialidadesCount}: quita algunas.`);
+      setState('error');
+      return;
+    }
+    if (comunasCount > MAX_COMUNAS) {
+      setErrorMsg(`Máximo ${MAX_COMUNAS} comunas. Tienes ${comunasCount}: quita algunas.`);
+      setState('error');
+      return;
+    }
+
     setState('saving');
+    setErrorMsg(null);
     const supabase = createClient();
     const { error } = await supabase.rpc('update_my_profile', {
       p_bio: bio, p_instagram: instagram,
       p_specialties: lista(specialties), p_comunas: lista(comunas),
       p_modality: modality, p_accepting: accepting,
     });
-    setState(error ? 'error' : 'saved');
+    if (error) {
+      setErrorMsg('No se pudo guardar. Inténtalo de nuevo.');
+      setState('error');
+    } else {
+      setState('saved');
+    }
   }
 
   return (
@@ -49,13 +77,17 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
       </div>
 
       <div className="field">
-        <label>Especialidades (separadas por coma)</label>
+        <label>
+          Especialidades (separadas por coma) — {especialidadesCount}/{MAX_ESPECIALIDADES}
+        </label>
         <input className="input" value={specialties} onChange={(e) => setSpecialties(e.target.value)}
                placeholder="Fuerza, Pérdida de grasa, Rehabilitación" />
       </div>
 
       <div className="field">
-        <label>Comunas donde atiendes (separadas por coma)</label>
+        <label>
+          Comunas donde atiendes (separadas por coma) — {comunasCount}/{MAX_COMUNAS}
+        </label>
         <input className="input" value={comunas} onChange={(e) => setComunas(e.target.value)}
                placeholder="Ñuñoa, Providencia" />
       </div>
@@ -75,7 +107,7 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
         <label style={{ margin: 0 }}>Estoy recibiendo alumnos nuevos</label>
       </div>
 
-      {state === 'error' && <div className="form-error">No se pudo guardar. Inténtalo de nuevo.</div>}
+      {state === 'error' && errorMsg && <div className="form-error">{errorMsg}</div>}
 
       <button className="btn btn-primary" disabled={state === 'saving'} style={{ marginTop: 24 }}>
         {state === 'saving' ? 'GUARDANDO…' : 'GUARDAR'}
