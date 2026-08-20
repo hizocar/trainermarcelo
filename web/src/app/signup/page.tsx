@@ -138,7 +138,7 @@ export default function SignupPage() {
 
           <div className="field">
             <label>Plan</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PLANS.map((p) => (
                 <button
                   type="button"
@@ -146,6 +146,7 @@ export default function SignupPage() {
                   onClick={() => setTier(p.tier)}
                   className="btn"
                   style={{
+                    flex: '1 1 160px',
                     justifyContent: 'flex-start', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
                     padding: '10px 14px', textTransform: 'none', letterSpacing: 0,
                     background: tier === p.tier ? 'var(--accent)' : 'var(--surface)',
