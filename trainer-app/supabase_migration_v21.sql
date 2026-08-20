@@ -5,7 +5,7 @@
 -- queda como lo que siempre debió ser: quién tecleó el registro.
 --
 -- Sin este cambio, un registro hecho por el coach es INVISIBLE para el alumno:
--- la política vieja era logs_client USING (logged_by = auth.uid()), así que su
+-- la política vigente desde la v3 es logs_client_select USING (logged_by = auth.uid()), así que su
 -- Hoy, su historial y su progreso lo ignorarían y él creería que no entrenó.
 
 create or replace function public.serie_de_mi_plan(p_series_id uuid)
@@ -28,7 +28,9 @@ $$;
 revoke execute on function public.serie_de_mi_plan(uuid) from public, anon;
 grant  execute on function public.serie_de_mi_plan(uuid) to authenticated;
 
-drop policy if exists "logs_client"        on public.workout_logs;
+drop policy if exists "logs_client"        on public.workout_logs; -- red: no-op si la base ya pasó por la v3
+drop policy if exists "logs_client_select" on public.workout_logs;
+drop policy if exists "logs_client_update" on public.workout_logs;
 drop policy if exists "logs_coach"         on public.workout_logs;
 drop policy if exists "logs_client_insert" on public.workout_logs;
 
@@ -47,5 +49,6 @@ create policy "logs_update" on public.workout_logs
 -- Sin política de delete a propósito: ningún archivo de la app borra
 -- workout_logs directamente. Los registros desaparecen solo por el
 -- on delete cascade desde exercise_series, que no consulta estas políticas.
--- La política vieja logs_client era FOR ALL y daba borrado al alumno; era un
--- permiso que nadie usaba y no se replica.
+-- La política logs_client (FOR ALL, drop de arriba) daba borrado al alumno en el
+-- esquema original; desde la v3 ya no existe -- logs_client_select/_update/_insert
+-- no incluían delete -- así que no había permiso vigente que replicar.
