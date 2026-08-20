@@ -1,5 +1,6 @@
 import { requireCoach } from '@/lib/guard';
 import RequestList, { type OpenRequest } from './RequestList';
+import MyApplications, { type MyApplication } from './MyApplications';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,12 @@ export default async function MarketplacePage() {
   // Un error tragado acá dibuja una bolsa vacía y le dice al coach "no hay
   // nadie buscando" cuando en realidad la consulta falló.
   if (error) throw error;
+
+  const { data: mias, error: miasError } = await supabase
+    .from('my_applications')
+    .select('request_id, name, whatsapp, comuna, modality, goal, availability, applied_at, status')
+    .order('applied_at', { ascending: false });
+  if (miasError) throw miasError;
 
   const pendiente = me.marketplace_status === 'pending';
 
@@ -42,6 +49,8 @@ export default async function MarketplacePage() {
       <div style={{ marginTop: 24 }}>
         <RequestList initial={(data ?? []) as OpenRequest[]} />
       </div>
+
+      <MyApplications initial={(mias ?? []) as MyApplication[]} />
     </main>
   );
 }
