@@ -78,45 +78,51 @@ export default function RequestForm() {
         Cuéntanos qué buscas y te escriben por WhatsApp. No tienes que crear cuenta.
       </p>
 
-      <label>Nombre
-        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
-      </label>
+      <div className="field">
+        <label>Nombre</label>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
+      </div>
 
-      <label>WhatsApp
-        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
+      <div className="field">
+        <label>WhatsApp</label>
+        <input className="input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
                inputMode="tel" placeholder="9 1234 5678" required />
-      </label>
+      </div>
 
-      <label>Comuna
-        <input value={comuna} onChange={(e) => setComuna(e.target.value)} maxLength={60} required />
-      </label>
+      <div className="field">
+        <label>Comuna</label>
+        <input className="input" value={comuna} onChange={(e) => setComuna(e.target.value)} maxLength={60} required />
+      </div>
 
-      <label>¿Presencial u online?
-        <select value={modality} onChange={(e) => setModality(e.target.value)}>
+      <div className="field">
+        <label>¿Presencial u online?</label>
+        <select className="input" value={modality} onChange={(e) => setModality(e.target.value)}>
           {MODALIDADES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
-      </label>
+      </div>
 
-      <label>¿Qué buscas?
-        <textarea value={goal} onChange={(e) => setGoal(e.target.value)}
+      <div className="field">
+        <label>¿Qué buscas?</label>
+        <textarea className="input" value={goal} onChange={(e) => setGoal(e.target.value)}
                   rows={4} maxLength={600} required
                   placeholder="Bajar de peso, ganar masa, volver a entrenar después de una lesión…" />
-      </label>
+      </div>
 
-      <label>¿Cuándo puedes entrenar? (opcional)
-        <input value={availability} onChange={(e) => setAvailability(e.target.value)}
+      <div className="field">
+        <label>¿Cuándo puedes entrenar? (opcional)</label>
+        <input className="input" value={availability} onChange={(e) => setAvailability(e.target.value)}
                maxLength={300} placeholder="Mañanas, o martes y jueves" />
-      </label>
+      </div>
 
       {/* Honeypot: fuera de pantalla y fuera del recorrido del teclado. Un
           humano no lo ve; un bot que rellena todo lo llena y queda rechazado. */}
       <input value={trap} onChange={(e) => setTrap(e.target.value)}
-             name="empresa" tabIndex={-1} autoComplete="off" aria-hidden="true"
+             name="url" tabIndex={-1} autoComplete="off" aria-hidden="true"
              style={{ position: 'absolute', left: '-9999px', width: 1, height: 1 }} />
 
-      {error && <p style={{ color: 'var(--warning)', fontSize: 13 }}>{error}</p>}
+      {error && <div className="form-error">{error}</div>}
 
-      <button className="btn btn-primary" type="submit" disabled={loading}>
+      <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: '100%', marginTop: 24 }}>
         {loading ? 'ENVIANDO…' : 'PUBLICAR MI SOLICITUD'}
       </button>
     </form>
