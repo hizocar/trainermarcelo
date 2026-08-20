@@ -77,10 +77,13 @@ create policy "logs_insert" on public.workout_logs
 create policy "logs_update" on public.workout_logs
   for update using (public.serie_de_mi_plan(series_id))
           with check (public.serie_de_mi_plan(series_id));
-
-create policy "logs_delete" on public.workout_logs
-  for delete using (public.serie_de_mi_plan(series_id));
 ```
+
+**No hay política de `delete` a propósito.** Se buscó en toda la app: ningún archivo borra
+`workout_logs` directamente. Los registros desaparecen solo por el `on delete cascade`
+desde `exercise_series`, que no consulta políticas de esta tabla. La política anterior
+`logs_client` era `FOR ALL` y daba borrado al alumno, pero era un permiso que nadie
+usaba; no se replica.
 
 Dos diferencias respecto de lo que había, deliberadas:
 
@@ -128,8 +131,13 @@ Desde `ClientDetailScreen`, un acceso junto a los que ya existen (`Semana`, `Cal
 semana en curso, con el mismo anillo de series completadas que ve el alumno, y de ahí a
 `WorkoutLogScreen` con `athleteId` del cliente.
 
-**Solo la semana en curso.** Registrar días pasados es corregir historial: otra función,
-con otras preguntas (¿hasta cuándo atrás? ¿el alumno se entera?). Acá no entra.
+**Solo la semana en curso**, la que devuelve `getCurrentWeek()` de `trainer-app/src/lib/weeks.ts`
+— la misma que ya usan `ClientDetailScreen` y `ClientWeekScreen`, y la misma que usa el
+alumno, para que coach y alumno nunca estén mirando semanas distintas. (`getCurrentWeek()`
+es el correcto acá: la regla de `santiagoCurrentWeek()` es de `web/`, donde el servidor
+corre en UTC; la app corre en el teléfono del usuario.) Registrar días pasados es corregir
+historial: otra función, con otras preguntas (¿hasta cuándo atrás? ¿el alumno se entera?).
+Acá no entra.
 
 ### El choque se evita, no se resuelve
 
