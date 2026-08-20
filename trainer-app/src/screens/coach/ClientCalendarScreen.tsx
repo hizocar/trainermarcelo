@@ -160,15 +160,20 @@ export default function ClientCalendarScreen() {
     }
     setHasAnyDay(!!anyDay);
 
-    // registros de la semanas visibles, por alumno — nunca por lista de
-    // series (esa lista crece con el plan). Si falla, el error NO se
-    // descarta: se avisa en pantalla en vez de pintar todo como "nadie
-    // entrenó" (ese bug ya pasó una vez en la versión web).
+    // registros de las semanas visibles — nunca por lista de series (esa
+    // lista crece con el plan). Si falla, el error NO se descarta: se avisa
+    // en pantalla en vez de pintar todo como "nadie entrenó" (ese bug ya
+    // pasó una vez en la versión web).
+    //
+    // Sin filtro por `logged_by`: desde la v21 esa columna dice quién tecleó
+    // el registro, así que filtrarla dejaba en blanco las sesiones que anotó
+    // el coach. Vuelven también registros de los OTROS alumnos del coach
+    // (RLS los deja pasar), pero `exBySeries` solo conoce las series de este
+    // plan y los descarta abajo.
     const { data: logs, error: logsErr } = weekNumbers.length
       ? await supabase
           .from('workout_logs')
           .select('series_id, week_number, logged_at')
-          .eq('logged_by', client.id)
           .in('week_number', weekNumbers)
       : { data: [], error: null };
     if (logsErr) {

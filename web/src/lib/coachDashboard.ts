@@ -5,10 +5,15 @@ import { santiagoCurrentWeek, santiagoWeekDay, santiagoDayKey } from './weeks';
 // Datos de la lista de alumnos del coach, cargados EN BLOQUE.
 //
 // Regla que no se puede romper: el número de consultas es fijo y ningún
-// `.in(...)` recibe una lista que crezca con el número de series del plan.
-// Los registros se piden por `logged_by` (un id por alumno, ~30) en vez de
-// por `series_id` (miles) — pedirlos por serie es exactamente el error que
+// `.in(...)` recibe una lista que crezca con el número de series del plan —
+// pedir los registros por `series_id` (miles) es exactamente el error que
 // hizo fallar en silencio al calendario y dibujar el mes como "nadie entrenó".
+//
+// Los registros ya NO se acotan por `logged_by`: desde la v21 esa columna
+// dice quién TECLEÓ el registro (puede ser el coach), no de quién es. La
+// pertenencia se deriva del plan de la serie, y RLS ya limita lo que vuelve
+// a los planes de los alumnos de quien consulta. Por eso el filtro se quita
+// en vez de reemplazarse por una lista de series.
 
 export interface CoachDashboardRow {
   id: string;
@@ -52,7 +57,11 @@ export async function loadCoachDashboard(
     .from('workout_plans').select('id, client_id').in('client_id', clientIds);
   if (plansError) throw new Error(`No se pudieron cargar los planes: ${plansError.message}`);
   const planByClient = new Map<string, string>();
-  (plans ?? []).forEach((p: any) => planByClient.set(p.client_id, p.id));
+  const clientByPlan = new Map<string, string>();
+  (plans ?? []).forEach((p: any) => {
+    planByClient.set(p.client_id, p.id);
+    clientByPlan.set(p.id, p.client_id);
+  });
   const planIds = Array.from(planByClient.values());
 
   // 2) semanas de esos planes -> la activa de cada uno
@@ -80,15 +89,26 @@ export async function loadCoachDashboard(
     : { data: [], error: null };
   if (daysError) throw new Error(`No se pudieron cargar los días de entrenamiento: ${daysError.message}`);
 
-  // 4) registros de las 2 últimas semanas, acotados por ALUMNO (no por serie)
+  // 4) registros de las 2 últimas semanas. Sin filtro por alumno: RLS los
+  // acota a los planes de los alumnos de este coach.
   const { data: logs, error: logsError } = await supabase
     .from('workout_logs')
-    .select('series_id, logged_by, logged_at, week_number')
-    .in('logged_by', clientIds)
+    .select('series_id, logged_at, week_number')
     .in('week_number', [currentWeek - 1, currentWeek]);
 
   // Un fallo acá NO puede disfrazarse de "nadie entrenó": se propaga.
   if (logsError) throw new Error(`No se pudieron cargar los registros: ${logsError.message}`);
+
+  // series_id -> plan, SIN filtrar: para saber de quién es un registro da lo
+  // mismo que su día esté archivado o se llame "libre". Se arma aparte de
+  // `dayBySeries` justamente para que el filtro de abajo no le quite
+  // entrenamientos a la fecha de "última vez que entrenó".
+  const planBySeries = new Map<string, string>();
+  ((days ?? []) as any[]).forEach((d) => {
+    (d.exercises ?? []).forEach((e: any) => {
+      (e.exercise_series ?? []).forEach((s: any) => planBySeries.set(s.id, d.plan_id));
+    });
+  });
 
   // series_id -> día planificado
   const dayBySeries = new Map<string, { dayId: string; planId: string; weekDay: number | null }>();
@@ -113,9 +133,14 @@ export async function loadCoachDashboard(
   const lastTrainedByClient = new Map<string, string>();
   ((logs ?? []) as any[]).forEach((l) => {
     if (l.logged_at) {
-      const key = santiagoDayKey(new Date(l.logged_at));
-      const prev = lastTrainedByClient.get(l.logged_by);
-      if (!prev || key > prev) lastTrainedByClient.set(l.logged_by, key);
+      // De quién es el registro sale del plan de la serie, no de quién lo
+      // tecleó: un registro que anotó el coach igual es del alumno.
+      const clienteId = clientByPlan.get(planBySeries.get(l.series_id) ?? '');
+      if (clienteId) {
+        const key = santiagoDayKey(new Date(l.logged_at));
+        const prev = lastTrainedByClient.get(clienteId);
+        if (!prev || key > prev) lastTrainedByClient.set(clienteId, key);
+      }
     }
     if (l.week_number !== currentWeek) return;
     const meta = dayBySeries.get(l.series_id);
