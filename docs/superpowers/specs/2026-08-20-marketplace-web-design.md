@@ -163,8 +163,17 @@ exige acción del coach —acá, una solicitud nueva que todavía tiene cupo.
   especialidades, biografía corta e Instagram. Cumple dos funciones: es lo que el coach
   comparte en sus redes y es el enlace que va **dentro de su primer WhatsApp**, para que
   el alumno sepa quién le escribió. Devuelve 404 si el coach no está aprobado.
-- **`/registro-coach`** — registro gratis, sin tarjeta y sin pasar por Flow. No toca
-  `/signup`, que sigue siendo el camino que cobra.
+- **`/signup`** — el registro **es uno solo** (decidido el 2026-08-20). No hay página
+  aparte: el registro gratis es **una opción más** en el selector de plan que ya existe,
+  junto a Solo, Starter, Growth y Pro. El formulario es el mismo —nombre, correo,
+  gimnasio— y lo único que cambia es a dónde se manda: elegir un plan de pago llama a
+  `start-signup` y va a Flow; elegir "Gratis · marketplace" llama a `start-free-signup`
+  y entra directo, sin tarjeta.
+
+  La razón de unirlos no es ahorrarse una página: es que el coach compare las dos
+  puertas en la misma pantalla. Un registro gratis escondido en otra URL se convierte
+  en el camino de los que llegaron por la campaña y nunca ven el resto; acá el que entra
+  gratis ya sabe qué está bloqueado y cuánto cuesta abrirlo.
 
 ### Con sesión de coach
 
@@ -185,7 +194,8 @@ Un solo guard en el layout autenticado: si el gimnasio está en `subscription_st
 
 ## Registro gratis y mes de regalo
 
-`/registro-coach` llama a una Edge Function nueva, `start-free-signup`, hermana de
+Elegir "Gratis · marketplace" en `/signup` llama a una Edge Function nueva,
+`start-free-signup`, hermana de
 `start-signup` pero sin cobro: crea el usuario de auth, la fila en `users` con
 `role='coach'` y `marketplace_status='pending'`, y un gimnasio con
 `subscription_status='marketplace'`, `plan_tier='solo'`, `coach_limit=1`.
