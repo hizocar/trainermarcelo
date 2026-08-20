@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **Expo SDK 54.** Leer `https://docs.expo.dev/versions/v54.0.0/` antes de escribir código; las APIs de versiones más nuevas no existen acá. **Sin dependencias nuevas.**
-- Solo se toca `trainer-app/`. **Nada de `web/`.**
+- Solo se toca `trainer-app/`, **salvo la Task 7**, donde el dueño autorizó explícitamente ampliar el alcance a `web/src/lib/coachDashboard.ts` porque la base de datos es compartida.
 - **`logged_by` significa "quién tecleó".** La pertenencia del registro se deriva del plan.
 - **El alumno ve lo que anotó su coach como propio, sin marca de origen.**
 - **Solo la semana en curso**, la de `getCurrentWeek()` de `trainer-app/src/lib/weeks.ts`.
@@ -610,6 +610,145 @@ git commit -m "feat(registro): el coach confirma antes de reemplazar una serie d
 ```
 
 ---
+
+---
+
+### Task 7: Las cuatro consultas que filtran por `logged_by`
+
+**Agregada el 2026-08-20**, después de que la revisión de la Task 3 encontrara que el
+cambio de significado de `logged_by` rompe consultas que ninguna otra tarea toca. **El
+dueño autorizó ampliar el alcance a `web/`** para esta tarea, porque la base es
+compartida: la migración cambia el comportamiento de la web aunque la web no se toque.
+
+**Files:**
+- Modify: `web/src/lib/coachDashboard.ts:5-11, 84-88, 114-118`
+- Modify: `trainer-app/src/lib/coachDashboard.ts:80-84` y su bloque de atribución equivalente
+- Modify: `trainer-app/src/screens/coach/ClientCalendarScreen.tsx:163-173`
+- Modify: `trainer-app/src/screens/client/SessionDetailScreen.tsx:47-55`
+
+**Interfaces:**
+- Consumes: la migración `v21` (Task 3), que hace que RLS acote los registros a los planes del coach.
+- Produces: nada.
+
+**La regla dura que gobierna esta tarea**, del `CLAUDE.md` del repo: *número fijo de
+consultas, ningún `.in(...)` acotado por el número de series de un plan, y nunca
+descartar el `error`*. La cabecera de `web/src/lib/coachDashboard.ts:5-11` documenta que
+pedir los registros por `series_id` es exactamente el error que hizo fallar en silencio
+al calendario y dibujar el mes como "nadie entrenó". **La solución no es cambiar
+`logged_by` por una lista de series.**
+
+- [ ] **Step 1: El panel del coach — quitar el filtro, no cambiarlo**
+
+En `web/src/lib/coachDashboard.ts:84-88`, la consulta hoy es:
+
+```ts
+    .select('series_id, logged_by, logged_at, week_number')
+    .in('logged_by', clientIds)
+    .in('week_number', [currentWeek - 1, currentWeek]);
+```
+
+El filtro por `logged_by` **se elimina**, no se reemplaza:
+
+```ts
+    .select('series_id, logged_at, week_number')
+    .in('week_number', [currentWeek - 1, currentWeek]);
+```
+
+Con las políticas de `v21`, RLS ya acota los registros a los planes de los alumnos de
+quien consulta: el filtro era redundante y ahora además es incorrecto. Se quita una
+condición en vez de agregar una lista larga, así que la regla dura se respeta sola y el
+número de consultas no cambia.
+
+- [ ] **Step 2: Atribuir el registro por el plan, no por quién tecleó**
+
+`web/src/lib/coachDashboard.ts:114-118` usa `l.logged_by` como el id del alumno:
+
+```ts
+      const prev = lastTrainedByClient.get(l.logged_by);
+      if (!prev || key > prev) lastTrainedByClient.set(l.logged_by, key);
+```
+
+El archivo ya tiene todo lo necesario para derivarlo: `planByClient` (línea 54) y
+`dayBySeries`, que guarda `planId` por serie. Construir el mapa inverso junto a
+`planByClient`:
+
+```ts
+  const clientByPlan = new Map<string, string>();
+  (plans ?? []).forEach((p: any) => clientByPlan.set(p.id, p.client_id));
+```
+
+y reemplazar la atribución por:
+
+```ts
+      const clienteId = clientByPlan.get(dayBySeries.get(l.series_id)?.planId ?? '');
+      if (!clienteId) return;
+      const prev = lastTrainedByClient.get(clienteId);
+      if (!prev || key > prev) lastTrainedByClient.set(clienteId, key);
+```
+
+**Comprueba antes de darlo por bueno:** `dayBySeries` se construye solo con los días **no
+archivados** y que no se llamen "libre" (el `.filter(...)` unas líneas más arriba). Con
+`logged_by` la fecha del último entrenamiento no dependía de eso. Verifica si un registro
+sobre un día archivado deja de contar para "última vez que entrenó" y, si es así, dilo en
+tu informe: es un cambio de comportamiento real, no un detalle.
+
+Actualiza también el comentario de la cabecera (líneas 5-11), que explica que se pide por
+`logged_by`. Un comentario que describe lo que el código ya no hace es cómo se llega al
+error que esta tarea arregla.
+
+- [ ] **Step 3: El mismo cambio en la app**
+
+`trainer-app/src/lib/coachDashboard.ts` es la copia de la anterior para la app —
+duplicación asumida en este proyecto, porque son proyectos npm separados. Aplica el mismo
+cambio de los pasos 1 y 2. **Lo que no puede pasar es que los valores diverjan.**
+
+- [ ] **Step 4: El calendario del coach**
+
+`trainer-app/src/screens/coach/ClientCalendarScreen.tsx:170` filtra
+`.eq('logged_by', client.id)`, así que dibujará vacías las sesiones que registró el
+coach. Quitar esa línea.
+
+El archivo ya construye `exBySeries` y descarta las series que no conoce
+(`const exId = exBySeries.get(l.series_id); if (!exId) return;` o equivalente —
+verifícalo), así que los registros de **otros** alumnos que ahora entran por RLS se
+descartan solos. **Confirma que ese descarte existe antes de quitar el filtro**; si no
+existe, agrégalo y dilo en tu informe, porque sin él el calendario de un alumno mostraría
+entrenamientos de otro.
+
+Deja anotado en tu informe cuántos registros de más viaja esta consulta ahora (dos
+semanas de todos los alumnos del coach en vez de uno solo). Si te parece demasiado, dilo
+— no lo optimices por tu cuenta con un `.in('series_id', ...)`, que es el patrón
+prohibido.
+
+- [ ] **Step 5: Corregir la fecha de una sesión**
+
+`trainer-app/src/screens/client/SessionDetailScreen.tsx:47-55` actualiza filtrando
+`.eq('logged_by', user!.id)`: el alumno no podría corregir la fecha de una sesión que
+anotó su coach, y la pantalla **igual diría "Fecha corregida"** porque un update de cero
+filas no devuelve error.
+
+Quitar `.eq('logged_by', user!.id)`. El `.in('series_id', ...)` que ya está acotado a las
+series de **esa sesión** se queda: es una lista corta y no es el patrón prohibido, que se
+refiere a listas que crecen con el plan entero. RLS impide tocar registros de otro plan.
+
+Además, hacer que la pantalla no mienta cuando no cambió nada: pedir el conteo de filas
+afectadas y, si es cero, mostrar un aviso de que no se pudo corregir en vez de decir que
+sí. En `@supabase/supabase-js` eso se consigue agregando `{ count: 'exact' }` a la
+llamada `.update(...)` y mirando el `count` de la respuesta; verifica la forma exacta
+contra la versión que usa el proyecto (`trainer-app/package.json`) antes de escribirlo.
+
+- [ ] **Step 6: Verificar**
+
+Run: `cd trainer-app && npx tsc --noEmit && npm test`
+Run: `cd web && npx tsc --noEmit && npm test`
+Expected: sin errores en ninguno de los dos, todos los tests pasando.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add web/src/lib/coachDashboard.ts trainer-app/src/lib/coachDashboard.ts trainer-app/src/screens/coach/ClientCalendarScreen.tsx trainer-app/src/screens/client/SessionDetailScreen.tsx
+git commit -m "fix(registro): atribuir los registros por el plan y no por quién los tecleó"
+```
 
 ## Verificación final, antes de compilar
 
