@@ -73,19 +73,32 @@ export async function loadCoachDashboard(
   ((weeks ?? []) as PlanWeek[]).forEach((w) => {
     weeksByPlan.set(w.plan_id, [...(weeksByPlan.get(w.plan_id) ?? []), w]);
   });
+  // Se resuelve la semana en curso Y la anterior. NO simplificar esto a una
+  // sola: los registros que se piden más abajo cubren DOS semanas, y en un
+  // plan multi-semana (v17) las series de la semana pasada viven en otra
+  // plan_week. Si no se cargan sus días, ese registro no se puede atribuir a
+  // nadie y un alumno que entrenó la semana pasada aparece como "sin
+  // registros en 2 semanas". Son 2 ids por plan, tamaño fijo: la lista no
+  // crece con el número de series.
   const activeWeekByPlan = new Map<string, string>();
+  const prevWeekByPlan = new Map<string, string>();
   planIds.forEach((planId) => {
-    const active = resolveActiveWeek(weeksByPlan.get(planId) ?? [], currentWeek);
+    const weeksOfPlan = weeksByPlan.get(planId) ?? [];
+    const active = resolveActiveWeek(weeksOfPlan, currentWeek);
     if (active) activeWeekByPlan.set(planId, active.id);
+    const previa = resolveActiveWeek(weeksOfPlan, currentWeek - 1);
+    if (previa) prevWeekByPlan.set(planId, previa.id);
   });
 
-  // 3) días de las semanas activas, con sus ejercicios y series
+  // 3) días de esas semanas, con sus ejercicios y series
   const activeWeekIds = Array.from(activeWeekByPlan.values());
-  const { data: days, error: daysError } = activeWeekIds.length
+  const activeWeekIdSet = new Set(activeWeekIds);
+  const weekIdsToLoad = Array.from(new Set([...activeWeekIds, ...prevWeekByPlan.values()]));
+  const { data: days, error: daysError } = weekIdsToLoad.length
     ? await supabase
         .from('training_days')
-        .select('id, plan_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
-        .in('plan_week_id', activeWeekIds)
+        .select('id, plan_id, plan_week_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
+        .in('plan_week_id', weekIdsToLoad)
     : { data: [], error: null };
   if (daysError) throw new Error(`No se pudieron cargar los días de entrenamiento: ${daysError.message}`);
 
@@ -111,9 +124,12 @@ export async function loadCoachDashboard(
   });
 
   // series_id -> día planificado
+  // Lo planificado y lo cumplido son SIEMPRE de la semana en curso: acá los
+  // días de la semana anterior se descartan (solo estaban para atribuir).
   const dayBySeries = new Map<string, { dayId: string; planId: string; weekDay: number | null }>();
   const plannedByPlan = new Map<string, number[]>();
   ((days ?? []) as any[])
+    .filter((d) => activeWeekIdSet.has(d.plan_week_id))
     .filter((d) => !d.archived && !d.name.toLowerCase().includes('libre'))
     .forEach((d) => {
       if (d.week_day != null) {

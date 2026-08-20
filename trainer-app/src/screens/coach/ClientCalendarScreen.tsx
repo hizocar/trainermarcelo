@@ -160,21 +160,34 @@ export default function ClientCalendarScreen() {
     }
     setHasAnyDay(!!anyDay);
 
-    // registros de las semanas visibles — nunca por lista de series (esa
-    // lista crece con el plan). Si falla, el error NO se descarta: se avisa
-    // en pantalla en vez de pintar todo como "nadie entrenó" (ese bug ya
-    // pasó una vez en la versión web).
+    // Bordes del rango visible, con un día de margen a cada lado: los usan
+    // tanto los registros como el cardio.
+    const desde = new Date(grid[0][0]);
+    desde.setDate(desde.getDate() - 1);
+    const hasta = new Date(grid[grid.length - 1][6]);
+    hasta.setDate(hasta.getDate() + 2);
+
+    // registros de las semanas visibles. Si falla, el error NO se descarta:
+    // se avisa en pantalla en vez de pintar todo como "nadie entrenó" (ese
+    // bug ya pasó una vez en la versión web).
     //
     // Sin filtro por `logged_by`: desde la v21 esa columna dice quién tecleó
     // el registro, así que filtrarla dejaba en blanco las sesiones que anotó
-    // el coach. Vuelven también registros de los OTROS alumnos del coach
-    // (RLS los deja pasar), pero `exBySeries` solo conoce las series de este
-    // plan y los descarta abajo.
+    // el coach. Como consecuencia RLS deja pasar los registros de los OTROS
+    // alumnos del coach; `exBySeries` los descarta abajo, pero igual viajan.
+    //
+    // Por eso se acota por FECHA y no por lista de series: acotar por
+    // `series_id` es el patrón que ya rompió esta pantalla una vez (la lista
+    // crece con el plan hasta reventar la URL y la consulta falla en
+    // silencio). `logged_at` es un filtro de tamaño fijo — dos bordes — y
+    // tiene precedente acá mismo, en la consulta de `cardio_logs`.
     const { data: logs, error: logsErr } = weekNumbers.length
       ? await supabase
           .from('workout_logs')
           .select('series_id, week_number, logged_at')
           .in('week_number', weekNumbers)
+          .gte('logged_at', desde.toISOString())
+          .lt('logged_at', hasta.toISOString())
       : { data: [], error: null };
     if (logsErr) {
       console.error('calendario: error cargando registros de entrenamiento', logsErr);
@@ -193,11 +206,7 @@ export default function ClientCalendarScreen() {
     });
     setDoneByDay(done);
 
-    // cardio del rango visible, con un día de margen a cada lado
-    const desde = new Date(grid[0][0]);
-    desde.setDate(desde.getDate() - 1);
-    const hasta = new Date(grid[grid.length - 1][6]);
-    hasta.setDate(hasta.getDate() + 2);
+    // cardio del mismo rango visible
     const { data: cardio, error: cardioError } = await supabase
       .from('cardio_logs')
       .select('id, duration_minutes, logged_at')
