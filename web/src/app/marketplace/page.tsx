@@ -1,4 +1,7 @@
+import Link from 'next/link';
+import Logo from '@/components/Logo';
 import { requireCoach } from '@/lib/guard';
+import { signOut } from '../actions';
 import RequestList, { type OpenRequest } from './RequestList';
 import MyApplications, { type MyApplication } from './MyApplications';
 
@@ -39,30 +42,49 @@ export default async function MarketplacePage() {
   const pendiente = me.marketplace_status === 'pending';
 
   return (
-    <main className="container" style={{ paddingTop: 32, paddingBottom: 64 }}>
-      <h1 className="display">SOLICITUDES</h1>
+    <>
+      <header className="app-header">
+        <div className="container inner">
+          <Link href="/dashboard" className="brand">
+            <Logo />
+          </Link>
+          {locked ? (
+            <form action={signOut}>
+              <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>CERRAR SESIÓN</button>
+            </form>
+          ) : (
+            <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+              VOLVER
+            </Link>
+          )}
+        </div>
+      </header>
 
-      {pendiente && (
-        // No es var(--warning): el ámbar acá se reserva para la solicitud
-        // nueva con cupo, lo único que de verdad requiere que el coach actúe.
-        // Estar "en revisión" no depende de él, es solo información.
-        <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
-          Tu cuenta está en revisión. Cuando la aprobemos vas a poder postularte.
-        </p>
-      )}
+      <main className="container" style={{ paddingTop: 32, paddingBottom: 64 }}>
+        <h1 className="display">SOLICITUDES</h1>
 
-      {locked && !pendiente && (
-        <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
-          El resto del panel se abre cuando tomes a tu primer alumno: ahí te regalamos
-          un mes.
-        </p>
-      )}
+        {pendiente && (
+          // No es var(--warning): el ámbar acá se reserva para la solicitud
+          // nueva con cupo, lo único que de verdad requiere que el coach actúe.
+          // Estar "en revisión" no depende de él, es solo información.
+          <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
+            Tu cuenta está en revisión. Cuando la aprobemos vas a poder postularte.
+          </p>
+        )}
 
-      <div style={{ marginTop: 24 }}>
-        <RequestList initial={(data ?? []) as OpenRequest[]} />
-      </div>
+        {locked && !pendiente && (
+          <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
+            El resto del panel se abre cuando tomes a tu primer alumno: ahí te regalamos
+            un mes.
+          </p>
+        )}
 
-      <MyApplications initial={misAplicaciones} />
-    </main>
+        <div style={{ marginTop: 24 }}>
+          <RequestList initial={(data ?? []) as OpenRequest[]} />
+        </div>
+
+        <MyApplications initial={misAplicaciones} />
+      </main>
+    </>
   );
 }

@@ -44,6 +44,11 @@ export default async function DashboardPage() {
           <div style={{ display: 'flex', gap: 10 }}>
             <Link href="/programs" className="btn btn-ghost" style={{ padding: '10px 18px' }}>PROGRAMAS</Link>
             <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
+            <Link href="/marketplace" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SOLICITUDES</Link>
+            <Link href="/perfil" className="btn btn-ghost" style={{ padding: '10px 18px' }}>MI PERFIL</Link>
+            {me?.is_platform_admin && (
+              <Link href="/admin/coaches" className="btn btn-ghost" style={{ padding: '10px 18px' }}>ADMIN</Link>
+            )}
             {me?.is_owner && (
               <Link href="/subscription" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SUSCRIPCIÓN</Link>
             )}
