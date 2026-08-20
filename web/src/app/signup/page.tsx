@@ -6,6 +6,7 @@ import Logo from '@/components/Logo';
 import { firstToken } from '@/lib/env';
 
 const PLANS = [
+  { tier: 'free', name: 'Gratis · marketplace', seats: 'Solo solicitudes', monthly: 0, annual: 0 },
   { tier: 'solo', name: 'Solo', seats: '1 entrenador', monthly: 4990, annual: 49900 },
   { tier: 'starter', name: 'Starter', seats: '2–3 entrenadores', monthly: 9990, annual: 99900 },
   { tier: 'growth', name: 'Growth', seats: '4–8 entrenadores', monthly: 19990, annual: 199900 },
@@ -22,6 +23,7 @@ export default function SignupPage() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [freeDone, setFreeDone] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,6 +36,33 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
+      if (tier === 'free') {
+        const res = await fetch(
+          `${firstToken(process.env.NEXT_PUBLIC_SUPABASE_URL)}/functions/v1/start-free-signup`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+            },
+            body: JSON.stringify({
+              name: name.trim(),
+              email: email.trim().toLowerCase(),
+              gymName: gymName.trim(),
+            }),
+          },
+        );
+        const result = await res.json();
+        if (!res.ok || result.error) {
+          setError(result.error ?? 'No se pudo crear la cuenta.');
+          setLoading(false);
+          return;
+        }
+        setFreeDone(true);
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch(
         `${firstToken(process.env.NEXT_PUBLIC_SUPABASE_URL)}/functions/v1/start-signup`,
         {
@@ -66,6 +95,21 @@ export default function SignupPage() {
 
   const selected = PLANS.find((p) => p.tier === tier)!;
   const price = billing === 'monthly' ? selected.monthly : selected.annual;
+
+  if (freeDone) {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-card" style={{ maxWidth: 460 }}>
+          <h1>Cuenta creada</h1>
+          <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
+            Te mandamos un correo para que definas tu contraseña. Revisamos tu cuenta a
+            mano antes de que puedas postularte a solicitudes: te avisamos apenas esté
+            lista.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-wrap">
@@ -116,37 +160,48 @@ export default function SignupPage() {
             </div>
           </div>
 
-          <div className="field">
-            <label>Facturación</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setBilling('monthly')}
-                className="btn btn-ghost"
-                style={{ flex: 1, padding: '9px', fontSize: 11, background: billing === 'monthly' ? 'var(--surface)' : 'transparent' }}
-              >
-                Mensual
-              </button>
-              <button
-                type="button"
-                onClick={() => setBilling('annual')}
-                className="btn btn-ghost"
-                style={{ flex: 1, padding: '9px', fontSize: 11, background: billing === 'annual' ? 'var(--surface)' : 'transparent' }}
-              >
-                Anual · 2 meses gratis
-              </button>
+          {tier !== 'free' && (
+            <div className="field">
+              <label>Facturación</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setBilling('monthly')}
+                  className="btn btn-ghost"
+                  style={{ flex: 1, padding: '9px', fontSize: 11, background: billing === 'monthly' ? 'var(--surface)' : 'transparent' }}
+                >
+                  Mensual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBilling('annual')}
+                  className="btn btn-ghost"
+                  style={{ flex: 1, padding: '9px', fontSize: 11, background: billing === 'annual' ? 'var(--surface)' : 'transparent' }}
+                >
+                  Anual · 2 meses gratis
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="muted" style={{ fontSize: 12 }}>Total {billing === 'monthly' ? 'mensual' : 'anual'}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 18 }}>{clp(price)}</span>
-          </div>
+          {tier === 'free' ? (
+            <p className="muted" style={{ fontSize: 13, lineHeight: 1.6, marginTop: 16 }}>
+              Entras al marketplace sin tarjeta. Planes, alumnos y biblioteca se abren
+              cuando tomes a tu primer alumno: ahí te regalamos un mes.
+            </p>
+          ) : (
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="muted" style={{ fontSize: 12 }}>Total {billing === 'monthly' ? 'mensual' : 'anual'}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 18 }}>{clp(price)}</span>
+            </div>
+          )}
 
           {error && <div className="form-error">{error}</div>}
 
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }} disabled={loading}>
-            {loading ? 'CONECTANDO CON FLOW…' : 'CONTINUAR AL PAGO'}
+            {loading
+              ? (tier === 'free' ? 'CREANDO CUENTA…' : 'CONECTANDO CON FLOW…')
+              : (tier === 'free' ? 'CREAR CUENTA GRATIS' : 'CONTINUAR AL PAGO')}
           </button>
         </form>
 
