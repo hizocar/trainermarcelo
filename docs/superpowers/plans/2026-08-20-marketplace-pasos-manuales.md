@@ -8,6 +8,45 @@ Todo lo que sigue toca la base de datos o el proyecto de Supabase, que no están
 repositorio y a los que ningún agente de esta sesión tuvo acceso. **El orden importa** y
 el último paso es el merge, no el primero.
 
+## ESTADO REAL, verificado el 2026-08-20 contra la base
+
+**Los pasos 1 y 2 ya están hechos.** `v19` y `v20` **están aplicadas**: existen
+`coach_requests`, `request_applications`, `open_requests`, `public_coaches`,
+`marketplace_stats` y `pending_coaches`, y las columnas nuevas de `users` y `gyms`.
+Comprobado con la service key. No las volvió a aplicar nadie de esta sesión.
+
+**Tres cosas que quedaron abiertas y que hay que resolver antes de mezclar:**
+
+1. **No se sabe qué versión de `v19` está aplicada.** El archivo se editó tres veces
+   durante las revisiones y el cuerpo de una función no se puede leer por la API REST.
+   Lo que sí se verificó: los `revoke` están (como `anon`, `coach_sub_status` e
+   `is_marketplace_coach` devuelven 401 mientras una consulta a tabla con la misma llave
+   devuelve 200). Lo que **no** se pudo verificar es si `claim_request` trae la
+   corrección crítica —el `and subscription_status = 'marketplace'` y el estado
+   `'free_month'`— sin la cual un coach que **sí paga** se lleva `free_month_ends_at`
+   al marcar "Lo tomé" y queda bloqueado un mes después.
+   **Qué hacer:** volver a aplicar `trainer-app/supabase_migration_v19.sql` y
+   `v20.sql` tal como están hoy en la rama `marketplace-web`. Se comprobó que **los dos
+   son reaplicables**: no tienen ningún `create` sin `if not exists` ni `or replace`.
+   Es la forma más barata de garantizar que la base coincide con lo revisado.
+
+2. **`hizocar@gmail.com` no existía en la base**, así que el paso 3 de este documento
+   —el `update ... set is_platform_admin = true`— habría afectado **cero filas sin dar
+   error**, y `/admin/coaches` habría redirigido para siempre.
+   El 2026-08-20 se creó el usuario de autenticación (id
+   `cea1ee1d-f42b-4204-ade4-1a5a404a1f82`, contraseña inicial `EliteAdmin905eb681!`),
+   pero **quedó a medio crear**: el disparador de la base le puso `role: 'client'` sin
+   gimnasio. Falta crear su gimnasio y convertirla en coach dueño y admin. El SQL exacto
+   está en la conversación; mientras no se haga, esa cuenta entra a la app como un
+   alumno sin coach.
+
+3. **La comprobación del teléfono sigue sin hacerse.** Con la anon key,
+   `coach_requests?select=whatsapp` devuelve `200` y `[]` — pero la tabla está vacía, así
+   que no distingue "sin política" de "sin filas". **Solo sirve con una solicitud
+   publicada dentro.** Es la comprobación que valida el corazón del diseño.
+
+---
+
 ## Por qué el orden no es negociable
 
 `web/src/lib/guard.ts` consulta `users.marketplace_status`, `users.is_platform_admin` y
