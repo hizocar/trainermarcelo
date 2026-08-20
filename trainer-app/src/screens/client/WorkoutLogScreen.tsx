@@ -24,7 +24,7 @@ import { suggestProgression } from '../../lib/progress';
 import { restOptions, secondsLeft, formatRest } from '../../lib/restTimer';
 import { scheduleRestAlert, cancelRestAlert } from '../../lib/notifications';
 
-type RouteParams = { exercise: Exercise; week: number; date?: string };
+type RouteParams = { exercise: Exercise; week: number; date?: string; athleteId?: string };
 
 // Lun..Dom — orden de los chips de "¿cuándo lo hiciste?" (getDay(): 0=Dom..6=Sáb)
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -44,6 +44,11 @@ export default function WorkoutLogScreen() {
   const route = useRoute();
   const { exercise, week, date } = route.params as RouteParams;
   const { user } = useAuth();
+  // De quién es este entrenamiento. Cuando entra el alumno es él mismo; cuando
+  // entra el coach a registrar por su alumno, llega por parámetro. Antes esto y
+  // `user.id` eran lo mismo y por eso el archivo los usaba indistintamente.
+  const athleteId = (route.params as RouteParams).athleteId ?? user!.id;
+  const esPropio = athleteId === user!.id;
 
   const [logDate, setLogDate] = useState(date ?? new Date().toISOString());
   const [entries, setEntries] = useState<SeriesEntry[]>([]);
@@ -157,7 +162,7 @@ export default function WorkoutLogScreen() {
     if (!user || !exercise.day_id) return;
     const { data } = await supabase
       .from('session_notes').select('note')
-      .eq('user_id', user.id).eq('day_id', exercise.day_id).eq('week_number', week)
+      .eq('user_id', athleteId).eq('day_id', exercise.day_id).eq('week_number', week)
       .maybeSingle();
     setNote(data?.note ?? '');
     setNoteDirty(false);
@@ -167,7 +172,7 @@ export default function WorkoutLogScreen() {
     if (!user || !note.trim()) return;
     setNoteSaving(true);
     const { error } = await supabase.from('session_notes').upsert(
-      { user_id: user.id, day_id: exercise.day_id, week_number: week, note: note.trim() },
+      { user_id: athleteId, day_id: exercise.day_id, week_number: week, note: note.trim() },
       { onConflict: 'user_id,day_id,week_number' },
     );
     setNoteSaving(false);
