@@ -124,20 +124,25 @@ registro debe decir que lo tecleó el coach.
 La cola offline es parte del alcance y no un detalle: un gimnasio es exactamente donde no
 hay señal, y el coach va a estar registrando ahí.
 
-### Recorrido nuevo
+### Recorrido: no hay pantalla nueva
 
-Desde `ClientDetailScreen`, un acceso junto a los que ya existen (`Semana`, `Calendario`,
-`Progreso`, `Composición`): **"Registrar entrenamiento"**. Lleva a la lista de días de la
-semana en curso, con el mismo anillo de series completadas que ve el alumno, y de ahí a
-`WorkoutLogScreen` con `athleteId` del cliente.
+**Corregido el 2026-08-20 al explorar el código.** El diseño proponía un acceso nuevo en
+`ClientDetailScreen` y una pantalla con la lista de días. No hace falta:
+`ClientWeekScreen` —a la que se llega con el botón "ESTA SEMANA", el primero de la
+ficha— ya carga el plan con `fetchFullPlan`, ya muestra los días con sus ejercicios y las
+series registradas, y ya tiene navegador de semanas con botón para volver a la actual.
 
-**Solo la semana en curso**, la que devuelve `getCurrentWeek()` de `trainer-app/src/lib/weeks.ts`
-— la misma que ya usan `ClientDetailScreen` y `ClientWeekScreen`, y la misma que usa el
-alumno, para que coach y alumno nunca estén mirando semanas distintas. (`getCurrentWeek()`
-es el correcto acá: la regla de `santiagoCurrentWeek()` es de `web/`, donde el servidor
-corre en UTC; la app corre en el teléfono del usuario.) Registrar días pasados es corregir
-historial: otra función, con otras preguntas (¿hasta cuándo atrás? ¿el alumno se entera?).
-Acá no entra.
+Lo que falta es **que los ejercicios sean tocables**. Al tocar uno se abre
+`WorkoutLogScreen` con el `athleteId` del cliente. La regla "solo la semana en curso" se
+convierte en una condición que el archivo ya tiene: la fila es tocable solo cuando
+`week === currentWeek`; en cualquier otra semana sigue siendo lectura, como hoy.
+
+Eso deja un lugar menos donde la lógica puede divergir, y el coach llega por donde ya
+entra a mirar cómo va la semana en vez de por un menú aparte que tendría que recordar.
+
+Para que se note que ahora se puede tocar, la fila del ejercicio gana la señal que el
+resto de la app ya usa para lo tocable, y la cabecera de la semana en curso dice que
+tocar un ejercicio registra. Sin eso, la función existe y nadie la encuentra.
 
 ### El choque se evita, no se resuelve
 
