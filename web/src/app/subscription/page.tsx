@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import SubscriptionActions from './SubscriptionActions';
+import { requireCoach } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +15,7 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
 };
 
 export default async function SubscriptionPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role, is_owner, gym_id').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, me } = await requireCoach();
   if (!me.is_owner) redirect('/dashboard');
 
   const { data: gym } = await supabase.from('gyms').select('*').eq('id', me.gym_id).maybeSingle();

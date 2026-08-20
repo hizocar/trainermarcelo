@@ -1,18 +1,12 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import LibraryClient from './LibraryClient';
+import { requireCoach } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LibraryPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, userId } = await requireCoach();
 
   const { data: library } = await supabase
     .from('exercise_library')
@@ -41,7 +35,7 @@ export default async function LibraryPage() {
           Los que agregas tú quedan marcados como propios.
         </p>
 
-        <LibraryClient initialLibrary={library ?? []} coachId={user.id} />
+        <LibraryClient initialLibrary={library ?? []} coachId={userId} />
       </main>
     </>
   );
