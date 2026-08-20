@@ -71,7 +71,7 @@ $$;
 -- a authenticated suma, no reemplaza: sin este revoke, cualquier anon podría
 -- llamarla (fallaría por el check de auth.uid(), pero la superficie queda
 -- abierta sin necesidad).
-revoke execute on function public.update_my_profile(text,text,text[],text[],text,boolean) from public;
+revoke execute on function public.update_my_profile(text,text,text[],text[],text,boolean) from public, anon;
 grant execute on function public.update_my_profile(text,text,text[],text[],text,boolean)
   to authenticated;
 

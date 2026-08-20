@@ -8,42 +8,58 @@ Todo lo que sigue toca la base de datos o el proyecto de Supabase, que no están
 repositorio y a los que ningún agente de esta sesión tuvo acceso. **El orden importa** y
 el último paso es el merge, no el primero.
 
-## ESTADO REAL, verificado el 2026-08-20 contra la base
+## ESTADO REAL, verificado el 2026-08-20 19:30 ejecutando SQL contra la base
 
-**Los pasos 1 y 2 ya están hechos.** `v19` y `v20` **están aplicadas**: existen
-`coach_requests`, `request_applications`, `open_requests`, `public_coaches`,
-`marketplace_stats` y `pending_coaches`, y las columnas nuevas de `users` y `gyms`.
-Comprobado con la service key. No las volvió a aplicar nadie de esta sesión.
+Reemplaza la nota anterior, que decía que `v19` y `v20` ya estaban aplicadas. **No lo
+estaban.** `information_schema` devolvió cero tablas, cero vistas, cero funciones y cero
+columnas nuevas; después de aplicarlas aparecieron todas. La comprobación anterior se
+hizo por la API REST, que no distingue bien ese caso.
 
-**Tres cosas que quedaron abiertas y que hay que resolver antes de mezclar:**
+**Pasos 1 a 5: hechos y verificados.**
 
-1. **No se sabe qué versión de `v19` está aplicada.** El archivo se editó tres veces
-   durante las revisiones y el cuerpo de una función no se puede leer por la API REST.
-   Lo que sí se verificó: los `revoke` están (como `anon`, `coach_sub_status` e
-   `is_marketplace_coach` devuelven 401 mientras una consulta a tabla con la misma llave
-   devuelve 200). Lo que **no** se pudo verificar es si `claim_request` trae la
-   corrección crítica —el `and subscription_status = 'marketplace'` y el estado
-   `'free_month'`— sin la cual un coach que **sí paga** se lleva `free_month_ends_at`
-   al marcar "Lo tomé" y queda bloqueado un mes después.
-   **Qué hacer:** volver a aplicar `trainer-app/supabase_migration_v19.sql` y
-   `v20.sql` tal como están hoy en la rama `marketplace-web`. Se comprobó que **los dos
-   son reaplicables**: no tienen ningún `create` sin `if not exists` ni `or replace`.
-   Es la forma más barata de garantizar que la base coincide con lo revisado.
+- `v19` y `v20` aplicadas, **byte a byte idénticas** a las de esta rama. `claim_request`
+  en la base trae la corrección crítica: se verificó con `pg_get_functiondef` que contiene
+  el estado `'free_month'` y la guarda `subscription_status = 'marketplace'`.
+- **Paso 4 encontró una alarma real:** `update_my_profile` quedaba ejecutable por `anon`.
+  Causa: los *default privileges* de Supabase otorgan `EXECUTE` a `anon` explícitamente
+  (`pg_default_acl` = `{postgres=X,anon=X,authenticated=X,service_role=X}`), y
+  `revoke … from public` no toca esa concesión. Ya se revocó en la base y **se corrigió
+  el origen** en `v20` (`from public, anon`), que si no reaparecía al reaplicar.
+- **Paso 5 pasa entero.** Con una solicitud real dentro de `coach_requests`, la anon key
+  recibe `[]` y `open_requests` devuelve `42501`. Los tres rechazos fallan por su razón
+  correcta: `P0001 solicitud inválida`, `P0001 teléfono inválido`, `P0005 ya tienes una
+  solicitud abierta`. La fila de prueba se borró.
 
-2. **`hizocar@gmail.com` no existía en la base**, así que el paso 3 de este documento
-   —el `update ... set is_platform_admin = true`— habría afectado **cero filas sin dar
-   error**, y `/admin/coaches` habría redirigido para siempre.
-   El 2026-08-20 se creó el usuario de autenticación (id
-   `cea1ee1d-f42b-4204-ade4-1a5a404a1f82`, contraseña inicial `EliteAdmin905eb681!`),
-   pero **quedó a medio crear**: el disparador de la base le puso `role: 'client'` sin
-   gimnasio. Falta crear su gimnasio y convertirla en coach dueño y admin. El SQL exacto
-   está en la conversación; mientras no se haga, esa cuenta entra a la app como un
-   alumno sin coach.
+**El paso 3 estaba mal escrito y habría fallado en silencio.** `hizocar@gmail.com` no
+existe en `public.users`, y la cuenta con la que el dueño entra —`sebastian@trainerapp.com`—
+tiene `role = 'client'`. Marcarla no habría servido: `requireAdmin` delega en
+`requireCoach`, que corta con `role !== 'coach'` **antes** de mirar el flag, y redirige a
+`/login`, que se lee como sesión caída. El admin quedó, por ahora, en la cuenta de semilla
+`owner2.1785701635957@trainerapp.com`. **Es de semilla, con la contraseña de
+`SEED_COACH_PASSWORD`: hay que moverlo a una cuenta real con `role = 'coach'` antes del
+primer coach del marketplace.**
 
-3. **La comprobación del teléfono sigue sin hacerse.** Con la anon key,
-   `coach_requests?select=whatsapp` devuelve `200` y `[]` — pero la tabla está vacía, así
-   que no distingue "sin política" de "sin filas". **Solo sirve con una solicitud
-   publicada dentro.** Es la comprobación que valida el corazón del diseño.
+**El paso 6 de más abajo describe mal la función.** Tres defectos, corregidos en
+`trainer-app/supabase/functions/start-free-signup/index.ts`, que ya está escrita:
+
+1. Decía "**insertar** en `users`". El disparador `handle_new_user` (`AFTER INSERT ON
+   auth.users`) ya inserta esa fila: el insert habría chocado con clave duplicada.
+   Va `update`, como hace `invite-coach`.
+2. El disparador nunca escribe `'coach'` — mapea `'coach'` y `'coach_pending'` a
+   `'coach_pending'`, y `requireCoach` compara por igualdad. Sin el `update` a `'coach'`,
+   el coach del marketplace no llega ni a `/marketplace`.
+3. El insert del gimnasio que describe omite `owner_id`, que es **NOT NULL**.
+
+Usa `inviteUserByEmail` en vez de `createUser` + `resetPasswordForEmail`: es una sola
+llamada, es lo que ya usa `confirm-signup`, y así el correo es el mismo que reciben los
+que pagan. Sobre la pregunta abierta de las cuentas huérfanas: deshace los pasos
+anteriores si alguno falla, y borra `public.users` a mano porque **no cuelga de
+`auth.users` con cascade**, y antes que el gimnasio porque `users_gym_id_fkey` es
+`NO ACTION`.
+
+**Lo que falta:** desplegar la función
+(`supabase functions deploy start-free-signup --no-verify-jwt`), probar el alta gratis
+de punta a punta, y el merge. Sin Deno instalado no se pudo verificar tipos localmente.
 
 ---
 

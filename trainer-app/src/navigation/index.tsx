@@ -181,7 +181,7 @@ export default function AppNavigator() {
   if (session && locked) return <AppLockScreen onUnlock={tryUnlock} />;
 
   // el gimnasio no está al día: se pausa el panel de coach (los datos no se tocan)
-  const subscriptionBlocked = user?.role === 'coach' && !!user.gymStatus && !['active', 'trialing'].includes(user.gymStatus);
+  const subscriptionBlocked = user?.role === 'coach' && !!user.gymStatus && !['active', 'trialing', 'free_month'].includes(user.gymStatus);
 
   return (
     <NavigationContainer
