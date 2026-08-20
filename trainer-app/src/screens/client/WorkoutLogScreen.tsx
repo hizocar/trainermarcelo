@@ -17,12 +17,13 @@ import SectionLabel from '../../components/common/SectionLabel';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
 import TrendChart from '../../components/common/TrendChart';
-import { showAlert } from '../../lib/alert';
+import { showAlert, showConfirm } from '../../lib/alert';
 import { formatShortDate, dateForWeekDay, WEEK_DAYS_SHORT } from '../../lib/weeks';
 import { saveLog } from '../../lib/offline';
 import { suggestProgression } from '../../lib/progress';
 import { restOptions, secondsLeft, formatRest } from '../../lib/restTimer';
 import { scheduleRestAlert, cancelRestAlert } from '../../lib/notifications';
+import { necesitaConfirmar, textoConfirmacion } from '../../lib/overwrite';
 
 type RouteParams = { exercise: Exercise; week: number; date?: string; athleteId?: string };
 
@@ -37,6 +38,10 @@ interface SeriesEntry {
   rir: string;
   prev?: { weight: number; reps: number; week: number };
   saved: boolean;
+  /** Tenía registro al abrir la pantalla: el coach no lo pisa sin confirmar. */
+  yaRegistrada: boolean;
+  /** El coach ya confirmó reemplazar esta serie en esta visita. */
+  desbloqueada: boolean;
 }
 
 export default function WorkoutLogScreen() {
@@ -68,6 +73,10 @@ export default function WorkoutLogScreen() {
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [restLeft, setRestLeft] = useState(0);
   const restAlertIdRef = React.useRef<string | null>(null);
+  // valor original de cada serie al abrir la pantalla (series_id → {weight, reps}):
+  // es lo que se muestra en la confirmación, no lo que hay en pantalla mientras
+  // el coach edita, porque es lo que se va a perder.
+  const currentLogRef = React.useRef<Record<string, { weight: number; reps: number }>>({});
   // token de secuencia: solo el último toque puede escribir `restAlertIdRef`
   const restTokenRef = React.useRef(0);
   const avisoPrevioRef = React.useRef(false);
@@ -221,6 +230,12 @@ export default function WorkoutLogScreen() {
         .sort((a, b) => b.week - a.week),
     );
 
+    const currentLogSimplified: Record<string, { weight: number; reps: number }> = {};
+    Object.entries(currentMap).forEach(([id, l]) => {
+      currentLogSimplified[id] = { weight: l.weight, reps: l.reps };
+    });
+    currentLogRef.current = currentLogSimplified;
+
     setEntries(seriesList.map(s => {
       const prev = prevMap[s.id];
       const cur = currentMap[s.id];
@@ -231,12 +246,30 @@ export default function WorkoutLogScreen() {
         rir: cur?.rir != null ? String(cur.rir) : '',
         prev: prev ? { weight: prev.weight, reps: prev.reps, week: prev.week_number } : undefined,
         saved: !!cur,
+        yaRegistrada: !!cur,
+        desbloqueada: false,
       };
     }));
     setLoading(false);
   }
 
   function updateEntry(index: number, field: 'weight' | 'reps' | 'rir', value: string) {
+    const e = entries[index];
+    if (necesitaConfirmar({ esPropio, yaRegistrada: e.yaRegistrada, desbloqueada: e.desbloqueada })) {
+      const cur = currentLogRef.current[e.series.id];
+      showConfirm(
+        'Reemplazar serie',
+        textoConfirmacion({
+          seriesNumber: e.series.series_number,
+          weight: cur?.weight ?? 0,
+          reps: cur?.reps ?? 0,
+        }),
+        () => setEntries(prev => prev.map((x, i) => i === index ? { ...x, desbloqueada: true } : x)),
+        'Reemplazar',
+      );
+      return;
+    }
+
     // permitir solo dígitos y un separador decimal (punto o coma)
     const clean = value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/, '$1');
     setEntries(prev => prev.map((e, i) => i === index
@@ -559,27 +592,37 @@ export default function WorkoutLogScreen() {
           </View>
         )}
 
-        <Card style={styles.noteCard}>
-          <View style={styles.noteHeader}>
-            <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.accent} />
-            <Text style={styles.noteTitle}>NOTA PARA TU COACH</Text>
-          </View>
-          <TextInput
-            style={styles.noteInput}
-            value={note}
-            onChangeText={v => { setNote(v); setNoteDirty(true); }}
-            placeholder="ej: sentí molestia en el hombro en la S3..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-          />
-          {noteDirty && note.trim().length > 0 ? (
-            <TouchableOpacity style={styles.noteSave} onPress={saveNote} disabled={noteSaving}>
-              <Text style={styles.noteSaveText}>{noteSaving ? 'GUARDANDO...' : 'GUARDAR NOTA'}</Text>
-            </TouchableOpacity>
-          ) : note.trim().length > 0 ? (
-            <Text style={styles.noteSaved}>✓ Guardada — tu coach la verá</Text>
-          ) : null}
-        </Card>
+        {/* La nota es del alumno: cuando opera el coach, solo lectura y solo si
+            hay algo escrito — no hay campo ni botón de guardar para él. */}
+        {(esPropio || note.trim().length > 0) && (
+          <Card style={styles.noteCard}>
+            <View style={styles.noteHeader}>
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.accent} />
+              <Text style={styles.noteTitle}>{esPropio ? 'NOTA PARA TU COACH' : 'NOTA DEL ALUMNO'}</Text>
+            </View>
+            {esPropio ? (
+              <>
+                <TextInput
+                  style={styles.noteInput}
+                  value={note}
+                  onChangeText={v => { setNote(v); setNoteDirty(true); }}
+                  placeholder="ej: sentí molestia en el hombro en la S3..."
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                />
+                {noteDirty && note.trim().length > 0 ? (
+                  <TouchableOpacity style={styles.noteSave} onPress={saveNote} disabled={noteSaving}>
+                    <Text style={styles.noteSaveText}>{noteSaving ? 'GUARDANDO...' : 'GUARDAR NOTA'}</Text>
+                  </TouchableOpacity>
+                ) : note.trim().length > 0 ? (
+                  <Text style={styles.noteSaved}>✓ Guardada — tu coach la verá</Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={styles.noteReadOnly}>{note}</Text>
+            )}
+          </Card>
+        )}
 
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -780,6 +823,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
     color: colors.textPrimary, fontSize: 14, minHeight: 56, textAlignVertical: 'top',
   },
+  noteReadOnly: { ...typography.body, color: colors.textPrimary, lineHeight: 20 },
   noteSave: { alignSelf: 'flex-end' },
   noteSaveText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
   noteSaved: { ...typography.caption, fontSize: 10, color: colors.success, textAlign: 'right' },
