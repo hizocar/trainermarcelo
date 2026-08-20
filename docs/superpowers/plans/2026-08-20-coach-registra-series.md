@@ -277,7 +277,12 @@ visible: deja la app **mostrando menos datos de los que hay**.
 
 Leer `trainer-app/supabase_schema.sql` líneas 124-132 (`logs_client`, `logs_coach`) y
 `trainer-app/supabase_migration_v6.sql` líneas 76-88 (`logs_client_insert`). Copiar el
-estilo de comentarios de `supabase_migration_v19.sql`, que es la más reciente.
+estilo de comentarios de `supabase_migration_v18.sql`, la más reciente de esta rama.
+
+**Sobre el número:** se salta de `v18` a `v21` a propósito. `v19` y `v20` existen en la
+rama `marketplace-web`, que todavía no se mezcla y cuyas migraciones tampoco están
+aplicadas; usar `v21` evita que dos ramas reclamen el mismo número. El hueco es
+cosmético: las migraciones de este proyecto se aplican a mano y son independientes.
 
 - [ ] **Step 2: Escribir la migración**
 
