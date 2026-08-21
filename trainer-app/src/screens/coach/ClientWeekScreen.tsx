@@ -92,6 +92,8 @@ export default function ClientWeekScreen() {
     .reduce((a, s) => a + s.weight * s.reps, 0);
   const doneExercises = Object.keys(setsByEx).length;
   const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
+  // solo la semana en curso admite registrar series; cualquier otra semana es de solo lectura
+  const registrable = week === currentWeek;
 
   return (
     <View style={styles.container}>
@@ -143,6 +145,9 @@ export default function ClientWeekScreen() {
             </Card>
           ) : (
             <>
+              {registrable && (
+                <Text style={styles.hint}>TOCA UN EJERCICIO PARA REGISTRAR SUS SERIES</Text>
+              )}
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
                   <Text style={styles.statValue}>{doneExercises}/{totalExercises}</Text>
@@ -182,8 +187,8 @@ export default function ClientWeekScreen() {
 
                     {day.exercises.map(ex => {
                       const sets = setsByEx[ex.id];
-                      return (
-                        <View key={ex.id} style={styles.exBlock}>
+                      const filaEjercicio = (
+                        <View style={styles.exBlock}>
                           <Text style={[styles.exName, !sets && styles.exNamePending]} numberOfLines={1}>
                             {ex.name}
                           </Text>
@@ -204,6 +209,22 @@ export default function ClientWeekScreen() {
                               — sin registro ({ex.exercise_series.length} series planificadas)
                             </Text>
                           )}
+                        </View>
+                      );
+                      return (
+                        <View key={ex.id}>
+                          {registrable ? (
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              onPress={() => navigation.navigate('WorkoutLog', {
+                                exercise: ex,
+                                week,
+                                athleteId: client.id,
+                              })}
+                            >
+                              {filaEjercicio}
+                            </TouchableOpacity>
+                          ) : filaEjercicio}
                         </View>
                       );
                     })}
@@ -258,6 +279,7 @@ const styles = StyleSheet.create({
   },
   todayBtnText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.accent },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
+  hint: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
   statBox: {
     flex: 1, alignItems: 'center', gap: 2,

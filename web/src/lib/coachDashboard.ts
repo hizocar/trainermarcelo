@@ -5,10 +5,15 @@ import { santiagoCurrentWeek, santiagoWeekDay, santiagoDayKey } from './weeks';
 // Datos de la lista de alumnos del coach, cargados EN BLOQUE.
 //
 // Regla que no se puede romper: el número de consultas es fijo y ningún
-// `.in(...)` recibe una lista que crezca con el número de series del plan.
-// Los registros se piden por `logged_by` (un id por alumno, ~30) en vez de
-// por `series_id` (miles) — pedirlos por serie es exactamente el error que
+// `.in(...)` recibe una lista que crezca con el número de series del plan —
+// pedir los registros por `series_id` (miles) es exactamente el error que
 // hizo fallar en silencio al calendario y dibujar el mes como "nadie entrenó".
+//
+// Los registros ya NO se acotan por `logged_by`: desde la v21 esa columna
+// dice quién TECLEÓ el registro (puede ser el coach), no de quién es. La
+// pertenencia se deriva del plan de la serie, y RLS ya limita lo que vuelve
+// a los planes de los alumnos de quien consulta. Por eso el filtro se quita
+// en vez de reemplazarse por una lista de series.
 
 export interface CoachDashboardRow {
   id: string;
@@ -52,7 +57,11 @@ export async function loadCoachDashboard(
     .from('workout_plans').select('id, client_id').in('client_id', clientIds);
   if (plansError) throw new Error(`No se pudieron cargar los planes: ${plansError.message}`);
   const planByClient = new Map<string, string>();
-  (plans ?? []).forEach((p: any) => planByClient.set(p.client_id, p.id));
+  const clientByPlan = new Map<string, string>();
+  (plans ?? []).forEach((p: any) => {
+    planByClient.set(p.client_id, p.id);
+    clientByPlan.set(p.id, p.client_id);
+  });
   const planIds = Array.from(planByClient.values());
 
   // 2) semanas de esos planes -> la activa de cada uno
@@ -64,33 +73,55 @@ export async function loadCoachDashboard(
   ((weeks ?? []) as PlanWeek[]).forEach((w) => {
     weeksByPlan.set(w.plan_id, [...(weeksByPlan.get(w.plan_id) ?? []), w]);
   });
+  // Se resuelve SOLO la semana en curso: es lo único que hace falta para saber
+  // qué está planificado y qué se cumplió. La atribución de los registros ya
+  // no pasa por acá — cada registro trae su plan, más abajo.
   const activeWeekByPlan = new Map<string, string>();
   planIds.forEach((planId) => {
     const active = resolveActiveWeek(weeksByPlan.get(planId) ?? [], currentWeek);
     if (active) activeWeekByPlan.set(planId, active.id);
   });
 
-  // 3) días de las semanas activas, con sus ejercicios y series
+  // 3) días de esas semanas, con sus ejercicios y series
   const activeWeekIds = Array.from(activeWeekByPlan.values());
   const { data: days, error: daysError } = activeWeekIds.length
     ? await supabase
         .from('training_days')
-        .select('id, plan_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
+        .select('id, plan_id, plan_week_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
         .in('plan_week_id', activeWeekIds)
     : { data: [], error: null };
   if (daysError) throw new Error(`No se pudieron cargar los días de entrenamiento: ${daysError.message}`);
 
-  // 4) registros de las 2 últimas semanas, acotados por ALUMNO (no por serie)
+  // 4) registros de las 2 últimas semanas. Sin filtro por alumno: RLS los
+  // acota a los planes de los alumnos de este coach.
+  //
+  // El plan de cada registro viene EN LA MISMA CONSULTA, subiendo por las
+  // claves foráneas. No es un `.in(series_id, ...)`: la lista de filtros sigue
+  // sin crecer con el número de series del plan.
   const { data: logs, error: logsError } = await supabase
     .from('workout_logs')
-    .select('series_id, logged_by, logged_at, week_number')
-    .in('logged_by', clientIds)
+    .select(
+      'series_id, logged_at, week_number, ' +
+      'exercise_series ( exercises ( training_days ( plan_id ) ) )',
+    )
     .in('week_number', [currentWeek - 1, currentWeek]);
 
   // Un fallo acá NO puede disfrazarse de "nadie entrenó": se propaga.
   if (logsError) throw new Error(`No se pudieron cargar los registros: ${logsError.message}`);
 
-  // series_id -> día planificado
+  // De quién es un registro: se sube por serie -> ejercicio -> día hasta el
+  // plan, con lo que vino en la MISMA consulta. Antes esto se cruzaba contra
+  // los días de las plan_weeks activas y "la última vez que entrenó" quedaba
+  // atada a qué semanas estuvieran activas o archivadas.
+  //
+  // PostgREST devuelve el embebido de una relación a-uno como objeto, pero
+  // según la versión puede llegar envuelto en un arreglo: se aceptan las dos.
+  const unwrap = (v: any) => (Array.isArray(v) ? v[0] : v);
+  const planIdDelLog = (l: any): string =>
+    unwrap(unwrap(unwrap(l.exercise_series)?.exercises)?.training_days)?.plan_id ?? '';
+
+  // series_id -> día planificado. Todos los días cargados son de la semana en
+  // curso: lo planificado y lo cumplido son SIEMPRE de esta semana.
   const dayBySeries = new Map<string, { dayId: string; planId: string; weekDay: number | null }>();
   const plannedByPlan = new Map<string, number[]>();
   ((days ?? []) as any[])
@@ -113,9 +144,14 @@ export async function loadCoachDashboard(
   const lastTrainedByClient = new Map<string, string>();
   ((logs ?? []) as any[]).forEach((l) => {
     if (l.logged_at) {
-      const key = santiagoDayKey(new Date(l.logged_at));
-      const prev = lastTrainedByClient.get(l.logged_by);
-      if (!prev || key > prev) lastTrainedByClient.set(l.logged_by, key);
+      // De quién es el registro sale del plan de la serie, no de quién lo
+      // tecleó: un registro que anotó el coach igual es del alumno.
+      const clienteId = clientByPlan.get(planIdDelLog(l));
+      if (clienteId) {
+        const key = santiagoDayKey(new Date(l.logged_at));
+        const prev = lastTrainedByClient.get(clienteId);
+        if (!prev || key > prev) lastTrainedByClient.set(clienteId, key);
+      }
     }
     if (l.week_number !== currentWeek) return;
     const meta = dayBySeries.get(l.series_id);

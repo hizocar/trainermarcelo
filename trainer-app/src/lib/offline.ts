@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
+import { buildLogUpdate } from './logPayload';
 
 // Cola de escrituras que sobrevive sin señal (el gimnasio suele ser un sótano).
 // Los registros se guardan localmente y se suben en cuanto vuelve la conexión.
@@ -100,9 +101,7 @@ async function upsertLog(log: Omit<QueuedLog, 'id' | 'queued_at'>) {
     .maybeSingle();
 
   return existing
-    ? await supabase.from('workout_logs').update({
-        weight: log.weight, reps: log.reps, rir: log.rir, logged_at: log.logged_at,
-      }).eq('id', existing.id)
+    ? await supabase.from('workout_logs').update(buildLogUpdate(log)).eq('id', existing.id)
     : await supabase.from('workout_logs').insert({
         series_id: log.series_id,
         week_number: log.week_number,

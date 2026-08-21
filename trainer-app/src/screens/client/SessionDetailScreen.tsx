@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Modal } fr
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
 import { Exercise } from '../../types';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
@@ -25,7 +24,6 @@ const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Lun..Dom
 export default function SessionDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const { user } = useAuth();
   const { sessions, dateLabel } = route.params as RouteParams;
   const [fixingIndex, setFixingIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,15 +42,26 @@ export default function SessionDetailScreen() {
       showAlert('No se pudo corregir', seriesErr?.message ?? 'Intenta de nuevo.');
       return;
     }
-    const { error } = await supabase
+    // Sin `.eq('logged_by', ...)`: desde la v21 esa columna dice quién tecleó
+    // el registro, así que filtrarla dejaba al alumno sin poder corregir la
+    // fecha de una sesión que anotó su coach. RLS impide tocar registros de
+    // otro plan. El `.in('series_id', ...)` se queda: es la lista corta de
+    // las series de ESTA sesión, no una que crezca con el plan entero.
+    //
+    // `count: 'exact'` para no mentir: un update de cero filas no devuelve
+    // error, y la pantalla decía "Fecha corregida" igual.
+    const { error, count } = await supabase
       .from('workout_logs')
-      .update({ logged_at: newDate.toISOString() })
-      .eq('logged_by', user!.id)
+      .update({ logged_at: newDate.toISOString() }, { count: 'exact' })
       .eq('week_number', session.week)
       .in('series_id', seriesRows.map(s => s.id));
     setSaving(false);
     setFixingIndex(null);
     if (error) { showAlert('No se pudo corregir', error.message); return; }
+    if (!count) {
+      showAlert('No se pudo corregir', 'No se encontraron registros de esta sesión para mover.');
+      return;
+    }
     showAlert('Fecha corregida', 'Toda la sesión quedó registrada en el día correcto.', () => navigation.goBack());
   }
 

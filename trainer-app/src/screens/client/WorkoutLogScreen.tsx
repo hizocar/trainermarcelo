@@ -17,14 +17,15 @@ import SectionLabel from '../../components/common/SectionLabel';
 import ExerciseVideo from '../../components/common/ExerciseVideo';
 import MuscleMap from '../../components/common/MuscleMap';
 import TrendChart from '../../components/common/TrendChart';
-import { showAlert } from '../../lib/alert';
+import { showAlert, showConfirm } from '../../lib/alert';
 import { formatShortDate, dateForWeekDay, WEEK_DAYS_SHORT } from '../../lib/weeks';
 import { saveLog } from '../../lib/offline';
 import { suggestProgression } from '../../lib/progress';
 import { restOptions, secondsLeft, formatRest } from '../../lib/restTimer';
 import { scheduleRestAlert, cancelRestAlert } from '../../lib/notifications';
+import { necesitaConfirmar, textoConfirmacion } from '../../lib/overwrite';
 
-type RouteParams = { exercise: Exercise; week: number; date?: string };
+type RouteParams = { exercise: Exercise; week: number; date?: string; athleteId?: string };
 
 // Lun..Dom — orden de los chips de "¿cuándo lo hiciste?" (getDay(): 0=Dom..6=Sáb)
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -37,6 +38,10 @@ interface SeriesEntry {
   rir: string;
   prev?: { weight: number; reps: number; week: number };
   saved: boolean;
+  /** Tenía registro al abrir la pantalla: el coach no lo pisa sin confirmar. */
+  yaRegistrada: boolean;
+  /** El coach ya confirmó reemplazar esta serie en esta visita. */
+  desbloqueada: boolean;
 }
 
 export default function WorkoutLogScreen() {
@@ -44,6 +49,11 @@ export default function WorkoutLogScreen() {
   const route = useRoute();
   const { exercise, week, date } = route.params as RouteParams;
   const { user } = useAuth();
+  // De quién es este entrenamiento. Cuando entra el alumno es él mismo; cuando
+  // entra el coach a registrar por su alumno, llega por parámetro. Antes esto y
+  // `user.id` eran lo mismo y por eso el archivo los usaba indistintamente.
+  const athleteId = (route.params as RouteParams).athleteId ?? user!.id;
+  const esPropio = athleteId === user!.id;
 
   const [logDate, setLogDate] = useState(date ?? new Date().toISOString());
   const [entries, setEntries] = useState<SeriesEntry[]>([]);
@@ -63,6 +73,10 @@ export default function WorkoutLogScreen() {
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [restLeft, setRestLeft] = useState(0);
   const restAlertIdRef = React.useRef<string | null>(null);
+  // valor original de cada serie al abrir la pantalla (series_id → {weight, reps}):
+  // es lo que se muestra en la confirmación, no lo que hay en pantalla mientras
+  // el coach edita, porque es lo que se va a perder.
+  const currentLogRef = React.useRef<Record<string, { weight: number; reps: number }>>({});
   // token de secuencia: solo el último toque puede escribir `restAlertIdRef`
   const restTokenRef = React.useRef(0);
   const avisoPrevioRef = React.useRef(false);
@@ -157,7 +171,7 @@ export default function WorkoutLogScreen() {
     if (!user || !exercise.day_id) return;
     const { data } = await supabase
       .from('session_notes').select('note')
-      .eq('user_id', user.id).eq('day_id', exercise.day_id).eq('week_number', week)
+      .eq('user_id', athleteId).eq('day_id', exercise.day_id).eq('week_number', week)
       .maybeSingle();
     setNote(data?.note ?? '');
     setNoteDirty(false);
@@ -167,7 +181,7 @@ export default function WorkoutLogScreen() {
     if (!user || !note.trim()) return;
     setNoteSaving(true);
     const { error } = await supabase.from('session_notes').upsert(
-      { user_id: user.id, day_id: exercise.day_id, week_number: week, note: note.trim() },
+      { user_id: athleteId, day_id: exercise.day_id, week_number: week, note: note.trim() },
       { onConflict: 'user_id,day_id,week_number' },
     );
     setNoteSaving(false);
@@ -216,6 +230,12 @@ export default function WorkoutLogScreen() {
         .sort((a, b) => b.week - a.week),
     );
 
+    const currentLogSimplified: Record<string, { weight: number; reps: number }> = {};
+    Object.entries(currentMap).forEach(([id, l]) => {
+      currentLogSimplified[id] = { weight: l.weight, reps: l.reps };
+    });
+    currentLogRef.current = currentLogSimplified;
+
     setEntries(seriesList.map(s => {
       const prev = prevMap[s.id];
       const cur = currentMap[s.id];
@@ -226,6 +246,8 @@ export default function WorkoutLogScreen() {
         rir: cur?.rir != null ? String(cur.rir) : '',
         prev: prev ? { weight: prev.weight, reps: prev.reps, week: prev.week_number } : undefined,
         saved: !!cur,
+        yaRegistrada: !!cur,
+        desbloqueada: false,
       };
     }));
     setLoading(false);
@@ -234,10 +256,41 @@ export default function WorkoutLogScreen() {
   function updateEntry(index: number, field: 'weight' | 'reps' | 'rir', value: string) {
     // permitir solo dígitos y un separador decimal (punto o coma)
     const clean = value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/, '$1');
-    setEntries(prev => prev.map((e, i) => i === index
-      ? { ...e, [field]: clean, saved: false }
-      : e
-    ));
+    const aplicar = (extra?: Partial<SeriesEntry>) =>
+      setEntries(prev => prev.map((x, i) => i === index
+        ? { ...x, [field]: clean, saved: false, ...extra }
+        : x
+      ));
+
+    const e = entries[index];
+    if (necesitaConfirmar({ esPropio, yaRegistrada: e.yaRegistrada, desbloqueada: e.desbloqueada })) {
+      const cur = currentLogRef.current[e.series.id];
+      showConfirm(
+        'Reemplazar serie',
+        textoConfirmacion({
+          seriesNumber: e.series.series_number,
+          weight: cur?.weight ?? 0,
+          reps: cur?.reps ?? 0,
+        }),
+        // Al confirmar se aplica TAMBIÉN la tecla que disparó la confirmación:
+        // si solo se desbloqueara, el campo volvería al valor viejo y el coach
+        // tendría que teclear de nuevo con el alumno esperando.
+        () => aplicar({ desbloqueada: true }),
+        'Reemplazar',
+      );
+      return;
+    }
+
+    aplicar();
+  }
+
+  /** ¿Esta serie es del alumno y el coach todavía no confirmó pisarla? */
+  function pendienteDeConfirmar(e: SeriesEntry) {
+    return necesitaConfirmar({
+      esPropio,
+      yaRegistrada: e.yaRegistrada,
+      desbloqueada: e.desbloqueada,
+    });
   }
 
   const toNum = (s: string) => {
@@ -261,7 +314,12 @@ export default function WorkoutLogScreen() {
     const list = entriesRef.current;
     const toSave = list
       .map((e, i) => ({ i, e, weightNum: toNum(e.weight), repsNum: toNum(e.reps) }))
-      .filter(({ e, weightNum, repsNum }) => !e.saved && weightNum != null && repsNum != null);
+      // `pendienteDeConfirmar` no debería filtrar nada acá (una serie del alumno
+      // sin confirmar nunca queda `saved: false`), pero la regla se escribe en
+      // TODOS los caminos de escritura: es la única que protege el registro del
+      // alumno de que se lo pisen sin querer.
+      .filter(({ e, weightNum, repsNum }) =>
+        !e.saved && weightNum != null && repsNum != null && !pendienteDeConfirmar(e));
     if (toSave.length === 0) return;
 
     for (const { i, e, weightNum, repsNum } of toSave) {
@@ -302,11 +360,20 @@ export default function WorkoutLogScreen() {
 
   function applySuggestion() {
     if (!suggestion) return;
-    setEntries(prev => prev.map((e, i) => ({ ...e, weight: String(suggestion[i]), saved: false })));
+    // Las series del alumno que el coach todavía no confirmó reemplazar se
+    // dejan como están: la sugerencia no es una confirmación.
+    setEntries(prev => prev.map((e, i) => pendienteDeConfirmar(e)
+      ? e
+      : { ...e, weight: String(suggestion[i]), saved: false }));
   }
 
   async function saveAll() {
+    // Las series que ya venían registradas llegan PRELLENADAS desde currentMap:
+    // sin este filtro, guardar reescribía las series 1-3 del alumno con la fecha
+    // de hoy y el entrenamiento saltaba de día en el calendario del coach,
+    // aunque los números no cambiaran.
     const toSave = entries
+      .filter(e => !pendienteDeConfirmar(e))
       .map(e => ({ ...e, weightNum: toNum(e.weight), repsNum: toNum(e.reps), rirNum: e.rir === '' ? null : Math.min(9, Math.round(toNum(e.rir) ?? 0)) }))
       .filter(e => e.weightNum != null && e.repsNum != null);
     if (toSave.length === 0) {
@@ -554,27 +621,37 @@ export default function WorkoutLogScreen() {
           </View>
         )}
 
-        <Card style={styles.noteCard}>
-          <View style={styles.noteHeader}>
-            <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.accent} />
-            <Text style={styles.noteTitle}>NOTA PARA TU COACH</Text>
-          </View>
-          <TextInput
-            style={styles.noteInput}
-            value={note}
-            onChangeText={v => { setNote(v); setNoteDirty(true); }}
-            placeholder="ej: sentí molestia en el hombro en la S3..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-          />
-          {noteDirty && note.trim().length > 0 ? (
-            <TouchableOpacity style={styles.noteSave} onPress={saveNote} disabled={noteSaving}>
-              <Text style={styles.noteSaveText}>{noteSaving ? 'GUARDANDO...' : 'GUARDAR NOTA'}</Text>
-            </TouchableOpacity>
-          ) : note.trim().length > 0 ? (
-            <Text style={styles.noteSaved}>✓ Guardada — tu coach la verá</Text>
-          ) : null}
-        </Card>
+        {/* La nota es del alumno: cuando opera el coach, solo lectura y solo si
+            hay algo escrito — no hay campo ni botón de guardar para él. */}
+        {(esPropio || note.trim().length > 0) && (
+          <Card style={styles.noteCard}>
+            <View style={styles.noteHeader}>
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.accent} />
+              <Text style={styles.noteTitle}>{esPropio ? 'NOTA PARA TU COACH' : 'NOTA DEL ALUMNO'}</Text>
+            </View>
+            {esPropio ? (
+              <>
+                <TextInput
+                  style={styles.noteInput}
+                  value={note}
+                  onChangeText={v => { setNote(v); setNoteDirty(true); }}
+                  placeholder="ej: sentí molestia en el hombro en la S3..."
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                />
+                {noteDirty && note.trim().length > 0 ? (
+                  <TouchableOpacity style={styles.noteSave} onPress={saveNote} disabled={noteSaving}>
+                    <Text style={styles.noteSaveText}>{noteSaving ? 'GUARDANDO...' : 'GUARDAR NOTA'}</Text>
+                  </TouchableOpacity>
+                ) : note.trim().length > 0 ? (
+                  <Text style={styles.noteSaved}>✓ Guardada — tu coach la verá</Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={styles.noteReadOnly}>{note}</Text>
+            )}
+          </Card>
+        )}
 
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -775,6 +852,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
     color: colors.textPrimary, fontSize: 14, minHeight: 56, textAlignVertical: 'top',
   },
+  noteReadOnly: { ...typography.body, color: colors.textPrimary, lineHeight: 20 },
   noteSave: { alignSelf: 'flex-end' },
   noteSaveText: { ...typography.label, color: colors.accent, letterSpacing: 1.5 },
   noteSaved: { ...typography.caption, fontSize: 10, color: colors.success, textAlign: 'right' },
