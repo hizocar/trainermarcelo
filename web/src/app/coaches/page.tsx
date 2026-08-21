@@ -9,13 +9,18 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: 'Entrenadores disponibles — EliteFitness',
   description:
-    'Mira los entrenadores del directorio, por comuna y modalidad, y pide que te contacte el que más te acomode.',
+    'Mira los entrenadores del directorio y pide que te contacte el que más te acomode. Todos revisados a mano.',
 };
 
-// El directorio público. Lee public_coaches, que anon puede leer y que solo
-// expone lo publicable — sin teléfonos ni correos. Sin filtros a propósito:
-// con los coaches del arranque una grilla limpia basta, y un filtro sobre
-// seis tarjetas es un formulario que estorba. Se agregan cuando haya volumen.
+// El directorio público. La tarjeta es un retrato — en un marketplace de
+// entrenadores el producto es la persona, no una fila de metadatos. La foto
+// va en blanco y negro (el monocromo del sitio aplicado a la fotografía) y
+// recupera el color al pasar el cursor. Sin ámbar: es página de cliente, y el
+// ámbar del sistema significa "el coach tiene que hacer algo".
+//
+// Lee public_coaches, que anon puede leer y solo expone lo publicable — sin
+// teléfonos ni correos. Sin filtros a propósito: se agregan cuando haya
+// volumen que filtrar.
 export default async function CoachesPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -26,6 +31,14 @@ export default async function CoachesPage() {
   if (error) throw error;
 
   const coaches = (data ?? []).filter((c) => c.accepting_clients);
+
+  // La línea de especificación bajo el nombre: comuna y servicios como ficha
+  // técnica, en mono. "ÑUÑOA · GIMNASIO · ONLINE".
+  const spec = (c: { comunas: string[] | null; services: string[] | null }) =>
+    [
+      ...(c.comunas ?? []).slice(0, 2),
+      ...(c.services ?? []).map((v) => SERVICIO_LABEL[v] ?? v),
+    ].join(' · ');
 
   return (
     <>
@@ -38,17 +51,25 @@ export default async function CoachesPage() {
         </div>
       </nav>
 
-      <main className="container" style={{ paddingTop: 48, paddingBottom: 64 }}>
-        <span className="label">Directorio</span>
-        <h1 className="display" style={{ marginTop: 4 }}>ENTRENADORES DISPONIBLES</h1>
-        <p className="sub" style={{ maxWidth: 520, marginTop: 8 }}>
-          Todos revisados a mano. Elige uno y pide que te contacte — o{' '}
-          <Link href="/busco-coach" className="accent">cuéntanos qué buscas</Link> y
-          deja que te escriban ellos.
+      <main className="container" style={{ paddingTop: 56, paddingBottom: 72 }}>
+        <div className="dir-head">
+          <div>
+            <span className="label">Directorio</span>
+            <h1 className="display" style={{ marginTop: 6 }}>
+              Entrenadores<br />disponibles
+            </h1>
+          </div>
+          <p className="dir-alt">
+            ¿No sabes cuál elegir? <Link href="/busco-coach">Cuéntanos qué buscas</Link>
+          </p>
+        </div>
+        <p className="sub" style={{ maxWidth: 480, marginTop: 14 }}>
+          Todos revisados a mano. Elige uno, mira su perfil y pide que te
+          contacte por WhatsApp — sin crear cuenta y sin costo para ti.
         </p>
 
         {coaches.length === 0 ? (
-          <div style={{ marginTop: 40, maxWidth: 460 }}>
+          <div style={{ marginTop: 48, maxWidth: 460 }}>
             <p className="muted">
               El directorio está recién abriendo y los primeros entrenadores están
               en revisión. Mientras tanto, <Link href="/busco-coach" className="accent">
@@ -56,56 +77,44 @@ export default async function CoachesPage() {
             </p>
           </div>
         ) : (
-          <div style={{
-            display: 'grid', gap: 16, marginTop: 32,
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          }}>
+          <div className="coach-grid">
             {coaches.map((c) => (
-              <Link key={c.slug} href={`/coach/${c.slug}`} style={{
-                border: '1px solid var(--border)', borderRadius: 12,
-                padding: 20, background: 'var(--card)', display: 'block',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Link key={c.slug} href={`/coach/${c.slug}`} className="coach-card">
+                <div className="coach-photo">
                   {c.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.avatar_url} alt="" width={48} height={48}
-                         style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                    <img src={c.avatar_url} alt={`${c.name}, entrenador`} loading="lazy" />
                   ) : (
-                    <span aria-hidden style={{
-                      width: 48, height: 48, borderRadius: '50%',
-                      border: '1px solid var(--border)', display: 'inline-flex',
-                      alignItems: 'center', justifyContent: 'center', fontWeight: 700,
-                    }}>{c.name.slice(0, 1)}</span>
+                    <span className="coach-monogram" aria-hidden>{c.name.slice(0, 1)}</span>
                   )}
-                  <div>
-                    <strong>{c.name}</strong>
-                    <p className="label" style={{ marginTop: 2 }}>
-                      {[
-                        ...(c.comunas ?? []).slice(0, 2),
-                        ...(c.services ?? []).map((v: string) => SERVICIO_LABEL[v] ?? v),
-                      ].join(' · ') || 'Coach'}
-                    </p>
+                  <div className="coach-scrim">
+                    <p className="coach-name">{c.name}</p>
+                    {spec(c) && <p className="coach-spec">{spec(c)}</p>}
                   </div>
                 </div>
 
-                {c.bio && (
-                  <p className="muted" style={{
-                    fontSize: 13, lineHeight: 1.5, marginTop: 12,
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                  }}>{c.bio}</p>
-                )}
-
-                {(c.specialties ?? []).length > 0 && (
-                  <p className="label" style={{ marginTop: 12, opacity: 0.7 }}>
-                    {c.specialties!.slice(0, 3).join(' · ')}
-                  </p>
+                {(c.bio || (c.specialties ?? []).length > 0) && (
+                  <div className="coach-body">
+                    {c.bio && <p className="coach-bio">{c.bio}</p>}
+                    {(c.specialties ?? []).length > 0 && (
+                      <p className="coach-tags">{c.specialties!.slice(0, 3).join(' · ')}</p>
+                    )}
+                  </div>
                 )}
               </Link>
             ))}
           </div>
         )}
 
-        <p className="muted" style={{ marginTop: 48, fontSize: 13 }}>
+        <div className="dir-band">
+          <div>
+            <h2>¿Prefieres que te elijan a ti?</h2>
+            <p>Cuéntanos qué buscas y deja que los entrenadores se postulen.</p>
+          </div>
+          <Link href="/busco-coach" className="btn btn-primary">Publicar lo que busco</Link>
+        </div>
+
+        <p className="muted" style={{ marginTop: 28, fontSize: 13 }}>
           ¿Eres entrenador? <Link href="/unete" className="accent">Aparece acá</Link> — es gratis.
         </p>
       </main>
