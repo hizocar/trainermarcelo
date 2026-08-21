@@ -67,9 +67,18 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
         </p>
       )}
 
-      <a className="btn btn-primary" href="/busco-coach" style={{ marginTop: 32 }}>
-        {coach.accepting_clients ? 'QUIERO ENTRENAR CON UN COACH' : 'BUSCAR OTRO ENTRENADOR'}
+      {/* Con cupo, la solicitud sale pre-marcada para ESTE coach (?coach=slug):
+          la ve destacada y postula sin esperar las 12 horas. Sin cupo, el
+          formulario genérico de siempre. */}
+      <a className="btn btn-primary"
+         href={coach.accepting_clients ? `/busco-coach?coach=${coach.slug}` : '/busco-coach'}
+         style={{ marginTop: 32 }}>
+        {coach.accepting_clients ? 'ME INTERESA — QUE ME CONTACTE' : 'BUSCAR OTRO ENTRENADOR'}
       </a>
+
+      <p className="muted" style={{ marginTop: 16, fontSize: 13 }}>
+        <a href="/coaches">← Ver todos los entrenadores</a>
+      </p>
     </main>
   );
 }

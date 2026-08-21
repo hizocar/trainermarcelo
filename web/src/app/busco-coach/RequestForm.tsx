@@ -10,7 +10,9 @@ const MODALIDADES = [
   { value: 'ambas', label: 'Me da igual' },
 ] as const;
 
-export default function RequestForm() {
+export default function RequestForm({
+  preferred,
+}: { preferred: { slug: string; name: string } | null }) {
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [comuna, setComuna] = useState('');
@@ -42,6 +44,7 @@ export default function RequestForm() {
       p_goal: goal.trim(),
       p_availability: availability.trim(),
       p_trap: trap,
+      p_preferred_slug: preferred?.slug ?? '',
     });
 
     if (rpcError) {
@@ -64,8 +67,9 @@ export default function RequestForm() {
       <div className="auth-card" style={{ maxWidth: 460 }}>
         <h1>Listo</h1>
         <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
-          En las próximas horas te va a escribir un entrenador por WhatsApp. Puede
-          escribirte más de uno: responde al que más te acomode.
+          {preferred
+            ? `Le avisamos a ${preferred.name}. En las próximas horas te escribe por WhatsApp — y puede escribirte algún otro entrenador también: responde al que más te acomode.`
+            : 'En las próximas horas te va a escribir un entrenador por WhatsApp. Puede escribirte más de uno: responde al que más te acomode.'}
         </p>
       </div>
     );
@@ -77,6 +81,16 @@ export default function RequestForm() {
       <p className="muted" style={{ fontSize: 14 }}>
         Cuéntanos qué buscas y te escriben por WhatsApp. No tienes que crear cuenta.
       </p>
+
+      {preferred && (
+        <p className="label" style={{
+          border: '1px solid var(--warning)', borderRadius: 8,
+          padding: '10px 12px', marginTop: 12,
+        }}>
+          Le pediremos a {preferred.name} que te contacte.{' '}
+          <a href="/busco-coach" style={{ opacity: 0.7 }}>¿Prefieres no elegir?</a>
+        </p>
+      )}
 
       <div className="field">
         <label>Nombre</label>

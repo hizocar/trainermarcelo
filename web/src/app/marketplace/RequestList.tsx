@@ -8,6 +8,8 @@ export type OpenRequest = {
   id: string; comuna: string; modality: string; goal: string;
   availability: string | null; created_at: string;
   slots_left: number; already_applied: boolean;
+  /** el cliente pidió a ESTE coach por nombre desde el directorio */
+  pedida_a_mi: boolean;
 };
 
 const MODALIDAD: Record<string, string> = {
@@ -61,11 +63,19 @@ export default function RequestList({ initial }: { initial: OpenRequest[] }) {
 
       {requests.map((r) => {
         const nueva = !r.already_applied && r.slots_left === MAX_APPLICATIONS;
+        // "te pidieron a ti" es EXACTAMENTE el caso para el que existe el
+        // ámbar: esto requiere que el coach haga algo, y lo generó su perfil.
+        const paraMi = r.pedida_a_mi && !r.already_applied;
         return (
           <article key={r.id} style={{
-            border: `1px solid ${nueva ? 'var(--warning)' : 'var(--border)'}`,
+            border: `1px solid ${paraMi || nueva ? 'var(--warning)' : 'var(--border)'}`,
             borderRadius: 12, padding: 16, background: 'var(--card)',
           }}>
+            {paraMi && (
+              <p className="label" style={{ color: 'var(--warning)', marginBottom: 8 }}>
+                TE PIDIERON A TI — postula sin esperar
+              </p>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <span className="label">{r.comuna} · {MODALIDAD[r.modality] ?? r.modality}</span>
               <span className="muted" style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 12 }}>
