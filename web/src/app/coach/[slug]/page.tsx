@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import Logo from '@/components/Logo';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase-server';
 import { SERVICIO_LABEL } from '@/lib/marketplace';
@@ -34,6 +36,18 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
   if (!coach) notFound();
 
   return (
+    <>
+    {/* Esta URL se comparte suelta (Instagram, WhatsApp): quien llega no vino
+        navegando desde el sitio, así que el header es su único marco. */}
+    <nav className="nav">
+      <div className="container nav-inner">
+        <Link href="/" className="brand"><Logo /></Link>
+        <Link href="/coaches" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
+          Ver entrenadores
+        </Link>
+      </div>
+    </nav>
+
     <main className="container" style={{ paddingTop: 48, paddingBottom: 64, maxWidth: 640 }}>
       {coach.avatar_url && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -83,5 +97,6 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
         <a href="/coaches">← Ver todos los entrenadores</a>
       </p>
     </main>
+    </>
   );
 }
