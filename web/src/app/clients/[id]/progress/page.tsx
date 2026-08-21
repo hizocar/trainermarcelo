@@ -1,6 +1,6 @@
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase-server';
+import { requireCoach } from '@/lib/guard';
 import Logo from '@/components/Logo';
 import TrendChart from '@/components/TrendChart';
 import type { AppUser } from '@/lib/types';
@@ -11,17 +11,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function ClientProgressPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, userId } = await requireCoach();
 
   const { data: client } = await supabase
     .from('users').select('id, name, coach_id').eq('id', id).maybeSingle();
-  if (!client || (client as AppUser).coach_id !== user.id) notFound();
+  if (!client || (client as AppUser).coach_id !== userId) notFound();
 
   const { data: plan } = await supabase
     .from('workout_plans')

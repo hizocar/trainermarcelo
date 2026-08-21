@@ -285,6 +285,10 @@ export default function LandingPage() {
             Si tu entrenador te invitó, revisa tu correo: ahí está el enlace para crear tu
             contraseña y descargar la app. Si no te llegó, pídeselo a él.
           </p>
+          <p className="sub">
+            ¿Todavía no tienes entrenador? <Link href="/busco-coach" className="accent">Cuéntanos qué buscas</Link> y
+            te escriben por WhatsApp. No tienes que crear cuenta.
+          </p>
         </div>
       </section>
 
@@ -305,6 +309,7 @@ export default function LandingPage() {
               <a href="#app">La app de tu alumno</a>
               <a href="#precios">Precios</a>
               <a href="#alumnos">¿Eres alumno?</a>
+              <Link href="/busco-coach">Busco entrenador</Link>
             </div>
             <div className="footer-col">
               <h4>Coaches</h4>

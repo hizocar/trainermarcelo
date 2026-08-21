@@ -1,27 +1,16 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase-server';
 import { signOut } from '../actions';
 import Logo from '@/components/Logo';
 import { loadCoachDashboard, type CoachDashboardRow } from '@/lib/coachDashboard';
 import { santiagoDayKey } from '@/lib/weeks';
+import { requireCoach } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const { supabase, userId, me } = await requireCoach();
 
-  const { data: me } = await supabase
-    .from('users')
-    .select('id, name, role, is_owner')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (me?.role !== 'coach') redirect('/login');
-
-  const list: CoachDashboardRow[] = await loadCoachDashboard(supabase, user.id);
+  const list: CoachDashboardRow[] = await loadCoachDashboard(supabase, userId);
   const atencion = list.filter((c) => c.status.needsAttention);
   const alDia = list.filter((c) => !c.status.needsAttention);
 
@@ -55,6 +44,11 @@ export default async function DashboardPage() {
           <div style={{ display: 'flex', gap: 10 }}>
             <Link href="/programs" className="btn btn-ghost" style={{ padding: '10px 18px' }}>PROGRAMAS</Link>
             <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
+            <Link href="/marketplace" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SOLICITUDES</Link>
+            <Link href="/perfil" className="btn btn-ghost" style={{ padding: '10px 18px' }}>MI PERFIL</Link>
+            {me?.is_platform_admin && (
+              <Link href="/admin/coaches" className="btn btn-ghost" style={{ padding: '10px 18px' }}>ADMIN</Link>
+            )}
             {me?.is_owner && (
               <Link href="/subscription" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SUSCRIPCIÓN</Link>
             )}
