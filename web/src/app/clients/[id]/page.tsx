@@ -1,6 +1,6 @@
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase-server';
+import { requireCoach } from '@/lib/guard';
 import type { AppUser, PlanDay } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
 import { santiagoCurrentWeek } from '@/lib/weeks';
@@ -16,13 +16,7 @@ export default async function ClientPlanPage({
 }: { params: Promise<{ id: string }>; searchParams: Promise<{ weekId?: string }> }) {
   const { id } = await params;
   const { weekId: requestedWeekId } = await searchParams;
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, userId } = await requireCoach();
 
   // el cliente debe pertenecer a este coach
   const { data: client } = await supabase
@@ -31,13 +25,13 @@ export default async function ClientPlanPage({
     .eq('id', id)
     .maybeSingle();
 
-  if (!client || (client as AppUser).coach_id !== user.id) notFound();
+  if (!client || (client as AppUser).coach_id !== userId) notFound();
 
   const { data: otherClients } = await supabase
     .from('users')
     .select('id, name, email')
     .eq('role', 'client')
-    .eq('coach_id', user.id)
+    .eq('coach_id', userId)
     .neq('id', id)
     .order('name');
 

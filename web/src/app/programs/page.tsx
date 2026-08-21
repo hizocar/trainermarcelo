@@ -1,24 +1,18 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase-server';
 import Logo from '@/components/Logo';
 import NewProgramButton from './NewProgramButton';
 import DeleteProgramButton from './DeleteProgramButton';
+import { requireCoach } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ProgramsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: me } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (me?.role !== 'coach') redirect('/login');
+  const { supabase, userId } = await requireCoach();
 
   const { data: templates } = await supabase
     .from('program_templates')
     .select('id, name, created_at, program_template_days(id)')
-    .eq('coach_id', user.id)
+    .eq('coach_id', userId)
     .order('created_at', { ascending: false });
 
   const list = (templates ?? []) as { id: string; name: string; created_at: string; program_template_days: { id: string }[] }[];

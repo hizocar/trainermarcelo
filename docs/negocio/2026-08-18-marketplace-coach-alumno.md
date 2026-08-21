@@ -37,7 +37,7 @@ El mes gratis del coach se activa al tomar a su primer alumno del marketplace, y
 
 **Cambia lo que se vende.** Hoy el argumento es "te ahorro la planilla": una herramienta que compite contra Excel y WhatsApp, y que el coach puede abandonar sin perder nada. Traer clientes es un argumento distinto, porque **paga la suscripción sola**: un alumno nuevo vale muchas veces los $4.990 del plan.
 
-**Aprovecha lo que ya existe.** La ficha del coach dentro de la app —foto, portada, especialidad, Instagram— ya está construida y es prácticamente un perfil público. Lo que falta no es el perfil: es que alguien de fuera pueda verlo.
+**Corregido el 2026-08-20:** este documento afirmaba que la ficha del coach —foto, portada, especialidad, Instagram— ya estaba construida. **Es falso.** `CoachProfileScreen` es la pantalla donde el alumno mira a *su* coach y muestra solo `name`, `avatar_url` y `email`; desde el esquema original, `users` únicamente ganó `avatar_url` (v6) e `is_owner` (v13). El perfil público hay que construirlo entero, columnas incluidas.
 
 ## Lo que hay que resolver antes de construir
 
@@ -85,7 +85,10 @@ Esto **no bloquea todo por igual**, y conviene no confundirlo:
 
 Ordenado por **riesgo, no por dificultad**: primero se prueba lo que puede hacer fracasar todo, que es si aparecen alumnos buscando coach. Esa pregunta no necesita código.
 
-### Etapa 0 — Confirmar que hay demanda (sin construir nada)
+### Etapa 0 — Confirmar que hay demanda (sin construir nada) — **SALTADA**
+
+**Decisión del 2026-08-20:** se salta. Se construye directamente la bolsa web, diseñada en `docs/superpowers/specs/2026-08-20-marketplace-web-design.md`. Ese diseño reemplaza también a las etapas 1 y 2 de acá: no hay directorio con filtros ni registro de alumno — el alumno publica una solicitud sin cuenta y los coaches se postulan.
+
 
 Marcelo y los coaches beta publican en sus redes que se puede pedir coach a través de EliteFitness. El interesado escribe al WhatsApp que **ya está** en la página. La conexión se hace a mano.
 
