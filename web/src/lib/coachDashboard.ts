@@ -1,6 +1,7 @@
 import { clientStatus, type ClientStatus } from './clientStatus';
 import { resolveActiveWeek, type PlanWeek } from './planWeeks';
 import { santiagoCurrentWeek, santiagoWeekDay, santiagoDayKey } from './weeks';
+import { atribuirRegistros } from './dashboardAttribution';
 
 // Datos de la lista de alumnos del coach, cargados EN BLOQUE.
 //
@@ -87,7 +88,7 @@ export async function loadCoachDashboard(
   const { data: days, error: daysError } = activeWeekIds.length
     ? await supabase
         .from('training_days')
-        .select('id, plan_id, plan_week_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
+        .select('id, plan_id, name, week_day, archived, exercises ( id, archived, exercise_series ( id ) )')
         .in('plan_week_id', activeWeekIds)
     : { data: [], error: null };
   if (daysError) throw new Error(`No se pudieron cargar los días de entrenamiento: ${daysError.message}`);
@@ -109,56 +110,16 @@ export async function loadCoachDashboard(
   // Un fallo acá NO puede disfrazarse de "nadie entrenó": se propaga.
   if (logsError) throw new Error(`No se pudieron cargar los registros: ${logsError.message}`);
 
-  // De quién es un registro: se sube por serie -> ejercicio -> día hasta el
-  // plan, con lo que vino en la MISMA consulta. Antes esto se cruzaba contra
-  // los días de las plan_weeks activas y "la última vez que entrenó" quedaba
-  // atada a qué semanas estuvieran activas o archivadas.
-  //
-  // PostgREST devuelve el embebido de una relación a-uno como objeto, pero
-  // según la versión puede llegar envuelto en un arreglo: se aceptan las dos.
-  const unwrap = (v: any) => (Array.isArray(v) ? v[0] : v);
-  const planIdDelLog = (l: any): string =>
-    unwrap(unwrap(unwrap(l.exercise_series)?.exercises)?.training_days)?.plan_id ?? '';
-
-  // series_id -> día planificado. Todos los días cargados son de la semana en
-  // curso: lo planificado y lo cumplido son SIEMPRE de esta semana.
-  const dayBySeries = new Map<string, { dayId: string; planId: string; weekDay: number | null }>();
-  const plannedByPlan = new Map<string, number[]>();
-  ((days ?? []) as any[])
-    .filter((d) => !d.archived && !d.name.toLowerCase().includes('libre'))
-    .forEach((d) => {
-      if (d.week_day != null) {
-        plannedByPlan.set(d.plan_id, [...(plannedByPlan.get(d.plan_id) ?? []), d.week_day]);
-      }
-      (d.exercises ?? []).filter((e: any) => !e.archived).forEach((e: any) => {
-        (e.exercise_series ?? []).forEach((s: any) => {
-          dayBySeries.set(s.id, { dayId: d.id, planId: d.plan_id, weekDay: d.week_day });
-        });
-      });
-    });
-
-  // Un día planificado está cumplido si ALGUNO de sus ejercicios tiene un
-  // registro en la semana en curso — sin importar en qué día lo hizo, que es
-  // el mismo criterio que usa el calendario.
-  const completedByPlan = new Map<string, Set<number>>();
-  const lastTrainedByClient = new Map<string, string>();
-  ((logs ?? []) as any[]).forEach((l) => {
-    if (l.logged_at) {
-      // De quién es el registro sale del plan de la serie, no de quién lo
-      // tecleó: un registro que anotó el coach igual es del alumno.
-      const clienteId = clientByPlan.get(planIdDelLog(l));
-      if (clienteId) {
-        const key = santiagoDayKey(new Date(l.logged_at));
-        const prev = lastTrainedByClient.get(clienteId);
-        if (!prev || key > prev) lastTrainedByClient.set(clienteId, key);
-      }
-    }
-    if (l.week_number !== currentWeek) return;
-    const meta = dayBySeries.get(l.series_id);
-    if (!meta || meta.weekDay == null) return;
-    const set = completedByPlan.get(meta.planId) ?? new Set<number>();
-    set.add(meta.weekDay);
-    completedByPlan.set(meta.planId, set);
+  // La atribución —de quién es cada registro y qué días quedaron cumplidos—
+  // vive en dashboardAttribution.ts, pura y con tests, espejo de la copia de
+  // trainer-app. Estaba escrita a mano acá y en la app, sin tests, que es
+  // justo lo que el CLAUDE.md no quiere: dos copias que pueden divergir.
+  const { plannedByPlan, completedByPlan, lastTrainedByClient } = atribuirRegistros({
+    days: (days ?? []) as any[],
+    logs: (logs ?? []) as any[],
+    clientByPlan,
+    currentWeek,
+    dayKey: santiagoDayKey,
   });
 
   return list.map((c) => {
