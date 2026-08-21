@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import { firstToken } from '@/lib/env';
@@ -15,11 +15,18 @@ const PLANS = [
 
 const clp = (n: number) => `$${n.toLocaleString('es-CL')}`;
 
-export default function SignupPage() {
+export default function SignupPage({
+  searchParams,
+}: { searchParams: Promise<{ plan?: string }> }) {
+  // /unete llega con ?plan=free: la landing del marketplace preselecciona la
+  // cuenta gratis para que el coach no aterrice mirando los planes pagados.
+  const { plan } = use(searchParams);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [gymName, setGymName] = useState('');
-  const [tier, setTier] = useState<(typeof PLANS)[number]['tier']>('solo');
+  const [tier, setTier] = useState<(typeof PLANS)[number]['tier']>(
+    plan === 'free' ? 'free' : 'solo',
+  );
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -15,7 +15,7 @@ export default async function MarketplacePage() {
 
   const { data, error } = await supabase
     .from('open_requests')
-    .select('id, comuna, modality, goal, availability, created_at, slots_left, already_applied')
+    .select('id, comuna, modality, goal, availability, created_at, slots_left, already_applied, pedida_a_mi')
     .order('created_at', { ascending: false });
 
   // Un error tragado acá dibuja una bolsa vacía y le dice al coach "no hay
