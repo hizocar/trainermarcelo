@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      (Deno.env.get('SERVICE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
     // cancelación o impago: se marca el gimnasio, no se borra nada — el

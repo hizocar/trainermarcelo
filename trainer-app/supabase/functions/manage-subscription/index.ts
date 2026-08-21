@@ -24,14 +24,14 @@ Deno.serve(async (req) => {
   if (!creds) return json({ error: 'Pagos no configurados todavía' }, 500);
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const anonKey = (Deno.env.get('PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY'))!;
   const authHeader = req.headers.get('Authorization') ?? '';
   const caller = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
 
   const { data: { user: authUser }, error: authErr } = await caller.auth.getUser();
   if (authErr || !authUser) return json({ error: 'No autenticado' }, 401);
 
-  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+  const admin = createClient(url, (Deno.env.get('SERVICE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const { data: me } = await admin.from('users').select('is_owner, gym_id').eq('id', authUser.id).single();

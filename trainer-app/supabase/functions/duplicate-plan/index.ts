@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const anonKey = (Deno.env.get('PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY'))!;
   const authHeader = req.headers.get('Authorization') ?? '';
   const caller = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
 
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
   if (!sourceClientId) return json({ error: 'Falta el cliente origen' }, 400);
   if (targetClientIds.length === 0) return json({ error: 'Elige al menos un cliente destino' }, 400);
 
-  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+  const admin = createClient(url, (Deno.env.get('SERVICE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 

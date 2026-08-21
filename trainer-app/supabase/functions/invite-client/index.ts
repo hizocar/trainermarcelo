@@ -23,8 +23,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const serviceKey = (Deno.env.get('SERVICE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!;
+  const anonKey = (Deno.env.get('PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY'))!;
 
   // 1. Verificar que quien llama es un COACH autenticado (nunca confiar en el body)
   const authHeader = req.headers.get('Authorization') ?? '';
