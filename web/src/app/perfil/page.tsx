@@ -10,7 +10,7 @@ export default async function PerfilPage() {
 
   const { data, error } = await supabase
     .from('users')
-    .select('slug, bio, instagram, specialties, comunas, modality, accepting_clients')
+    .select('slug, bio, instagram, specialties, comunas, services, accepting_clients')
     .eq('id', userId)
     .single();
   if (error) throw error;

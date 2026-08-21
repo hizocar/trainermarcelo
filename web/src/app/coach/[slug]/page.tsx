@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase-server';
+import { SERVICIO_LABEL } from '@/lib/marketplace';
 
 export const revalidate = 300;
 
@@ -8,7 +9,7 @@ async function loadCoach(slug: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('public_coaches')
-    .select('slug, name, avatar_url, bio, instagram, specialties, comunas, modality, accepting_clients')
+    .select('slug, name, avatar_url, bio, instagram, specialties, comunas, services, accepting_clients')
     .eq('slug', slug)
     .maybeSingle();
   if (error) throw error;
@@ -43,8 +44,10 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
       <h1 className="display" style={{ marginTop: 16 }}>{coach.name.toUpperCase()}</h1>
 
       <p className="label" style={{ marginTop: 4 }}>
-        {(coach.comunas ?? []).join(' · ')}
-        {coach.modality === 'online' ? ' Online' : coach.modality === 'ambas' ? ' · También online' : ''}
+        {[
+          ...(coach.comunas ?? []),
+          ...(coach.services ?? []).map((v: string) => SERVICIO_LABEL[v] ?? v),
+        ].join(' · ')}
       </p>
 
       {coach.bio && <p style={{ marginTop: 20, lineHeight: 1.7 }}>{coach.bio}</p>}

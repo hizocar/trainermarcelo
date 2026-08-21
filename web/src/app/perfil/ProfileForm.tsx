@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
+import { SERVICIOS } from '@/lib/marketplace';
 
 export type Profile = {
   slug: string | null; bio: string | null; instagram: string | null;
   specialties: string[] | null; comunas: string[] | null;
-  modality: string | null; accepting_clients: boolean;
+  services: string[] | null; accepting_clients: boolean;
 };
 
 // Deben coincidir con los topes que exige update_my_profile en
@@ -23,7 +24,7 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
   const [instagram, setInstagram] = useState(initial.instagram ?? '');
   const [specialties, setSpecialties] = useState((initial.specialties ?? []).join(', '));
   const [comunas, setComunas] = useState((initial.comunas ?? []).join(', '));
-  const [modality, setModality] = useState(initial.modality ?? 'ambas');
+  const [services, setServices] = useState<string[]>(initial.services ?? []);
   const [accepting, setAccepting] = useState(initial.accepting_clients);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
     const { error } = await supabase.rpc('update_my_profile', {
       p_bio: bio, p_instagram: instagram,
       p_specialties: lista(specialties), p_comunas: lista(comunas),
-      p_modality: modality, p_accepting: accepting,
+      p_services: services, p_accepting: accepting,
     });
     if (error) {
       setErrorMsg('No se pudo guardar. Inténtalo de nuevo.');
@@ -93,12 +94,17 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
       </div>
 
       <div className="field">
-        <label>Modalidad</label>
-        <select className="input" value={modality} onChange={(e) => setModality(e.target.value)}>
-          <option value="presencial">Presencial</option>
-          <option value="online">Online</option>
-          <option value="ambas">Presencial y online</option>
-        </select>
+        <label>¿Cómo entrenas? (marca todas las que apliquen)</label>
+        <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
+          {SERVICIOS.map(([value, label]) => (
+            <label key={value} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: 0 }}>
+              <input type="checkbox" checked={services.includes(value)}
+                     onChange={(e) => setServices((prev) =>
+                       e.target.checked ? [...prev, value] : prev.filter((v) => v !== value))} />
+              {label}
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

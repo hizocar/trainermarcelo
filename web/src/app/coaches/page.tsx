@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import { createClient } from '@/lib/supabase-server';
+import { SERVICIO_LABEL } from '@/lib/marketplace';
 
 export const revalidate = 300;
 
@@ -19,7 +20,7 @@ export default async function CoachesPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('public_coaches')
-    .select('slug, name, avatar_url, bio, specialties, comunas, modality, accepting_clients')
+    .select('slug, name, avatar_url, bio, specialties, comunas, services, accepting_clients')
     .order('name');
   // Un error tragado acá dibuja "no hay coaches" cuando la consulta falló.
   if (error) throw error;
@@ -79,8 +80,10 @@ export default async function CoachesPage() {
                   <div>
                     <strong>{c.name}</strong>
                     <p className="label" style={{ marginTop: 2 }}>
-                      {(c.comunas ?? []).slice(0, 2).join(' · ') || 'Online'}
-                      {c.modality === 'ambas' ? ' · También online' : c.modality === 'online' ? ' · Online' : ''}
+                      {[
+                        ...(c.comunas ?? []).slice(0, 2),
+                        ...(c.services ?? []).map((v: string) => SERVICIO_LABEL[v] ?? v),
+                      ].join(' · ') || 'Coach'}
                     </p>
                   </div>
                 </div>

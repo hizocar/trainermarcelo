@@ -4,6 +4,19 @@
 // la ANON_KEY. Lo de acá es para que la interfaz muestre lo mismo que la base
 // va a decidir, no para decidirlo.
 
+// Lo que un coach ofrece. El orden es el de presentación; las claves deben
+// calzar con el check de users.services (v25) — divergen y el coach puede
+// marcar algo que el SQL rechaza.
+export const SERVICIOS = [
+  ['domicilio', 'A domicilio'],
+  ['gimnasio', 'En gimnasio'],
+  ['online', 'Online'],
+  ['planifica', 'Solo planificación'],
+] as const;
+
+export const SERVICIO_LABEL: Record<string, string> =
+  Object.fromEntries(SERVICIOS);
+
 export const MAX_APPLICATIONS = 3;
 export const FREE_COACH_DELAY_HOURS = 12;
 export const REQUEST_TTL_DAYS = 21;
