@@ -1359,3 +1359,55 @@ a {
   .coach-card:hover { transform: none; }
   .coach-card:hover .coach-photo img { transform: none; }
 }
+
+/* ── Comentarios de alumnos en la ficha del coach ──────── */
+.reviews {
+  margin-top: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.reviews summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 14px 18px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.reviews summary::-webkit-details-marker { display: none; }
+.reviews summary::after {
+  content: '+';
+  margin-left: auto;
+  font-family: var(--font-mono), monospace;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.reviews[open] summary::after { content: '−'; }
+.reviews summary:hover { color: var(--text); }
+.reviews-count {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+.review-item {
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
+}
+.review-item p { font-size: 14px; line-height: 1.65; }
+.review-meta {
+  margin-top: 8px;
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
