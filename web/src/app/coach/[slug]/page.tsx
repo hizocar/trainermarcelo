@@ -30,10 +30,23 @@ export async function generateMetadata(
   };
 }
 
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
 export default async function CoachPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const coach = await loadCoach(slug);
   if (!coach) notFound();
+
+  // Comentarios de alumnos verificados: la vista ya recorta el nombre y solo
+  // sale lo de coaches aprobados. Un error acá no puede fingir "sin
+  // comentarios" — se propaga.
+  const supabase = await createClient();
+  const { data: reviews, error: reviewsError } = await supabase
+    .from('public_coach_reviews')
+    .select('body, author_name, updated_at')
+    .eq('coach_slug', slug);
+  if (reviewsError) throw reviewsError;
 
   return (
     <>
@@ -76,6 +89,24 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
         </ul>
       )}
 
+      {(reviews ?? []).length > 0 && (
+        <details className="reviews">
+          <summary>
+            Lo que dicen sus alumnos
+            <span className="reviews-count">{reviews!.length}</span>
+          </summary>
+          {reviews!.map((r, i) => (
+            <blockquote key={i} className="review-item">
+              <p>{r.body}</p>
+              <footer className="review-meta">
+                {r.author_name} · Alumno verificado ·{' '}
+                {MESES[new Date(r.updated_at).getMonth()]} {new Date(r.updated_at).getFullYear()}
+              </footer>
+            </blockquote>
+          ))}
+        </details>
+      )}
+
       {coach.instagram && (
         <p className="muted" style={{ marginTop: 20, fontSize: 14 }}>
           <a href={`https://instagram.com/${coach.instagram}`} target="_blank" rel="noopener noreferrer">
@@ -94,6 +125,11 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
       </a>
 
       <p className="muted" style={{ marginTop: 16, fontSize: 13 }}>
+        ¿Entrenas con {coach.name.split(' ')[0]}?{' '}
+        <a className="accent" href={`/coach/${coach.slug}/opinar`}>Deja tu comentario</a>
+      </p>
+
+      <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
         <a href="/coaches">← Ver todos los entrenadores</a>
       </p>
     </main>
