@@ -114,17 +114,24 @@ export default async function ClientCalendarPage({
     ? await supabase.from('training_days').select('id').eq('plan_id', plan.id).limit(1).maybeSingle()
     : { data: null };
 
-  const allSeriesIds = trainingDays.flatMap((d: any) =>
-    d.exercises.flatMap((e: any) => (e.exercise_series ?? []).map((s: any) => s.id)));
-
-  const { data: logs, error: logsError } = allSeriesIds.length
+  // Los registros se acotan al plan SUBIENDO por las claves foráneas, no con
+  // una lista de series: la consulta no crece con el tamaño del plan. Antes
+  // esto era un `.in('series_id', ...)` con un id por serie, y es exactamente
+  // lo que rompió esta pantalla — con un plan grande la lista se pasaba del
+  // largo de la URL y el mes entero se dibujaba vacío.
+  const { data: logs, error: logsError } = plan
     ? await supabase
         .from('workout_logs')
-        .select('series_id, week_number, logged_at')
-        .in('series_id', allSeriesIds)
+        .select(
+          'series_id, week_number, logged_at, ' +
+          'exercise_series!inner ( exercises!inner ( training_days!inner ( plan_id ) ) )',
+        )
+        .eq('exercise_series.exercises.training_days.plan_id', plan.id)
         .in('week_number', weekNumbers)
     : { data: null, error: null };
-  if (logsError) console.error('calendar: error cargando workout_logs', logsError);
+
+  // Un fallo acá NO puede disfrazarse de "no entrenó ningún día": se propaga.
+  if (logsError) throw new Error(`No se pudieron cargar los registros: ${logsError.message}`);
 
   // series_id -> exercise_id, para contar ejercicios completados (no series)
   const exBySeries = new Map<string, string>();
