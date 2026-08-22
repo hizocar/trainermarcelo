@@ -48,6 +48,7 @@ import ProgramEditorScreen from '../screens/coach/ProgramEditorScreen';
 import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
 import SubscriptionExpiredScreen from '../screens/coach/SubscriptionExpiredScreen';
+import { initAnalytics, track } from '../lib/analytics';
 import GymScreen from '../screens/coach/GymScreen';
 import AppLockScreen from '../screens/shared/AppLockScreen';
 import SettingsScreen from '../screens/shared/SettingsScreen';
@@ -164,9 +165,20 @@ export default function AppNavigator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
+  // el registro de eventos parte con la app; sin sesión, la cola espera
+  React.useEffect(() => { initAnalytics(); }, []);
+  const ultimaPantalla = React.useRef<string | null>(null);
+
   function persistNavState(state: any) {
     if (!user?.id) return;
     AsyncStorage.setItem(NAV_STATE_KEY, JSON.stringify({ userId: user.id, state })).catch(() => {});
+    // cada pantalla visitada es un evento: la cobertura ancha sale gratis de
+    // acá; los eventos de negocio con nombre se registran donde ocurren
+    const ruta = navigationRef.getCurrentRoute()?.name ?? null;
+    if (ruta && ruta !== ultimaPantalla.current) {
+      ultimaPantalla.current = ruta;
+      track('pantalla', { nombre: ruta });
+    }
   }
 
   React.useEffect(() => {

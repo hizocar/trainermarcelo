@@ -4,6 +4,7 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { colors, spacing, radius, fonts } from '../../theme';
 import { formatDuration } from '../../lib/sessionTimer';
+import { track } from '../../lib/analytics';
 
 // La tarjeta que el alumno comparte al terminar su sesión — el camino que
 // describía docs/negocio/2026-08-20-compartir-imagen.md: se dibuja como vista
@@ -34,6 +35,7 @@ export default function ShareSessionCard({ dayName, durationSeconds, done, total
       const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png' });
+        track('compartir_enviado', { segundos: durationSeconds });
       }
     } catch {
       // si la captura falla no hay nada que guardar ni que romper
