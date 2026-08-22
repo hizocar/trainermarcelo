@@ -24,9 +24,23 @@ export async function generateMetadata(
   const { slug } = await params;
   const coach = await loadCoach(slug);
   if (!coach) return { title: 'Entrenador no encontrado — EliteFitness' };
+  const description = coach.bio ?? `${coach.name} entrena en EliteFitness.`;
   return {
     title: `${coach.name} — Entrenador en EliteFitness`,
-    description: coach.bio ?? `${coach.name} entrena en EliteFitness.`,
+    description,
+    // La ficha se comparte por WhatsApp e Instagram: la previsualización debe
+    // mostrar AL coach — su foto y su nombre — no el og genérico del sitio.
+    openGraph: {
+      title: coach.name,
+      description,
+      type: 'profile',
+      ...(coach.avatar_url ? { images: [{ url: coach.avatar_url, width: 600, height: 600 }] } : {}),
+    },
+    twitter: {
+      card: coach.avatar_url ? 'summary_large_image' : 'summary',
+      title: coach.name,
+      description,
+    },
   };
 }
 

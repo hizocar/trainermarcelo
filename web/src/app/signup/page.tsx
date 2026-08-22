@@ -4,16 +4,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import { firstToken } from '@/lib/env';
-
-const PLANS = [
-  { tier: 'free', name: 'Gratis · marketplace', seats: 'Solo solicitudes', monthly: 0, annual: 0 },
-  { tier: 'solo', name: 'Solo', seats: '1 entrenador', monthly: 4990, annual: 49900 },
-  { tier: 'starter', name: 'Starter', seats: '2–3 entrenadores', monthly: 9990, annual: 99900 },
-  { tier: 'growth', name: 'Growth', seats: '4–8 entrenadores', monthly: 19990, annual: 199900 },
-  { tier: 'pro', name: 'Pro', seats: '9–20 entrenadores', monthly: 39990, annual: 399900 },
-] as const;
-
-const clp = (n: number) => `$${n.toLocaleString('es-CL')}`;
+import { PLANS, clp } from '@/lib/plans';
 
 export default function SignupPage({
   searchParams,

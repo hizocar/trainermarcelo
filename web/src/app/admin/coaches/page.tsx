@@ -34,7 +34,10 @@ export default async function AdminCoachesPage() {
       </header>
 
       <main className="container" style={{ paddingTop: 32, paddingBottom: 64 }}>
-        <h1 className="display">COACHES POR APROBAR</h1>
+        <p className="label" style={{ marginBottom: 8 }}>
+        <a href="/admin/negocio" className="accent">→ VER EL NEGOCIO (EMBUDO Y MRR)</a>
+      </p>
+      <h1 className="display">COACHES POR APROBAR</h1>
 
         <div className="hero-stats" style={{ marginTop: 24, marginBottom: 32 }}>
           <div><strong className="mono">{stats?.solicitudes ?? 0}</strong><span>SOLICITUDES</span></div>
