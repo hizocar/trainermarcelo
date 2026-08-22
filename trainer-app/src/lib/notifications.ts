@@ -18,6 +18,14 @@ const ENABLED_KEY = 'notif_enabled_v1';
  * borrarlo al reprogramarlos. Ver `cancelarSoloRecordatorios()`.
  */
 const REST_KIND = 'rest';
+/**
+ * Marca del aviso "entrenamiento en curso" (TodayScreen). Vive fijo en el
+ * Centro de Notificaciones mientras la sesión está abierta: es lo único que
+ * el alumno ve en la pantalla bloqueada — el reloj vivo ahí sería una Live
+ * Activity nativa, que Expo SDK 54 no trae. También se preserva al
+ * reprogramar recordatorios.
+ */
+const SESSION_KIND = 'session';
 const TRAIN_HOUR_KEY = 'notif_train_hour_v1';
 const MOOD_HOUR_KEY = 'notif_mood_hour_v1';
 
@@ -51,12 +59,15 @@ Notifications.setNotificationHandler({
     // ya está haciendo. Con la app en primer plano el háptico ya avisa, así que
     // lo silenciamos; con la app en segundo plano se muestra normal, que es
     // justo para lo que existe.
-    const esDescanso =
-      (notification.request.content.data as any)?.kind === REST_KIND;
+    const kind = (notification.request.content.data as any)?.kind;
     const enPrimerPlano = AppState.currentState === 'active';
-    const mostrar = !(esDescanso && enPrimerPlano);
+    const mostrar = !(kind === REST_KIND && enPrimerPlano);
+    // "entrenamiento en curso" nunca banner —el alumno acaba de apretar el
+    // botón y lo está mirando—, pero SÍ a la lista: su lugar es la pantalla
+    // bloqueada y el Centro de Notificaciones.
+    const banner = kind === SESSION_KIND ? false : mostrar;
     return {
-      shouldShowBanner: mostrar,
+      shouldShowBanner: banner,
       shouldShowList: mostrar,
       shouldPlaySound: false,
       shouldSetBadge: false,
@@ -185,8 +196,56 @@ export async function cancelReminders(): Promise<void> {
 async function cancelarSoloRecordatorios(): Promise<void> {
   const programadas = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of programadas) {
-    if ((n.content?.data as any)?.kind === REST_KIND) continue;
+    const kind = (n.content?.data as any)?.kind;
+    if (kind === REST_KIND || kind === SESSION_KIND) continue;
     await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  }
+}
+
+/**
+ * Deja en la pantalla bloqueada el aviso de "entrenamiento en curso".
+ * Mismo contrato que scheduleRestAlert: solo CONSULTA el permiso, nunca lo
+ * pide (ver el comentario de allá). Sin permiso no hay aviso — el cronómetro
+ * en pantalla funciona igual, porque cuenta contra el timestamp.
+ */
+export async function showSessionOngoing(startedAt: Date): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return null;
+  } catch {
+    return null;
+  }
+  const hora = `${startedAt.getHours()}:${String(startedAt.getMinutes()).padStart(2, '0')}`;
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Entrenamiento en curso',
+        body: `Empezaste a las ${hora} — el reloj sigue corriendo en la app 💪`,
+        data: { kind: SESSION_KIND },
+      },
+      trigger: null, // ahora mismo: su lugar es el Centro de Notificaciones
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Limpia el aviso al terminar o descartar la sesión. */
+export async function dismissSessionOngoing(id: string | null): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    if (id) await Notifications.dismissNotificationAsync(id);
+    // por si el id se perdió (reinstalación, reinicio a mitad de sesión):
+    // se barren las entregadas de este tipo
+    const entregadas = await Notifications.getPresentedNotificationsAsync();
+    for (const n of entregadas) {
+      if ((n.request.content.data as any)?.kind === SESSION_KIND) {
+        await Notifications.dismissNotificationAsync(n.request.identifier);
+      }
+    }
+  } catch {
+    // limpiar un aviso jamás puede romper el guardado de la sesión
   }
 }
 

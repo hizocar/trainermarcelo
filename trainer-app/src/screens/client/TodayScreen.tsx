@@ -17,6 +17,8 @@ import ProgressRing from '../../components/common/ProgressRing';
 import ExerciseRow from '../../components/client/ExerciseRow';
 import { seriesDoneByExercise } from '../../lib/progress';
 import { pickSelectedDayId } from '../../lib/selectedDay';
+import { elapsedSeconds, formatClock, formatDuration, esSesionColgada } from '../../lib/sessionTimer';
+import { showSessionOngoing, dismissSessionOngoing } from '../../lib/notifications';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
@@ -59,6 +61,71 @@ export default function TodayScreen() {
   const [note, setNote] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Cronómetro de sesión. `sesion` es la fila abierta (si hay); el reloj se
+  // calcula SIEMPRE contra started_at (patrón restTimer: iOS congela los
+  // timers de JS al bloquear la pantalla, un timestamp siempre vuelve bien).
+  // `tick` solo fuerza el re-render por segundo mientras corre.
+  const [sesion, setSesion] = useState<{ id: string; startedAt: string; notifId: string | null } | null>(null);
+  const [, setTick] = useState(0);
+  const [ultimaDuracion, setUltimaDuracion] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!sesion) return;
+    const int = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(int);
+  }, [sesion?.id]);
+
+  const cargarSesionAbierta = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('workout_sessions')
+      .select('id, started_at')
+      .eq('user_id', user.id)
+      .is('ended_at', null)
+      .maybeSingle();
+    setSesion(data ? { id: data.id, startedAt: data.started_at, notifId: null } : null);
+  }, [user?.id]);
+
+  React.useEffect(() => { cargarSesionAbierta(); }, [cargarSesionAbierta]);
+
+  async function comenzarSesion() {
+    if (!selectedDay || sesion) return;
+    const { data, error } = await supabase
+      .from('workout_sessions')
+      .insert({ user_id: user!.id, day_id: selectedDay.id, week_number: selectedWeek })
+      .select('id, started_at')
+      .single();
+    if (error || !data) {
+      // el único choque esperable es la sesión abierta que este dispositivo
+      // no conocía (otra instalación): se recarga y se retoma esa
+      await cargarSesionAbierta();
+      return;
+    }
+    setUltimaDuracion(null);
+    const notifId = await showSessionOngoing(new Date(data.started_at));
+    setSesion({ id: data.id, startedAt: data.started_at, notifId });
+  }
+
+  async function terminarSesion() {
+    if (!sesion) return;
+    const segundos = elapsedSeconds(sesion.startedAt);
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({ ended_at: new Date().toISOString(), duration_seconds: segundos })
+      .eq('id', sesion.id);
+    if (error) return; // sigue corriendo: mejor un reloj vivo que un dato perdido
+    await dismissSessionOngoing(sesion.notifId);
+    setSesion(null);
+    setUltimaDuracion(segundos);
+  }
+
+  async function descartarSesion() {
+    if (!sesion) return;
+    // una sesión colgada (olvidó terminar) no es un entrenamiento: se borra
+    await supabase.from('workout_sessions').delete().eq('id', sesion.id);
+    await dismissSessionOngoing(sesion.notifId);
+    setSesion(null);
+  }
   // Qué semana es la que está dibujada en pantalla ahora mismo (null = ninguna).
   // Va en ref y no en estado porque `fetchWeek` corre desde el callback de
   // `useFocusEffect`, que captura el render en que cambiaron sus dependencias y
@@ -275,6 +342,35 @@ export default function TodayScreen() {
             />
           )}
           <Text style={styles.dayName}>{selectedDay.name.toUpperCase()}</Text>
+
+          {exercises.length > 0 && !sesion && ultimaDuracion == null && (
+            <TouchableOpacity style={styles.sesionStart} onPress={comenzarSesion} activeOpacity={0.85}>
+              <Ionicons name="play" size={14} color={colors.background} />
+              <Text style={styles.sesionStartText}>COMENZAR ENTRENAMIENTO</Text>
+            </TouchableOpacity>
+          )}
+
+          {sesion && !esSesionColgada(sesion.startedAt) && (
+            <View style={styles.sesionBar}>
+              <Text style={styles.sesionClock}>{formatClock(elapsedSeconds(sesion.startedAt))}</Text>
+              <TouchableOpacity style={styles.sesionEnd} onPress={terminarSesion} activeOpacity={0.85}>
+                <Text style={styles.sesionEndText}>TERMINAR</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {sesion && esSesionColgada(sesion.startedAt) && (
+            <View style={styles.sesionBar}>
+              <Text style={styles.sesionStale}>Quedó una sesión abierta de hace horas.</Text>
+              <TouchableOpacity style={styles.sesionEnd} onPress={descartarSesion} activeOpacity={0.85}>
+                <Text style={styles.sesionEndText}>DESCARTAR</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!sesion && ultimaDuracion != null && (
+            <Text style={styles.sesionDone}>Entrenaste {formatDuration(ultimaDuracion)} ✓</Text>
+          )}
         </View>
       )}
 
@@ -572,6 +668,26 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm },
   // mismo bloque sin anillo: el nombre del día solo
   heroBare: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  sesionStart: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.accent, borderRadius: radius.md,
+    paddingVertical: 10, paddingHorizontal: 18, marginTop: spacing.md,
+  },
+  sesionStartText: { color: colors.background, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  sesionBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: spacing.md,
+    borderWidth: 1, borderColor: colors.borderLight, borderRadius: radius.md,
+    paddingVertical: 8, paddingHorizontal: 16, backgroundColor: colors.surface,
+  },
+  // el reloj en mono y grande: se mira de reojo entre series
+  sesionClock: { fontFamily: fonts.mono, fontSize: 22, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+  sesionEnd: {
+    borderWidth: 1, borderColor: colors.borderLight, borderRadius: radius.sm,
+    paddingVertical: 6, paddingHorizontal: 12,
+  },
+  sesionEndText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
+  sesionStale: { flex: 1, color: colors.textMuted, fontSize: 12 },
+  sesionDone: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   dayName: { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary, letterSpacing: 0.5, marginTop: 2 },
   weekNav: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.textPrimary },
