@@ -7,6 +7,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-body' });
 const mono = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '600'], variable: '--font-mono' });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://elitefitapp.com'),
   title: {
     default: 'EliteFitness · Software para entrenadores',
     template: '%s · EliteFitness',

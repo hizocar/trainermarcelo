@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: 'Súmate como coach — EliteFitness',
   description:
     'Cuenta gratis, alumnos que ya están buscando entrenador, y un mes de regalo con el panel completo al tomar tu primera solicitud.',
+  openGraph: {
+    title: 'Los alumnos ya están buscando. Falta que te encuentren.',
+    description: 'Cuenta gratis para coaches: postula a solicitudes de alumnos reales y gana un mes del panel completo.',
+  },
 };
 
 // La página que le vende el marketplace al coach. La landing principal vende

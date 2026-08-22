@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: 'Entrenadores disponibles — EliteFitness',
   description:
     'Mira los entrenadores del directorio y pide que te contacte el que más te acomode. Todos revisados a mano.',
+  openGraph: {
+    title: 'Entrenadores disponibles',
+    description: 'Elige un entrenador revisado a mano y pide que te contacte por WhatsApp. Sin crear cuenta.',
+  },
 };
 
 // El directorio público. La tarjeta es un retrato — en un marketplace de
