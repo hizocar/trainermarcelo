@@ -1,9 +1,14 @@
 // Encadenar ejercicios en biseries y triseries, para el editor del coach.
 //
-// Regla de oro: ninguna función de acá reordena la lista. `groupBySuperseries`
+// Regla de oro: encadenar nunca reordena la lista. `groupBySuperseries`
 // (en plan.ts) solo agrupa ejercicios CONSECUTIVOS, y por eso encadenar es
 // siempre "unir con el de arriba": la adyacencia queda garantizada sin tocar
 // `order_index`, que es lo que determina qué entrena el alumno y en qué orden.
+//
+// La ÚNICA excepción es `superseriarSeleccion` (selección múltiple): ahí el
+// coach eligió ejercicios que pueden no ser vecinos, y una superserie separada
+// no significa nada al ejecutarla — reordenar es el punto, no un accidente.
+// Quien la llame debe persistir order_index además de los grupos.
 
 export interface Chainable {
   id: string;
@@ -127,4 +132,29 @@ export function colorForLabel(label: string): string {
   let suma = 0;
   for (let i = 0; i < label.length; i++) suma += label.charCodeAt(i);
   return COLORES[suma % COLORES.length];
+}
+
+/**
+ * Superseriar una selección múltiple: junta los seleccionados donde está el
+ * primero de ellos —conservando el orden del plan, no el de los toques— y les
+ * asigna una etiqueta nueva. El resto de la lista conserva su orden relativo.
+ *
+ * Es la única función de este módulo que reordena (ver el encabezado). El que
+ * la llama persiste los `order_index` que cambiaron y los grupos.
+ */
+export function superseriarSeleccion<T extends Chainable>(
+  exercises: T[], selectedIds: string[],
+): T[] {
+  const ids = new Set(selectedIds);
+  const seleccion = exercises.filter(e => ids.has(e.id));
+  if (seleccion.length < 2) return exercises;
+
+  const label = nextGroupLabel(exercises.map(e => e.superseries_group));
+  const marcados = seleccion.map(e => ({ ...e, superseries_group: label }));
+  const resto = exercises.filter(e => !ids.has(e.id));
+  const donde = exercises.findIndex(e => ids.has(e.id));
+
+  const resultado = [...resto.slice(0, donde), ...marcados, ...resto.slice(donde)];
+  // la selección pudo robarle un miembro a un grupo existente y dejarlo cojo
+  return normalizeGroups(resultado);
 }

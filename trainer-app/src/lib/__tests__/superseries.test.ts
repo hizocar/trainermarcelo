@@ -1,6 +1,6 @@
 import {
   nextGroupLabel, chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel,
-  normalizeGroups,
+  normalizeGroups, superseriarSeleccion,
 } from '../superseries';
 
 const ej = (id: string, g: string | null = null) => ({ id, superseries_group: g });
@@ -207,5 +207,56 @@ describe('la letra se pide sobre lo guardado, no sobre lo normalizado', () => {
       (e, i) => e.superseries_group !== crudas[i].superseries_group,
     );
     expect(aEscribir.map(e => e.id)).toEqual(['1', '2', '3']);
+  });
+});
+
+describe('superseriarSeleccion', () => {
+  const ej = (id: string, g: string | null = null) => ({ id, superseries_group: g });
+
+  it('dos adyacentes: mismo orden, etiqueta nueva para ambos', () => {
+    const r = superseriarSeleccion([ej('1'), ej('2'), ej('3')], ['1', '2']);
+    expect(r.map(e => e.id)).toEqual(['1', '2', '3']);
+    expect(r.map(e => e.superseries_group)).toEqual(['A', 'A', null]);
+  });
+
+  it('no adyacentes: se juntan donde está el primero, el resto conserva su orden', () => {
+    const r = superseriarSeleccion([ej('1'), ej('2'), ej('3'), ej('4')], ['1', '3']);
+    expect(r.map(e => e.id)).toEqual(['1', '3', '2', '4']);
+    expect(r.map(e => e.superseries_group)).toEqual(['A', 'A', null, null]);
+  });
+
+  it('el orden de la selección es el del plan, no el de los toques', () => {
+    const r = superseriarSeleccion([ej('1'), ej('2'), ej('3')], ['3', '1']);
+    expect(r.map(e => e.id)).toEqual(['1', '3', '2']);
+  });
+
+  it('sacar un miembro de una biserie existente disuelve lo que queda de ella', () => {
+    // 1-2 son biserie A; superseriar 2 con 4 deja a 1 solo → pierde la etiqueta
+    const r = superseriarSeleccion(
+      [ej('1', 'A'), ej('2', 'A'), ej('3'), ej('4')], ['2', '4'],
+    );
+    expect(r.map(e => e.id)).toEqual(['1', '2', '4', '3']);
+    expect(r.map(e => e.superseries_group)).toEqual([null, 'B', 'B', null]);
+  });
+
+  it('la etiqueta nueva salta las que ya están ocupadas', () => {
+    const r = superseriarSeleccion(
+      [ej('1', 'A'), ej('2', 'A'), ej('3'), ej('4')], ['3', '4'],
+    );
+    expect(r.map(e => e.superseries_group)).toEqual(['A', 'A', 'B', 'B']);
+  });
+
+  it('con menos de dos seleccionados presentes no cambia nada', () => {
+    const lista = [ej('1'), ej('2')];
+    expect(superseriarSeleccion(lista, ['1'])).toEqual(lista);
+    expect(superseriarSeleccion(lista, ['no-existe', '1'])).toEqual(lista);
+  });
+
+  it('tres seleccionados quedan como triserie consecutiva', () => {
+    const r = superseriarSeleccion(
+      [ej('1'), ej('2'), ej('3'), ej('4'), ej('5')], ['1', '3', '5'],
+    );
+    expect(r.map(e => e.id)).toEqual(['1', '3', '5', '2', '4']);
+    expect(r.map(e => e.superseries_group)).toEqual(['A', 'A', 'A', null, null]);
   });
 });

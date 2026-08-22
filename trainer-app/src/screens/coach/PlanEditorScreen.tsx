@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Modal, Image,
+  TextInput, ActivityIndicator, Modal, Image, Pressable,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 import { parseRepsRange, formatRepsRange } from '../../lib/reps';
 import {
   chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel, normalizeGroups,
+  superseriarSeleccion,
 } from '../../lib/superseries';
 
 const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
@@ -93,6 +94,13 @@ export default function PlanEditorScreen() {
   // el ref es la guarda real (síncrona); este estado es solo para que el coach
   // VEA que los controles están inactivos en vez de sentir que no responden
   const [operando, setOperando] = useState(false);
+  // Selección múltiple (pedida por Marcelo con un storyboard): toque largo en
+  // una tarjeta entra al modo; los toques siguientes marcan o desmarcan DENTRO
+  // del mismo día, y la barra de abajo actúa sobre todos a la vez. Cambiar de
+  // día reinicia la selección: las superseries viven dentro de un día.
+  const [seleccion, setSeleccion] = useState<{ dayId: string; ids: string[] } | null>(null);
+  const estaSeleccionado = (dayId: string, id: string) =>
+    seleccion?.dayId === dayId && seleccion.ids.includes(id);
 
   useEffect(() => { fetchPlan(); fetchTemplates(); }, []);
 
@@ -621,6 +629,70 @@ export default function PlanEditorScreen() {
     }, 'Eliminar');
   }
 
+  function toggleSeleccion(dayId: string, exId: string) {
+    if (operando) return;
+    setSeleccion(prev => {
+      if (!prev || prev.dayId !== dayId) return { dayId, ids: [exId] };
+      const ids = prev.ids.includes(exId)
+        ? prev.ids.filter(i => i !== exId)
+        : [...prev.ids, exId];
+      return ids.length === 0 ? null : { ...prev, ids };
+    });
+  }
+
+  function superseriarSeleccionados() {
+    if (!seleccion || seleccion.ids.length < 2 || enVuelo.current) return;
+    const sel = seleccion;
+    const day = days.find(d => d.id === sel.dayId);
+    if (!day) return;
+    const antes = encadenables(day.exercises);
+    const despues = superseriarSeleccion(antes, sel.ids);
+    setSeleccion(null);
+    conGuarda(async () => {
+      // Primero el orden, después los grupos — el mismo contrato que
+      // moveExercise: si el lote de grupos falla a la mitad, persistirGrupos
+      // recarga desde la base y lo que se ve es lo que quedó guardado.
+      for (let i = 0; i < despues.length; i++) {
+        if (antes[i]?.id !== despues[i].id) {
+          const { error } = await supabase
+            .from('exercises').update({ order_index: i }).eq('id', despues[i].id);
+          if (error) {
+            showAlert('Error', 'No se pudo reordenar: ' + error.message);
+            await fetchPlan();
+            return;
+          }
+        }
+      }
+      await persistirGrupos(sel.dayId, despues);
+    });
+  }
+
+  function eliminarSeleccionados() {
+    if (!seleccion || enVuelo.current) return;
+    const sel = seleccion;
+    const day = days.find(d => d.id === sel.dayId);
+    if (!day) return;
+    const n = sel.ids.length;
+    showConfirm(
+      n === 1 ? 'Eliminar ejercicio' : `Eliminar ${n} ejercicios`,
+      'Se quitarán del plan. El historial del cliente se conserva.',
+      async () => {
+        setSeleccion(null);
+        await conGuarda(async () => {
+          // archivado, no borrado: igual que eliminar de a uno
+          const { error } = await supabase
+            .from('exercises').update({ archived: true }).in('id', sel.ids);
+          if (error) {
+            showAlert('Error', 'No se pudo eliminar: ' + error.message);
+            return;
+          }
+          sel.ids.forEach(id => grupoEnBase.current.delete(id));
+          const restantes = day.exercises.filter(e => !sel.ids.includes(e.id));
+          await persistirGrupos(sel.dayId, normalizeGroups(encadenables(restantes)));
+        });
+      }, 'Eliminar');
+  }
+
   if (loading) return (
     <View style={styles.container}>
       <ActivityIndicator color={colors.accent} style={{ marginTop: 100 }} />
@@ -695,14 +767,21 @@ export default function PlanEditorScreen() {
                     </TouchableOpacity>
                   );
                 })()}
+                <Pressable
+                  onLongPress={() => toggleSeleccion(day.id, ex.id)}
+                  delayLongPress={350}
+                >
                 <Card
-                  style={ex.superseries_group
-                    ? {
-                        ...styles.exCard,
-                        borderColor: colorForLabel(ex.superseries_group),
-                        borderWidth: 1.5,
-                      }
-                    : styles.exCard}
+                  style={{
+                    ...(ex.superseries_group
+                      ? {
+                          ...styles.exCard,
+                          borderColor: colorForLabel(ex.superseries_group),
+                          borderWidth: 1.5,
+                        }
+                      : styles.exCard),
+                    ...(estaSeleccionado(day.id, ex.id) ? styles.exCardSel : null),
+                  }}
                 >
                 <View style={styles.exRow}>
                   <View style={styles.reorderCol}>
@@ -777,7 +856,18 @@ export default function PlanEditorScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+                {/* En modo selección, CUALQUIER toque sobre la tarjeta marca o
+                    desmarca — el velo captura antes que los botones internos,
+                    que en este modo no deben actuar. */}
+                {seleccion?.dayId === day.id && (
+                  <Pressable
+                    style={StyleSheet.absoluteFill}
+                    onPress={() => toggleSeleccion(day.id, ex.id)}
+                    onLongPress={() => toggleSeleccion(day.id, ex.id)}
+                  />
+                )}
                 </Card>
+                </Pressable>
               </React.Fragment>
             ))}
 
@@ -1128,6 +1218,38 @@ export default function PlanEditorScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {seleccion && (
+        <View style={styles.selBar}>
+          <TouchableOpacity
+            onPress={() => setSeleccion(null)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.selCancel}
+          >
+            <Ionicons name="close" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+          <Text style={styles.selCount}>
+            {seleccion.ids.length} {seleccion.ids.length === 1 ? 'elegido' : 'elegidos'}
+          </Text>
+          <TouchableOpacity
+            onPress={eliminarSeleccionados}
+            disabled={operando}
+            style={[styles.selBtn, operando && styles.controlInactivo]}
+          >
+            <Text style={styles.selBtnText}>ELIMINAR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={superseriarSeleccionados}
+            disabled={operando || seleccion.ids.length < 2}
+            style={[
+              styles.selBtnPrimary,
+              (operando || seleccion.ids.length < 2) && styles.controlInactivo,
+            ]}
+          >
+            <Text style={styles.selBtnPrimaryText}>⛓ SUPERSERIAR</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -1178,6 +1300,29 @@ const styles = StyleSheet.create({
   iconBtnDangerText: { ...typography.caption, color: colors.danger },
 
   exCard: { },
+  // seleccionado: el acento del monocromo, más grueso que el borde de grupo
+  exCardSel: { borderColor: colors.accent, borderWidth: 2 },
+  selBar: {
+    position: 'absolute', left: 12, right: 12, bottom: 28,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.borderLight,
+    borderRadius: radius.lg, paddingVertical: 10, paddingHorizontal: 14,
+    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 }, elevation: 12,
+  },
+  selCancel: { paddingRight: 2 },
+  selCount: { flex: 1, color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
+  selBtn: {
+    borderWidth: 1, borderColor: colors.borderLight, borderRadius: radius.md,
+    paddingVertical: 9, paddingHorizontal: 14,
+  },
+  selBtnText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  selBtnPrimary: {
+    backgroundColor: colors.accent, borderRadius: radius.md,
+    paddingVertical: 9, paddingHorizontal: 14,
+  },
+  selBtnPrimaryText: { color: colors.background, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   exRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   exThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface },
   templateList: { gap: spacing.xs },
