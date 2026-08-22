@@ -32,20 +32,51 @@ export default function UnetePage() {
       </nav>
 
       <header className="hero">
-        <div className="container">
-          <span className="hero-badge fade-up">Para coaches · gratis</span>
-          <h1 className="fade-up d1">
-            Los alumnos ya están buscando.<br />
-            <em>Falta que te encuentren.</em>
-          </h1>
-          <p className="sub fade-up d2" style={{ maxWidth: 560 }}>
-            Personas reales publican qué buscan y dejan su WhatsApp. Tú postulas,
-            les escribes, y cierras. Sin tarjeta, sin mensualidad: tu cuenta del
-            marketplace es gratis.
-          </p>
-          <div className="hero-cta fade-up d3">
-            <Link className="btn btn-primary" href="/signup?plan=free">Crear mi cuenta gratis</Link>
-            <Link className="btn btn-ghost" href="/coaches">Ver el directorio</Link>
+        <div className="container hero-grid">
+          <div>
+            <span className="hero-badge fade-up">Para coaches · gratis</span>
+            <h1 className="fade-up d1">
+              Los alumnos ya están buscando.<br />
+              <em>Falta que te encuentren.</em>
+            </h1>
+            <p className="sub fade-up d2" style={{ maxWidth: 560 }}>
+              Personas reales publican qué buscan y dejan su WhatsApp. Tú postulas,
+              les escribes, y cierras. Sin tarjeta, sin mensualidad: tu cuenta del
+              marketplace es gratis.
+            </p>
+            <div className="hero-cta fade-up d3">
+              <Link className="btn btn-primary" href="/signup?plan=free">Crear mi cuenta gratis</Link>
+              <Link className="btn btn-ghost" href="/coaches">Ver el directorio</Link>
+            </div>
+          </div>
+
+          {/* La misma tarjeta que muestran los avisos de Meta: el aviso promete
+              una solicitud real, y la página que abre la muestra. El ámbar acá
+              es legítimo — le está diciendo al coach "esto te pediría acción". */}
+          <div className="hero-visual fade-up d2" aria-hidden>
+            <div style={{
+              border: '1px solid var(--warning)', borderRadius: 16,
+              background: 'var(--card)', padding: 24, maxWidth: 420,
+            }}>
+              <p className="label" style={{ color: 'var(--warning)' }}>
+                Te pidieron a ti — postula sin esperar
+              </p>
+              <p className="label" style={{ marginTop: 14 }}>Providencia · Presencial</p>
+              <p style={{ marginTop: 10, fontSize: 17, lineHeight: 1.55 }}>
+                “Quiero volver a entrenar después de una lesión. Puedo martes y
+                jueves por la mañana.”
+              </p>
+              <p className="mono muted" style={{ fontSize: 12, marginTop: 14, letterSpacing: 1 }}>
+                HACE 2 H · QUEDAN 2 DE 3 CUPOS
+              </p>
+              <div style={{
+                marginTop: 16, background: 'var(--accent)', color: 'var(--bg)',
+                textAlign: 'center', fontWeight: 800, fontSize: 13,
+                letterSpacing: 2, padding: 14, borderRadius: 10,
+              }}>
+                POSTULAR Y VER SU WHATSAPP
+              </div>
+            </div>
           </div>
         </div>
       </header>
