@@ -19,6 +19,8 @@ import { seriesDoneByExercise } from '../../lib/progress';
 import { pickSelectedDayId } from '../../lib/selectedDay';
 import { elapsedSeconds, formatClock, formatDuration, esSesionColgada } from '../../lib/sessionTimer';
 import { showSessionOngoing, dismissSessionOngoing } from '../../lib/notifications';
+import { startSessionActivity, stopSessionActivity } from '../../lib/liveActivity';
+import ShareSessionCard from '../../components/client/ShareSessionCard';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { refreshReminders } from '../../lib/notifications';
@@ -65,7 +67,8 @@ export default function TodayScreen() {
   // calcula SIEMPRE contra started_at (patrón restTimer: iOS congela los
   // timers de JS al bloquear la pantalla, un timestamp siempre vuelve bien).
   // `tick` solo fuerza el re-render por segundo mientras corre.
-  const [sesion, setSesion] = useState<{ id: string; startedAt: string; notifId: string | null } | null>(null);
+  const [sesion, setSesion] = useState<{ id: string; startedAt: string; notifId: string | null; liveId: string | null } | null>(null);
+  const [compartiendo, setCompartiendo] = useState(false);
   const [, setTick] = useState(0);
   const [ultimaDuracion, setUltimaDuracion] = useState<number | null>(null);
 
@@ -83,7 +86,7 @@ export default function TodayScreen() {
       .eq('user_id', user.id)
       .is('ended_at', null)
       .maybeSingle();
-    setSesion(data ? { id: data.id, startedAt: data.started_at, notifId: null } : null);
+    setSesion(data ? { id: data.id, startedAt: data.started_at, notifId: null, liveId: null } : null);
   }, [user?.id]);
 
   React.useEffect(() => { cargarSesionAbierta(); }, [cargarSesionAbierta]);
@@ -103,7 +106,10 @@ export default function TodayScreen() {
     }
     setUltimaDuracion(null);
     const notifId = await showSessionOngoing(new Date(data.started_at));
-    setSesion({ id: data.id, startedAt: data.started_at, notifId });
+    // el reloj vivo de la pantalla bloqueada: iOS lo dibuja tickeando él
+    // mismo desde startedAt, con la app suspendida o muerta
+    const liveId = startSessionActivity(selectedDay.name.toUpperCase(), data.started_at);
+    setSesion({ id: data.id, startedAt: data.started_at, notifId, liveId });
   }
 
   async function terminarSesion() {
@@ -115,6 +121,7 @@ export default function TodayScreen() {
       .eq('id', sesion.id);
     if (error) return; // sigue corriendo: mejor un reloj vivo que un dato perdido
     await dismissSessionOngoing(sesion.notifId);
+    stopSessionActivity(sesion.liveId, segundos);
     setSesion(null);
     setUltimaDuracion(segundos);
   }
@@ -124,6 +131,7 @@ export default function TodayScreen() {
     // una sesión colgada (olvidó terminar) no es un entrenamiento: se borra
     await supabase.from('workout_sessions').delete().eq('id', sesion.id);
     await dismissSessionOngoing(sesion.notifId);
+    stopSessionActivity(sesion.liveId, null);
     setSesion(null);
   }
   // Qué semana es la que está dibujada en pantalla ahora mismo (null = ninguna).
@@ -369,7 +377,23 @@ export default function TodayScreen() {
           )}
 
           {!sesion && ultimaDuracion != null && (
-            <Text style={styles.sesionDone}>Entrenaste {formatDuration(ultimaDuracion)} ✓</Text>
+            <View style={styles.sesionDoneRow}>
+              <Text style={styles.sesionDone}>Entrenaste {formatDuration(ultimaDuracion)} ✓</Text>
+              <TouchableOpacity style={styles.sesionShare} onPress={() => setCompartiendo(true)} activeOpacity={0.85}>
+                <Ionicons name="share-outline" size={13} color={colors.background} />
+                <Text style={styles.sesionShareText}>COMPARTIR</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {compartiendo && ultimaDuracion != null && (
+            <ShareSessionCard
+              dayName={selectedDay.name}
+              durationSeconds={ultimaDuracion}
+              done={dayStatus[selectedDay.id]?.done ?? 0}
+              total={exercises.length}
+              onClose={() => setCompartiendo(false)}
+            />
           )}
         </View>
       )}
@@ -687,7 +711,14 @@ const styles = StyleSheet.create({
   },
   sesionEndText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   sesionStale: { flex: 1, color: colors.textMuted, fontSize: 12 },
-  sesionDone: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  sesionDone: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  sesionDoneRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: spacing.sm },
+  sesionShare: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: colors.accent, borderRadius: radius.sm,
+    paddingVertical: 6, paddingHorizontal: 10,
+  },
+  sesionShareText: { color: colors.background, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   dayName: { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary, letterSpacing: 0.5, marginTop: 2 },
   weekNav: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   weekNavTodayText: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: colors.textPrimary },
