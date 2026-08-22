@@ -20,6 +20,7 @@ import { pickSelectedDayId } from '../../lib/selectedDay';
 import { elapsedSeconds, formatClock, formatDuration, esSesionColgada } from '../../lib/sessionTimer';
 import { showSessionOngoing, dismissSessionOngoing } from '../../lib/notifications';
 import { startSessionActivity, stopSessionActivity } from '../../lib/liveActivity';
+import { track } from '../../lib/analytics';
 import ShareSessionCard from '../../components/client/ShareSessionCard';
 import { WEEK_DAYS, getCurrentWeek, formatShortDate, weekStartLabel, daysUntilWeek, dateForWeekDay } from '../../lib/weeks';
 import { showAlert, showConfirm } from '../../lib/alert';
@@ -110,6 +111,7 @@ export default function TodayScreen() {
     // mismo desde startedAt, con la app suspendida o muerta
     const liveId = startSessionActivity(selectedDay.name.toUpperCase(), data.started_at);
     setSesion({ id: data.id, startedAt: data.started_at, notifId, liveId });
+    track('sesion_comenzada', { dia: selectedDay.name, live_activity: liveId != null });
   }
 
   async function terminarSesion() {
@@ -124,6 +126,7 @@ export default function TodayScreen() {
     stopSessionActivity(sesion.liveId, segundos);
     setSesion(null);
     setUltimaDuracion(segundos);
+    track('sesion_terminada', { segundos });
   }
 
   async function descartarSesion() {
@@ -133,6 +136,7 @@ export default function TodayScreen() {
     await dismissSessionOngoing(sesion.notifId);
     stopSessionActivity(sesion.liveId, null);
     setSesion(null);
+    track('sesion_descartada', { minutos_colgada: Math.round(elapsedSeconds(sesion.startedAt) / 60) });
   }
   // Qué semana es la que está dibujada en pantalla ahora mismo (null = ninguna).
   // Va en ref y no en estado porque `fetchWeek` corre desde el callback de
@@ -379,7 +383,7 @@ export default function TodayScreen() {
           {!sesion && ultimaDuracion != null && (
             <View style={styles.sesionDoneRow}>
               <Text style={styles.sesionDone}>Entrenaste {formatDuration(ultimaDuracion)} ✓</Text>
-              <TouchableOpacity style={styles.sesionShare} onPress={() => setCompartiendo(true)} activeOpacity={0.85}>
+              <TouchableOpacity style={styles.sesionShare} onPress={() => { track('compartir_abierto', {}); setCompartiendo(true); }} activeOpacity={0.85}>
                 <Ionicons name="share-outline" size={13} color={colors.background} />
                 <Text style={styles.sesionShareText}>COMPARTIR</Text>
               </TouchableOpacity>

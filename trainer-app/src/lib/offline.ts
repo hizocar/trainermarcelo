@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
+import { track } from './analytics';
 import { buildLogUpdate } from './logPayload';
 
 // Cola de escrituras que sobrevive sin señal (el gimnasio suele ser un sótano).
@@ -78,6 +79,8 @@ async function isOnline(): Promise<boolean> {
  * devuelve 'queued' — la UI puede seguir como si se hubiera guardado.
  */
 export async function saveLog(log: Omit<QueuedLog, 'id' | 'queued_at'>): Promise<'saved' | 'queued'> {
+  // el evento registra el ACTO de guardar una serie, llegue ahora o en cola
+  track('serie_guardada', { week_number: log.week_number });
   if (!(await isOnline())) {
     await enqueueLog(log);
     return 'queued';
