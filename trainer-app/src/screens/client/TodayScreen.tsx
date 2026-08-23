@@ -355,6 +355,13 @@ export default function TodayScreen() {
           )}
           <Text style={styles.dayName}>{selectedDay.name.toUpperCase()}</Text>
 
+          {!user?.coach_id && (
+            <TouchableOpacity onPress={() => (navigation as any).navigate('MyRoutine')}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.editarRutina}>EDITAR MI RUTINA</Text>
+            </TouchableOpacity>
+          )}
+
           {exercises.length > 0 && !sesion && ultimaDuracion == null && (
             <TouchableOpacity style={styles.sesionStart} onPress={comenzarSesion} activeOpacity={0.85}>
               <Ionicons name="play" size={14} color={colors.background} />
@@ -431,9 +438,17 @@ export default function TodayScreen() {
           <Text style={styles.emptyTitle}>{noPlanAtAll ? 'SIN PLAN' : `SIN PLAN · SEMANA ${selectedWeek}`}</Text>
           <Text style={styles.emptyText}>
             {noPlanAtAll
-              ? 'Tu coach aún no ha configurado tu plan de entrenamiento.'
+              ? (user?.coach_id
+                  ? 'Tu coach aún no ha configurado tu plan de entrenamiento.'
+                  : 'Todavía no armas tu rutina. Elige tus días, colócales ejercicios y empieza a entrenar.')
               : 'Tu coach todavía no planificó esta semana. Prueba mirando otra semana con las flechas de arriba.'}
           </Text>
+          {noPlanAtAll && !user?.coach_id && (
+            <TouchableOpacity style={styles.armarRutina}
+                              onPress={() => (navigation as any).navigate('MyRoutine')} activeOpacity={0.85}>
+              <Text style={styles.armarRutinaText}>ARMAR MI RUTINA</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <>
@@ -716,6 +731,15 @@ const styles = StyleSheet.create({
   sesionEndText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   sesionStale: { flex: 1, color: colors.textMuted, fontSize: 12 },
   sesionDone: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  armarRutina: {
+    backgroundColor: colors.accent, borderRadius: radius.md,
+    paddingVertical: 12, paddingHorizontal: 24, marginTop: spacing.lg, alignSelf: 'center',
+  },
+  armarRutinaText: { color: colors.background, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  editarRutina: {
+    color: colors.textMuted, fontSize: 10, fontWeight: '800',
+    letterSpacing: 1.5, marginTop: 6,
+  },
   sesionDoneRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: spacing.sm },
   sesionShare: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
