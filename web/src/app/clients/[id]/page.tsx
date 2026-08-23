@@ -27,6 +27,13 @@ export default async function ClientPlanPage({
 
   if (!client || (client as AppUser).coach_id !== userId) notFound();
 
+  // La ficha inicial (PAR-Q): la respondió el alumno en su app; acá se lee.
+  const { data: ficha } = await supabase
+    .from('client_forms')
+    .select('answers, updated_at')
+    .eq('client_id', id).eq('kind', 'parq')
+    .maybeSingle();
+
   const { data: otherClients } = await supabase
     .from('users')
     .select('id, name, email')
@@ -148,6 +155,51 @@ export default async function ClientPlanPage({
               </p>
             )}
           </>
+        )}
+
+        {ficha && (
+          <details style={{
+            marginTop: 32, border: '1px solid var(--border)', borderRadius: 12,
+            background: 'var(--card)', padding: '4px 16px',
+          }}>
+            <summary className="label" style={{ cursor: 'pointer', padding: '10px 0' }}>
+              FICHA INICIAL (PAR-Q)
+              {Object.entries(ficha.answers as Record<string, unknown>)
+                .filter(([k, v]) => k.startsWith('p') && v === true).length > 0 && (
+                <span style={{ color: 'var(--warning)', marginLeft: 8 }}>
+                  · {Object.entries(ficha.answers as Record<string, unknown>)
+                      .filter(([k, v]) => k.startsWith('p') && v === true).length} respuesta(s) SÍ
+                </span>
+              )}
+            </summary>
+            <div style={{ padding: '8px 0 14px' }}>
+              {[
+                ['p1', 'Problema cardíaco diagnosticado (actividad solo con indicación médica)'],
+                ['p2', 'Dolor en el pecho al hacer actividad física'],
+                ['p3', 'Dolor en el pecho en reposo (último mes)'],
+                ['p4', 'Mareos o pérdida de conocimiento'],
+                ['p5', 'Problema óseo o articular que pueda empeorar'],
+                ['p6', 'Medicamentos para presión o corazón'],
+                ['p7', 'Otra razón para no hacer actividad física'],
+              ].map(([id, texto]) => (
+                <p key={id} style={{ fontSize: 13, margin: '6px 0' }}>
+                  <strong className="mono" style={{
+                    color: (ficha.answers as Record<string, unknown>)[id] === true
+                      ? 'var(--warning)' : 'var(--text-muted)',
+                  }}>
+                    {(ficha.answers as Record<string, unknown>)[id] === true ? 'SÍ' : 'NO'}
+                  </strong>
+                  {'  '}<span className="muted">{texto}</span>
+                </p>
+              ))}
+              {(ficha.answers as Record<string, unknown>).comentario ? (
+                <p style={{ fontSize: 13, marginTop: 10 }}>
+                  <span className="label">Comentario: </span>
+                  {String((ficha.answers as Record<string, unknown>).comentario)}
+                </p>
+              ) : null}
+            </div>
+          </details>
         )}
       </main>
     </>
