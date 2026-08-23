@@ -18,6 +18,7 @@ import ExerciseRow from '../../components/client/ExerciseRow';
 import { seriesDoneByExercise } from '../../lib/progress';
 import { pickSelectedDayId } from '../../lib/selectedDay';
 import { elapsedSeconds, formatClock, formatDuration, esSesionColgada } from '../../lib/sessionTimer';
+import { puedeCancelar, formatCita } from '../../lib/citas';
 import { showSessionOngoing, dismissSessionOngoing } from '../../lib/notifications';
 import { startSessionActivity, stopSessionActivity } from '../../lib/liveActivity';
 import { track } from '../../lib/analytics';
@@ -70,6 +71,38 @@ export default function TodayScreen() {
   // `tick` solo fuerza el re-render por segundo mientras corre.
   const [sesion, setSesion] = useState<{ id: string; startedAt: string; notifId: string | null; liveId: string | null } | null>(null);
   const [compartiendo, setCompartiendo] = useState(false);
+  // agenda y ficha: la próxima cita agendada, y si falta el PAR-Q (solo con coach)
+  const [proximaCita, setProximaCita] = useState<{ id: string; starts_at: string; modality: string } | null>(null);
+  const [faltaParq, setFaltaParq] = useState(false);
+
+  const cargarAgendaYFicha = useCallback(async () => {
+    if (!user) return;
+    const { data: cita } = await supabase
+      .from('appointments')
+      .select('id, starts_at, modality')
+      .eq('client_id', user.id).eq('status', 'agendada')
+      .gte('starts_at', new Date().toISOString())
+      .order('starts_at').limit(1).maybeSingle();
+    setProximaCita(cita ?? null);
+    if (user.coach_id) {
+      const { data: ficha } = await supabase
+        .from('client_forms').select('id')
+        .eq('client_id', user.id).eq('kind', 'parq').maybeSingle();
+      setFaltaParq(!ficha);
+    } else {
+      setFaltaParq(false);
+    }
+  }, [user?.id, user?.coach_id]);
+
+  useFocusEffect(useCallback(() => { cargarAgendaYFicha(); }, [cargarAgendaYFicha]));
+
+  async function cancelarCita() {
+    if (!proximaCita) return;
+    const { error } = await supabase.rpc('cancelar_cita', { p_cita_id: proximaCita.id });
+    // si la base dice que no (muy encima de la hora), se recarga y se ve igual
+    if (!error) track('cita_cancelada_por_alumno', {});
+    await cargarAgendaYFicha();
+  }
   const [, setTick] = useState(0);
   const [ultimaDuracion, setUltimaDuracion] = useState<number | null>(null);
 
@@ -341,6 +374,33 @@ export default function TodayScreen() {
           </View>
         )}
       </View>
+
+      {faltaParq && (
+        <TouchableOpacity style={styles.avisoFicha}
+                          onPress={() => (navigation as any).navigate('Parq')} activeOpacity={0.85}>
+          <Text style={styles.avisoFichaTitulo}>COMPLETA TU FICHA INICIAL</Text>
+          <Text style={styles.avisoFichaText}>
+            7 preguntas rápidas para que tu coach arme tu plan sabiendo qué cuidar.
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {proximaCita && (
+        <View style={styles.citaCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.citaLabel}>PRÓXIMA SESIÓN CON TU COACH</Text>
+            <Text style={styles.citaCuando}>
+              {formatCita(proximaCita.starts_at)} · {proximaCita.modality === 'online' ? 'Online' : 'Presencial'}
+            </Text>
+          </View>
+          {puedeCancelar(proximaCita.starts_at) && (
+            <TouchableOpacity onPress={cancelarCita}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.citaCancelar}>CANCELAR</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Sin ejercicios no hay anillo que llenar, pero el nombre del día se
           queda: si no, "PIERNAS" desaparece de la pantalla por completo y el
@@ -736,6 +796,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 24, marginTop: spacing.lg, alignSelf: 'center',
   },
   armarRutinaText: { color: colors.background, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  avisoFicha: {
+    borderWidth: 1, borderColor: colors.borderLight, borderRadius: radius.md,
+    backgroundColor: colors.card, padding: spacing.md,
+    marginHorizontal: spacing.lg, marginBottom: spacing.sm,
+  },
+  avisoFichaTitulo: { color: colors.textPrimary, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
+  avisoFichaText: { color: colors.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 17 },
+  citaCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    backgroundColor: colors.card, padding: spacing.md,
+    marginHorizontal: spacing.lg, marginBottom: spacing.sm,
+  },
+  citaLabel: { color: colors.textMuted, fontSize: 9.5, fontWeight: '800', letterSpacing: 1.5 },
+  citaCuando: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', marginTop: 3 },
+  citaCancelar: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
   editarRutina: {
     color: colors.textMuted, fontSize: 10, fontWeight: '800',
     letterSpacing: 1.5, marginTop: 6,

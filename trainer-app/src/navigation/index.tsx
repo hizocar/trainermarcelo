@@ -49,6 +49,7 @@ import InviteClientScreen from '../screens/coach/InviteClientScreen';
 import CoachPendingScreen from '../screens/coach/CoachPendingScreen';
 import SubscriptionExpiredScreen from '../screens/coach/SubscriptionExpiredScreen';
 import MyRoutineScreen from '../screens/client/MyRoutineScreen';
+import ParqScreen from '../screens/client/ParqScreen';
 import { initAnalytics, track } from '../lib/analytics';
 import GymScreen from '../screens/coach/GymScreen';
 import AppLockScreen from '../screens/shared/AppLockScreen';
@@ -234,6 +235,7 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="ClientHome" component={ClientTabs} />
             <Stack.Screen name="MyRoutine" component={MyRoutineScreen} />
+            <Stack.Screen name="Parq" component={ParqScreen} />
             <Stack.Screen name="SessionDetail" component={SessionDetailScreen} />
             <Stack.Screen name="WorkoutLog" component={WorkoutLogScreen} />
             <Stack.Screen name="Body" component={BodyProgressScreen} />

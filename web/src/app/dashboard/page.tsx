@@ -42,6 +42,7 @@ export default async function DashboardPage() {
             <Logo />
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
+            <Link href="/agenda" className="btn btn-ghost" style={{ padding: '10px 18px' }}>AGENDA</Link>
             <Link href="/programs" className="btn btn-ghost" style={{ padding: '10px 18px' }}>PROGRAMAS</Link>
             <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
             <Link href="/marketplace" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SOLICITUDES</Link>
