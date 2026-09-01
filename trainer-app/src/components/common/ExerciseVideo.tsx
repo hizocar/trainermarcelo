@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Linking, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -23,6 +23,25 @@ function InlinePlayer({ url }: { url: string }) {
     p.loop = true;
     p.muted = true;
   });
+
+  // El reproductor nativo NO sobrevive al segundo plano. Bloquear el teléfono
+  // a mitad de un ejercicio y volver hacía caer la app a veces: la familia de
+  // bugs de ciclo de vida de expo-video (AVPlayer retomando en estado rancio).
+  // Al irse del primer plano se pausa y se DESMONTA la vista; al volver se
+  // monta fresca — nunca hay un reproductor "resucitando".
+  const [enPrimerPlano, setEnPrimerPlano] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      const activo = estado === 'active';
+      if (!activo) {
+        try { player.pause(); } catch { /* pausar jamás puede botar la app */ }
+      }
+      setEnPrimerPlano(activo);
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  if (!enPrimerPlano) return <View style={styles.playerBox} />;
 
   return (
     <View style={styles.playerBox}>
