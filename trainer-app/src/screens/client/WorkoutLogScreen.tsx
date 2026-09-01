@@ -310,10 +310,18 @@ export default function WorkoutLogScreen() {
   const logDateRef = React.useRef(logDate);
   React.useEffect(() => { logDateRef.current = logDate; }, [logDate]);
 
-  async function flushAutoSave() {
+  // La serie cuyo campo está ENFOCADO no se guarda: el alumno está
+  // escribiendo, y una pausa entre el "1" y el "2" de "12" no es "terminé".
+  // El guardado de esa serie llega al soltar el campo (blur), o con los
+  // últimos recursos (salir de la pantalla / app a segundo plano), donde
+  // escribir ya se acabó por definición.
+  const serieEnFoco = React.useRef<number | null>(null);
+
+  async function flushAutoSave(incluirEnfocada = false) {
     const list = entriesRef.current;
     const toSave = list
       .map((e, i) => ({ i, e, weightNum: toNum(e.weight), repsNum: toNum(e.reps) }))
+      .filter(({ i }) => incluirEnfocada || i !== serieEnFoco.current)
       // `pendienteDeConfirmar` no debería filtrar nada acá (una serie del alumno
       // sin confirmar nunca queda `saved: false`), pero la regla se escribe en
       // TODOS los caminos de escritura: es la única que protege el registro del
@@ -343,10 +351,18 @@ export default function WorkoutLogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries]);
 
+  React.useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'background') flushAutoSave(true);
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // último recurso: si el cliente navega antes de que el debounce dispare
   React.useEffect(() => {
-    const sub = navigation.addListener('beforeRemove', () => { flushAutoSave(); });
-    return () => { sub(); flushAutoSave(); };
+    const sub = navigation.addListener('beforeRemove', () => { flushAutoSave(true); });
+    return () => { sub(); flushAutoSave(true); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
@@ -555,6 +571,11 @@ export default function WorkoutLogScreen() {
                     style={[styles.input, { flex: 1 }]}
                     value={entry.weight}
                     onChangeText={v => updateEntry(i, 'weight', v)}
+                    onFocus={() => { serieEnFoco.current = i; }}
+                    onBlur={() => {
+                      if (serieEnFoco.current === i) serieEnFoco.current = null;
+                      flushAutoSave();
+                    }}
                     keyboardType="decimal-pad"
                     placeholder="0"
                     placeholderTextColor={colors.textMuted}
@@ -563,6 +584,11 @@ export default function WorkoutLogScreen() {
                     style={[styles.input, { flex: 1 }]}
                     value={entry.reps}
                     onChangeText={v => updateEntry(i, 'reps', v)}
+                    onFocus={() => { serieEnFoco.current = i; }}
+                    onBlur={() => {
+                      if (serieEnFoco.current === i) serieEnFoco.current = null;
+                      flushAutoSave();
+                    }}
                     keyboardType="number-pad"
                     placeholder="0"
                     placeholderTextColor={colors.textMuted}
@@ -571,6 +597,11 @@ export default function WorkoutLogScreen() {
                     style={[styles.input, { flex: 0.7 }]}
                     value={entry.rir}
                     onChangeText={v => updateEntry(i, 'rir', v)}
+                    onFocus={() => { serieEnFoco.current = i; }}
+                    onBlur={() => {
+                      if (serieEnFoco.current === i) serieEnFoco.current = null;
+                      flushAutoSave();
+                    }}
                     keyboardType="number-pad"
                     placeholder="–"
                     placeholderTextColor={colors.textMuted}
