@@ -463,6 +463,18 @@ export default function TodayScreen() {
               durationSeconds={ultimaDuracion}
               done={dayStatus[selectedDay.id]?.done ?? 0}
               total={exercises.length}
+              muscles={(() => {
+                // intensidad por grupo: cuántos ejercicios del día lo trabajan,
+                // normalizado al más frecuente — enciende el mapa de la tarjeta
+                const conteo: Record<string, number> = {};
+                exercises.forEach(e => {
+                  if (e.muscle_group) conteo[e.muscle_group] = (conteo[e.muscle_group] ?? 0) + 1;
+                });
+                const max = Math.max(1, ...Object.values(conteo));
+                return Object.fromEntries(
+                  Object.entries(conteo).map(([g, n]) => [g, n / max]),
+                );
+              })()}
               onClose={() => setCompartiendo(false)}
             />
           )}

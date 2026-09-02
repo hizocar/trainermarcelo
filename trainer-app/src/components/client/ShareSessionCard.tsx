@@ -1,32 +1,39 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import Dumbbell from '../common/Dumbbell';
+import MuscleMap from '../common/MuscleMap';
 import { colors, spacing, radius, fonts } from '../../theme';
-import { formatDuration } from '../../lib/sessionTimer';
 import { track } from '../../lib/analytics';
 
-// La tarjeta que el alumno comparte al terminar su sesión — el camino que
-// describía docs/negocio/2026-08-20-compartir-imagen.md: se dibuja como vista
-// normal, view-shot la vuelve PNG, y la hoja de compartir de iOS hace el
-// resto (Instagram, WhatsApp, lo que tenga instalado). Sin servidor.
+// La tarjeta que el alumno comparte al terminar — formato 4:5 (el que manda
+// en el feed) y la gramática de las grandes (Strava, Nike Run Club): UNA
+// cifra gigante como héroe y los datos como ficha técnica. Pero con lo que
+// ninguna de ellas puede mostrar: el cuerpo con los músculos del día
+// encendidos — ese mapa es nuestro.
 //
-// Cuadrada a propósito: es el formato que sirve igual en feed y en historias,
-// y el monocromo de la marca la hace reconocible en cualquier red.
+// Monocromo estricto: la marca se reconoce por el negro, el Anton y la
+// mancuerna, no por un color.
 interface Props {
   dayName: string;
   durationSeconds: number;
   done: number;
   total: number;
+  /** intensidad 0..1 por grupo muscular del día — enciende el mapa */
+  muscles: Record<string, number>;
   onClose: () => void;
 }
 
-export default function ShareSessionCard({ dayName, durationSeconds, done, total, onClose }: Props) {
+export default function ShareSessionCard({ dayName, durationSeconds, done, total, muscles, onClose }: Props) {
   const cardRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
 
   const hoy = new Date();
-  const fecha = `${hoy.getDate()}·${String(hoy.getMonth() + 1).padStart(2, '0')}·${hoy.getFullYear()}`;
+  const fecha = `${String(hoy.getDate()).padStart(2, '0')}·${String(hoy.getMonth() + 1).padStart(2, '0')}·${hoy.getFullYear()}`;
+  const minutos = Math.max(1, Math.round(durationSeconds / 60));
+  const tieneMusculos = Object.keys(muscles).length > 0;
 
   async function compartir() {
     if (sharing) return;
@@ -48,16 +55,37 @@ export default function ShareSessionCard({ dayName, durationSeconds, done, total
     <Modal transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         {/* La tarjeta: lo que sale en la imagen es EXACTAMENTE esto */}
-        <View ref={cardRef} collapsable={false} style={styles.card}>
-          <Text style={styles.brand}>ELITEFITNESS</Text>
+        <View ref={cardRef} collapsable={false} style={styles.cardShell}>
+          <LinearGradient
+            colors={[colors.cardElevated, colors.background]}
+            start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }}
+            style={styles.card}
+          >
+            <View style={styles.brandRow}>
+              <Dumbbell size={18} />
+              <Text style={styles.brand}>ELITEFITNESS</Text>
+            </View>
 
-          <Text style={styles.dayName}>{dayName.toUpperCase()}</Text>
-          <Text style={styles.duration}>{formatDuration(durationSeconds)}</Text>
+            <View style={styles.cuerpo}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dayName}>{dayName.toUpperCase()}</Text>
+                {/* la cifra ES el logro: gigante, a la Nike Run Club */}
+                <Text style={styles.duracionNum}>{minutos}</Text>
+                <Text style={styles.duracionUnidad}>MINUTOS</Text>
+              </View>
+              {tieneMusculos && (
+                <View style={styles.mapa}>
+                  <MuscleMap highlights={muscles} height={190} showLabels={false} />
+                </View>
+              )}
+            </View>
 
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>{done}/{total} EJERCICIOS</Text>
-            <Text style={styles.meta}>{fecha}</Text>
-          </View>
+            <View style={styles.hairline} />
+            <View style={styles.metaRow}>
+              <Text style={styles.meta}>{done}/{total} EJERCICIOS</Text>
+              <Text style={styles.meta}>{fecha}</Text>
+            </View>
+          </LinearGradient>
         </View>
 
         <View style={styles.actions}>
@@ -78,18 +106,29 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
     alignItems: 'center', justifyContent: 'center', padding: spacing.xl,
   },
+  // 4:5 — el formato del feed. El shell recorta el gradiente al radio.
+  cardShell: { width: 320, height: 400, borderRadius: radius.lg, overflow: 'hidden' },
   card: {
-    width: 320, height: 320, backgroundColor: colors.background,
+    flex: 1, padding: 26, justifyContent: 'space-between',
     borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,
-    padding: 28, justifyContent: 'space-between',
   },
-  brand: { color: colors.textSecondary, fontSize: 12, fontWeight: '800', letterSpacing: 3 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brand: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 3 },
+  cuerpo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.md },
   dayName: {
     fontFamily: fonts.display, color: colors.textSecondary,
-    fontSize: 22, letterSpacing: 1,
+    fontSize: 20, letterSpacing: 1,
   },
-  // la duración ES el logro: la cifra más grande de la tarjeta
-  duration: { fontFamily: fonts.display, color: colors.textPrimary, fontSize: 64, lineHeight: 66 },
+  duracionNum: {
+    fontFamily: fonts.display, color: colors.textPrimary,
+    fontSize: 118, lineHeight: 118, marginTop: 2, letterSpacing: -2,
+  },
+  duracionUnidad: {
+    fontFamily: fonts.mono, color: colors.textMuted,
+    fontSize: 12, letterSpacing: 4, marginTop: 2,
+  },
+  mapa: { width: 120, alignItems: 'center' },
+  hairline: { height: 1, backgroundColor: colors.border, marginBottom: 12 },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between' },
   meta: {
     fontFamily: fonts.mono, color: colors.textMuted,
