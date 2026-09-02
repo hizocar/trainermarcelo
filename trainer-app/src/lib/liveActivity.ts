@@ -33,8 +33,18 @@ export function startSessionActivity(dayName: string, startedAtIso: string): str
         progressBar: {
           elapsedTimer: { startDate: new Date(startedAtIso).getTime() },
         },
+        // la mancuerna de la marca, empaquetada en el widget
+        // (assets/liveActivity/logo.png — iOS exige ≤4KB acá)
+        imageName: 'logo',
+        dynamicIslandImageName: 'logo',
       },
-      { timerType: 'digital', ...COLORES },
+      {
+        timerType: 'digital',
+        imagePosition: 'left',
+        imageSize: { width: 34, height: 34 },
+        contentFit: 'contain',
+        ...COLORES,
+      },
     );
     return id ?? null; // null: iOS < 16.2 — el aviso fijo sigue cubriendo
   } catch {
@@ -51,6 +61,8 @@ export function stopSessionActivity(id: string | null, durationSeconds: number |
         ? `Entrenaste ${formatDuration(durationSeconds)}`
         : 'Entrenamiento descartado',
       subtitle: durationSeconds != null ? 'Bien hecho 💪' : '',
+      imageName: 'logo',
+      dynamicIslandImageName: 'logo',
     });
   } catch {
     // cerrar el widget jamás puede romper el guardado de la sesión
