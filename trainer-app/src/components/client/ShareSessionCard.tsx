@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import Body from 'react-native-body-highlighter';
 import Dumbbell from '../common/Dumbbell';
-import MuscleMap from '../common/MuscleMap';
+import { aPartesDelCuerpo, ESCALA } from '../common/MuscleMap';
 import { colors, spacing, radius, fonts } from '../../theme';
 import { track } from '../../lib/analytics';
 
@@ -34,6 +35,18 @@ export default function ShareSessionCard({ dayName, durationSeconds, done, total
   const fecha = `${String(hoy.getDate()).padStart(2, '0')}·${String(hoy.getMonth() + 1).padStart(2, '0')}·${hoy.getFullYear()}`;
   const minutos = Math.max(1, Math.round(durationSeconds / 60));
   const tieneMusculos = Object.keys(muscles).length > 0;
+
+  // UN solo cuerpo (MuscleMap dibuja frontal Y posterior — acá no caben los
+  // dos). El lado lo decide dónde cayó el trabajo del día.
+  const GRUPOS_POSTERIORES = new Set([
+    'Espalda alta', 'Espalda baja', 'Hombro posterior', 'Tríceps',
+    'Isquiotibiales', 'Glúteo mayor', 'Glúteo medio', 'Glúteo menor', 'Gastrocnemios',
+  ]);
+  let atras = 0, adelante = 0;
+  Object.entries(muscles).forEach(([g, v]) => {
+    if (GRUPOS_POSTERIORES.has(g)) atras += v; else adelante += v;
+  });
+  const lado: 'front' | 'back' = atras > adelante ? 'back' : 'front';
 
   async function compartir() {
     if (sharing) return;
@@ -75,7 +88,15 @@ export default function ShareSessionCard({ dayName, durationSeconds, done, total
               </View>
               {tieneMusculos && (
                 <View style={styles.mapa}>
-                  <MuscleMap highlights={muscles} height={190} showLabels={false} />
+                  <Body
+                    data={aPartesDelCuerpo(muscles)}
+                    side={lado}
+                    gender="male"
+                    scale={190 / 400}
+                    colors={[...ESCALA]}
+                    border={colors.borderLight}
+                    defaultFill={colors.surface}
+                  />
                 </View>
               )}
             </View>
