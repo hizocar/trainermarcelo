@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/guard';
 import { PLANS, clp, mrrClp } from '@/lib/plans';
+import RegalarPanel from './RegalarPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +94,10 @@ export default async function NegocioPage() {
               que nadie las tomara — demanda que se perdió por falta de oferta.
             </p>
           )}
+        </section>
+
+        <section style={{ marginTop: 28 }}>
+          <RegalarPanel />
         </section>
 
         <section style={{ marginTop: 28 }}>
