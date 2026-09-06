@@ -6,6 +6,7 @@ import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
 import { santiagoCurrentWeek } from '@/lib/weeks';
 import PlanEditor from './PlanEditor';
 import WeekManager from './WeekManager';
+import CreatePlan from './CreatePlan';
 import AssignToClients from './AssignToClients';
 import Logo from '@/components/Logo';
 
@@ -141,9 +142,7 @@ export default async function ClientPlanPage({
         </div>
 
         {!plan ? (
-          <p className="muted" style={{ marginTop: 30 }}>
-            Este cliente aún no tiene un plan. Créalo desde la app y luego edítalo aquí.
-          </p>
+          <CreatePlan clientId={id} clientName={(client as AppUser).name} coachId={userId} />
         ) : (
           <>
             <WeekManager planId={plan.id} weeks={weeks} selectedWeekId={selectedWeek?.id ?? null} clientId={id} />
