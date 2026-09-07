@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
 import type { PlanDay } from '@/lib/types';
 import TemplateEditor from './TemplateEditor';
@@ -8,7 +7,6 @@ import EditableName from './EditableName';
 import EditableDuration from './EditableDuration';
 import EditableTags from './EditableTags';
 import SellProgram from './SellProgram';
-import Logo from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,16 +63,6 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand">
-            <Logo />
-          </Link>
-          <Link href="/programs" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            ← PROGRAMAS
-          </Link>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 40 }}>
         <span className="label accent">Editar programa</span>

@@ -792,6 +792,15 @@ a {
   color: var(--text);
   border-left-color: var(--accent);
 }
+.panel-rail-out { margin-top: auto; padding-bottom: 8px; }
+.panel-rail-out .panel-rail-item {
+  width: 100%;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
 .panel-main { margin-left: 68px; }
 
 @media (max-width: 720px) {
@@ -817,6 +826,8 @@ a {
     border-top: 2px solid transparent;
   }
   .panel-rail-item.activo { border-top-color: var(--accent); }
+  .panel-rail-out { margin-top: 0; padding-bottom: 0; display: flex; flex: 1; }
+  .panel-rail-out .panel-rail-item { border-left: none; border-top: 2px solid transparent; }
   .panel-main { margin-left: 0; padding-bottom: 72px; }
 }
 

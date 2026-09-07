@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
-import Logo from '@/components/Logo';
+import ClientTabs from '../ClientTabs';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
 import {
@@ -176,23 +176,11 @@ export default async function ClientCalendarPage({
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand"><Logo /></Link>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ESTA SEMANA
-            </Link>
-            <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ← PLAN
-            </Link>
-          </div>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60 }}>
         <span className="label accent">Calendario</span>
         <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+        <ClientTabs clientId={id} actual="calendario" />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
           <Link href={`/clients/${id}/calendar?m=${asParam(prevDate)}`} className="btn btn-ghost" style={{ padding: '8px 14px' }}>

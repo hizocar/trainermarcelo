@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
-import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
+import ClientTabs from '../ClientTabs';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
 import { santiagoCurrentWeek, formatShortDate } from '@/lib/weeks';
 import WeekLive, { type DiaSemana, type LogSerie } from './WeekLive';
@@ -100,20 +100,11 @@ export default async function ClientWeekPage({
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand"><Logo /></Link>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>CALENDARIO</Link>
-            <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>POR EJERCICIO</Link>
-            <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>← PLAN</Link>
-          </div>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60, maxWidth: 900 }}>
         <span className="label accent">Progreso semanal</span>
         <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+        <ClientTabs clientId={id} actual="semana" />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
           <Link
@@ -141,6 +132,9 @@ export default async function ClientWeekPage({
         ) : (
           <>
             <WeekLive
+              /* la key remonta el componente al cambiar de semana: sin ella el
+                 estado interno (los logs) queda pegado a la semana anterior */
+              key={`${activeWeek.id}:${week}`}
               clientId={id}
               coachId={userId}
               week={week}

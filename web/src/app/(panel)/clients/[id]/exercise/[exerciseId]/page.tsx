@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
-import Logo from '@/components/Logo';
+import ClientTabs from '../../ClientTabs';
 import TrendChart from '@/components/TrendChart';
 import type { AppUser } from '@/lib/types';
 import { formatShortDate } from '@/lib/weeks';
@@ -86,23 +85,11 @@ export default async function ExerciseHistoryPage({
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand"><Logo /></Link>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              CALENDARIO
-            </Link>
-            <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ← ESTA SEMANA
-            </Link>
-          </div>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60, maxWidth: 860 }}>
         <span className="label accent">Historial · {(client as AppUser).name}</span>
         <h1 className="display" style={{ fontSize: 40 }}>{ref.name}</h1>
+        <ClientTabs clientId={id} />
         <p className="muted" style={{ fontSize: 13, marginTop: 2 }}>
           {[ref.name_en, ref.muscle_group, ref.reps_objective ? `objetivo ${ref.reps_objective} reps` : null]
             .filter(Boolean).join(' · ')}

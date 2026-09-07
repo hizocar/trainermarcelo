@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Dumbbell } from '@/components/Logo';
+import { signOut } from '@/app/actions';
 
 // El riel del panel del coach: navegación persistente de íconos, monocroma.
 // En desktop es una columna fija a la izquierda; en pantallas angostas baja
@@ -55,6 +56,14 @@ export default function PanelRail() {
           );
         })}
       </div>
+      <form action={signOut} className="panel-rail-out">
+        <button type="submit" className="panel-rail-item" title="Cerrar sesión">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M16 13v-2H7V8l-5 4 5 4v-3h9Zm3-10h-8v2h8v14h-8v2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z" />
+          </svg>
+          <span>SALIR</span>
+        </button>
+      </form>
     </nav>
   );
 }
