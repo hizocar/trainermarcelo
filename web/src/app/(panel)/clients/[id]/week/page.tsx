@@ -27,8 +27,19 @@ export default async function ClientWeekPage({
   const currentWeek = santiagoCurrentWeek();
   const week = Math.max(1, parseInt(weekParam ?? '', 10) || currentWeek);
 
-  const { data: plan } = await supabase
-    .from('workout_plans').select('id').eq('client_id', id).maybeSingle();
+  // el cardio no depende del plan: viaja en paralelo con él
+  const monday0 = new Date(Date.now() - (currentWeek - week) * 7 * 86400000);
+  monday0.setDate(monday0.getDate() - ((monday0.getDay() + 6) % 7));
+  monday0.setHours(0, 0, 0, 0);
+  const sunday0 = new Date(monday0.getTime() + 7 * 86400000);
+
+  const [{ data: plan }, { data: cardio }] = await Promise.all([
+    supabase.from('workout_plans').select('id').eq('client_id', id).maybeSingle(),
+    supabase.from('cardio_logs').select('id, type, duration_minutes, logged_at')
+      .eq('user_id', id)
+      .gte('logged_at', monday0.toISOString()).lt('logged_at', sunday0.toISOString())
+      .order('logged_at'),
+  ]);
 
   const { data: weeksData } = plan
     ? await supabase.from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false)
@@ -96,17 +107,6 @@ export default async function ClientWeekPage({
   const logsVivos: LogSerie[] = (logs ?? []).map((l: any) => ({
     series_id: l.series_id, weight: l.weight, reps: l.reps, rir: l.rir, logged_at: l.logged_at,
   }));
-
-  // cardio de esa semana calendario (lun–dom)
-  const monday = new Date(Date.now() - (currentWeek - week) * 7 * 86400000);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday.getTime() + 7 * 86400000);
-  const { data: cardio } = await supabase
-    .from('cardio_logs').select('id, type, duration_minutes, logged_at')
-    .eq('user_id', id)
-    .gte('logged_at', monday.toISOString()).lt('logged_at', sunday.toISOString())
-    .order('logged_at');
 
   const cardioMin = (cardio ?? []).reduce((a, c) => a + c.duration_minutes, 0);
 

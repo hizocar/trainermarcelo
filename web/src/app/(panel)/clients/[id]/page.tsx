@@ -30,56 +30,39 @@ export default async function ClientPlanPage({
 
   if (!client || (client as AppUser).coach_id !== userId) notFound();
 
-  // La ficha inicial (PAR-Q): la respondió el alumno en su app; acá se lee.
-  const { data: ficha } = await supabase
-    .from('client_forms')
-    .select('answers, updated_at')
-    .eq('client_id', id).eq('kind', 'parq')
-    .maybeSingle();
-
-  const { data: otherClients } = await supabase
-    .from('users')
-    .select('id, name, email')
-    .eq('role', 'client')
-    .eq('coach_id', userId)
-    .neq('id', id)
-    .order('name');
-
-  const { data: plan } = await supabase.from('workout_plans').select('id, ends_at').eq('client_id', id).maybeSingle();
-
-  // ficha privada del coach (notas + próxima revisión) — v33
-  const { data: ficha33 } = await supabase
-    .from('client_files')
-    .select('notes, next_review_at')
-    .eq('client_id', id)
-    .maybeSingle();
-
-  // resumen de tracking de los últimos 28 días (consultas de tamaño fijo)
+  // Todo lo que no depende de nada más, EN PARALELO: eran seis idas y
+  // vueltas en serie a Supabase y el clic se sentía muerto mientras tanto.
   const desde = new Date(Date.now() - 28 * 86400000);
-  const { data: sesiones } = await supabase
-    .from('workout_sessions')
-    .select('duration_seconds')
-    .eq('user_id', id)
-    .not('ended_at', 'is', null)
-    .gte('started_at', desde.toISOString());
+  const [
+    { data: ficha },
+    { data: otherClients },
+    { data: plan },
+    { data: ficha33 },
+    { data: sesiones },
+    { data: animos },
+  ] = await Promise.all([
+    // La ficha inicial (PAR-Q): la respondió el alumno en su app; acá se lee.
+    supabase.from('client_forms').select('answers, updated_at').eq('client_id', id).eq('kind', 'parq').maybeSingle(),
+    supabase.from('users').select('id, name, email').eq('role', 'client').eq('coach_id', userId).neq('id', id).order('name'),
+    supabase.from('workout_plans').select('id, ends_at').eq('client_id', id).maybeSingle(),
+    // ficha privada del coach (notas + próxima revisión) — v33
+    supabase.from('client_files').select('notes, next_review_at').eq('client_id', id).maybeSingle(),
+    // resumen de tracking de los últimos 28 días (consultas de tamaño fijo)
+    supabase.from('workout_sessions').select('duration_seconds').eq('user_id', id).not('ended_at', 'is', null).gte('started_at', desde.toISOString()),
+    supabase.from('mood_logs').select('mood').eq('user_id', id).gte('logged_date', santiagoDayKey(desde)),
+  ]);
 
-  const { data: animos } = await supabase
-    .from('mood_logs')
-    .select('mood')
-    .eq('user_id', id)
-    .gte('logged_date', santiagoDayKey(desde));
-
-  const { data: logs28 } = plan
-    ? await supabase
-        .from('workout_logs')
-        .select('rir, logged_at, exercise_series!inner ( exercises!inner ( training_days!inner ( plan_id ) ) )')
-        .eq('exercise_series.exercises.training_days.plan_id', plan.id)
-        .gte('logged_at', desde.toISOString())
-    : { data: null };
-
-  const { data: weeksData } = plan
-    ? await supabase.from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false).order('week_number')
-    : { data: null };
+  // segunda tanda: lo que necesita el plan
+  const [{ data: logs28 }, { data: weeksData }] = plan
+    ? await Promise.all([
+        supabase
+          .from('workout_logs')
+          .select('rir, logged_at, exercise_series!inner ( exercises!inner ( training_days!inner ( plan_id ) ) )')
+          .eq('exercise_series.exercises.training_days.plan_id', plan.id)
+          .gte('logged_at', desde.toISOString()),
+        supabase.from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false).order('week_number'),
+      ])
+    : [{ data: null }, { data: null }];
   const weeks = (weeksData ?? []) as PlanWeek[];
 
   // semana a editar: la que el coach eligió en el selector, o si no eligió
