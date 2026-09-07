@@ -821,6 +821,30 @@ a {
 .board-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 .board-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* esqueleto de carga: brillo que recorre, marca que pulsa */
+.skel-brand {
+  color: var(--text-muted);
+  animation: skel-pulso 1.2s ease-in-out infinite;
+  width: fit-content;
+}
+.skel-line {
+  border-radius: 8px;
+  background: linear-gradient(100deg, var(--card) 40%, var(--surface, #14161a) 50%, var(--card) 60%);
+  background-size: 200% 100%;
+  animation: skel-brillo 1.4s linear infinite;
+}
+@keyframes skel-pulso {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+@keyframes skel-brillo {
+  from { background-position: 120% 0; }
+  to { background-position: -80% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-brand, .skel-line { animation: none; }
+}
+
 /* avatar de cabecera: foto real cuando la hay (contenido, no UI — va a color) */
 .head-avatar {
   width: 52px;
