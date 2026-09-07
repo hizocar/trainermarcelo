@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { signOut } from '../actions';
+import { signOut } from '@/app/actions';
 import Logo from '@/components/Logo';
 import { loadCoachDashboard, type CoachDashboardRow } from '@/lib/coachDashboard';
 import { santiagoDayKey } from '@/lib/weeks';
