@@ -9,6 +9,7 @@ import WeekManager from './WeekManager';
 import CreatePlan from './CreatePlan';
 import ClientFile from './ClientFile';
 import ClientTabs from './ClientTabs';
+import PlanEndDate from './PlanEndDate';
 import AssignToClients from './AssignToClients';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,7 @@ export default async function ClientPlanPage({
     .neq('id', id)
     .order('name');
 
-  const { data: plan } = await supabase.from('workout_plans').select('id').eq('client_id', id).maybeSingle();
+  const { data: plan } = await supabase.from('workout_plans').select('id, ends_at').eq('client_id', id).maybeSingle();
 
   // ficha privada del coach (notas + próxima revisión) — v33
   const { data: ficha33 } = await supabase
@@ -183,6 +184,8 @@ export default async function ClientPlanPage({
             initialNotes={ficha33?.notes ?? ''}
             initialReview={ficha33?.next_review_at ?? null}
           />
+
+          {plan && <PlanEndDate planId={plan.id} initialEndsAt={(plan as any).ends_at ?? null} />}
 
           <div>
             <span className="label muted" style={{ letterSpacing: 2 }}>Qué va a hacer</span>

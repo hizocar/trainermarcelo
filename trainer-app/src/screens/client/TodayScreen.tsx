@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { TrainingDay } from '../../types';
-import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, PlanDay, PlanExercise } from '../../lib/plan';
+import { fetchFullPlan, fetchLogs, activeDays, groupBySuperseries, planVencido, PlanDay, PlanExercise } from '../../lib/plan';
 import { colors, spacing, radius, typography, fonts } from '../../theme';
 import Card from '../../components/common/Card';
 import SyncBanner from '../../components/common/SyncBanner';
@@ -180,6 +180,8 @@ export default function TodayScreen() {
   // planificó esta semana calendario (ni hay una anterior marcada "repetir")
   const [noPlanForWeek, setNoPlanForWeek] = useState(false);
   const [noPlanAtAll, setNoPlanAtAll] = useState(false);
+  /** fecha límite ya pasada (YYYY-MM-DD) — el plan terminó */
+  const [finDelPlan, setFinDelPlan] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>([]);
   const [showCardioModal, setShowCardioModal] = useState(false);
@@ -236,6 +238,18 @@ export default function TodayScreen() {
     const plan = await fetchFullPlan(user.id, week);
     if (!plan) { setLoading(false); loadedWeekRef.current = null; setDays([]); setNoPlanAtAll(true); setNoPlanForWeek(true); return; }
     setNoPlanAtAll(false);
+
+    // fecha límite del coach (v36): vencido el plan, se acaba — nada de
+    // repetir la última semana eternamente
+    if (planVencido(plan.ends_at)) {
+      setFinDelPlan(plan.ends_at);
+      setLoading(false);
+      loadedWeekRef.current = null;
+      setDays([]);
+      setNoPlanForWeek(false);
+      return;
+    }
+    setFinDelPlan(null);
 
     setPhase(plan.activeWeek?.is_deload ? 'descarga' : null);
     setNoPlanForWeek(!plan.activeWeek);
@@ -507,13 +521,17 @@ export default function TodayScreen() {
         <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
       ) : days.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>{noPlanAtAll ? 'SIN PLAN' : `SIN PLAN · SEMANA ${selectedWeek}`}</Text>
+          <Text style={styles.emptyTitle}>
+            {finDelPlan ? 'PLAN FINALIZADO' : noPlanAtAll ? 'SIN PLAN' : `SIN PLAN · SEMANA ${selectedWeek}`}
+          </Text>
           <Text style={styles.emptyText}>
-            {noPlanAtAll
-              ? (user?.coach_id
-                  ? 'Tu coach aún no ha configurado tu plan de entrenamiento.'
-                  : 'Todavía no armas tu rutina. Elige tus días, colócales ejercicios y empieza a entrenar.')
-              : 'Tu coach todavía no planificó esta semana. Prueba mirando otra semana con las flechas de arriba.'}
+            {finDelPlan
+              ? `Tu plan llegó a su fecha límite el ${finDelPlan.slice(8, 10)}-${finDelPlan.slice(5, 7)}-${finDelPlan.slice(0, 4)}. Escríbele a tu coach para armar lo que viene.`
+              : noPlanAtAll
+                ? (user?.coach_id
+                    ? 'Tu coach aún no ha configurado tu plan de entrenamiento.'
+                    : 'Todavía no armas tu rutina. Elige tus días, colócales ejercicios y empieza a entrenar.')
+                : 'Tu coach todavía no planificó esta semana. Prueba mirando otra semana con las flechas de arriba.'}
           </Text>
           {noPlanAtAll && !user?.coach_id && (
             <TouchableOpacity style={styles.armarRutina}

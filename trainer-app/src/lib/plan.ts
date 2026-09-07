@@ -59,6 +59,8 @@ export interface PlanDay extends TrainingDay {
 
 export interface FullPlan {
   id: string;
+  /** fecha límite puesta por el coach (YYYY-MM-DD); null = sin límite */
+  ends_at: string | null;
   weeks: PlanWeek[];
   /** semana resuelta para el calendarWeek pedido, o null si el coach aún no la planificó */
   activeWeek: PlanWeek | null;
@@ -80,7 +82,7 @@ export interface FullPlan {
  */
 export async function fetchFullPlan(clientId: string, calendarWeek: number = getCurrentWeek()): Promise<FullPlan | null> {
   const { data: planRow, error: planErr } = await supabase
-    .from('workout_plans').select('id')
+    .from('workout_plans').select('id, ends_at')
     .eq('client_id', clientId).maybeSingle();
   if (planErr || !planRow) return null;
 
@@ -145,8 +147,13 @@ export async function fetchFullPlan(clientId: string, calendarWeek: number = get
     });
   });
 
-  return { id: planRow.id, weeks, activeWeek, days, seriesToExercise, seriesToDay, seriesIds };
+  return {
+    id: planRow.id, ends_at: (planRow as any).ends_at ?? null,
+    weeks, activeWeek, days, seriesToExercise, seriesToDay, seriesIds,
+  };
 }
+
+export { planVencido } from './planVencido';
 
 /** Logs del plan (todos o de una semana concreta) en una sola consulta. */
 export async function fetchLogs(seriesIds: string[], week?: number) {
