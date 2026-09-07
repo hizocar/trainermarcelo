@@ -22,8 +22,14 @@ export interface DiaSemana {
   day_number: number;
   name: string;
   week_day: number | null;
-  exercises: { id: string; name: string; unit: string; series: { id: string; num: number }[] }[];
+  exercises: {
+    id: string; name: string; unit: string; ref_weight: number | null;
+    series: { id: string; num: number }[];
+  }[];
 }
+
+/** Último registro anterior a esta semana, por serie — para precargar. */
+export type LogPrevio = { weight: number; reps: number; week: number };
 
 export interface LogSerie {
   series_id: string;
@@ -46,10 +52,12 @@ const inputStyle: React.CSSProperties = {
 // escribe y se intenta guardar recién al salir del campo. La key del padre la
 // remonta cuando el registro cambia desde afuera (el alumno, otro refresco).
 function SerieFila({
-  serie, log, week, coachId, alGuardar, alEnfocar, alDesenfocar,
+  serie, log, previo, refWeight, week, coachId, alGuardar, alEnfocar, alDesenfocar,
 }: {
   serie: { id: string; num: number };
   log: LogSerie | undefined;
+  previo: LogPrevio | undefined;
+  refWeight: number | null;
   week: number;
   coachId: string;
   alGuardar: (l: LogSerie) => void;
@@ -57,7 +65,12 @@ function SerieFila({
   alDesenfocar: () => void;
 }) {
   const supabase = createClient();
-  const [peso, setPeso] = useState(log ? String(log.weight) : '');
+  // sin registro aún: el peso llega precargado con el de la última vez (o el
+  // de referencia del plan), igual que la app; no se guarda nada hasta que
+  // haya también repeticiones.
+  const [peso, setPeso] = useState(
+    log ? String(log.weight) : ((previo?.weight ?? refWeight)?.toString() ?? ''),
+  );
   const [reps, setReps] = useState(log ? String(log.reps) : '');
   const [rir, setRir] = useState(log?.rir != null ? String(log.rir) : '');
   const [estado, setEstado] = useState<'vacia' | 'guardando' | 'ok' | 'error'>(log ? 'ok' : 'vacia');
@@ -110,7 +123,9 @@ function SerieFila({
           onFocus={alEnfocar} onBlur={blur} inputMode="decimal" placeholder="—"
           aria-label={`Peso serie ${serie.num}`} />
         <input style={inputStyle} value={reps} onChange={e => setReps(e.target.value)}
-          onFocus={alEnfocar} onBlur={blur} inputMode="numeric" placeholder="—"
+          onFocus={alEnfocar} onBlur={blur} inputMode="numeric"
+          placeholder={previo ? String(previo.reps) : '—'}
+          title={previo ? `Semana ${previo.week}: ${previo.weight} × ${previo.reps}` : undefined}
           aria-label={`Repeticiones serie ${serie.num}`} />
         <input style={inputStyle} value={rir} onChange={e => setRir(e.target.value)}
           onFocus={alEnfocar} onBlur={blur} inputMode="numeric" placeholder="—"
@@ -132,7 +147,7 @@ function SerieFila({
 }
 
 export default function WeekLive({
-  clientId, coachId, week, planWeekId, days, initialLogs, cardioMin, live,
+  clientId, coachId, week, planWeekId, days, initialLogs, previos, cardioMin, live,
 }: {
   clientId: string;
   coachId: string;
@@ -140,6 +155,7 @@ export default function WeekLive({
   planWeekId: string;
   days: DiaSemana[];
   initialLogs: LogSerie[];
+  previos: Record<string, LogPrevio>;
   cardioMin: number;
   live: boolean;
 }) {
@@ -278,6 +294,8 @@ export default function WeekLive({
                       key={`${s.id}:${epoca}`}
                       serie={s}
                       log={log}
+                      previo={previos[s.id]}
+                      refWeight={ex.ref_weight}
                       week={week}
                       coachId={coachId}
                       alGuardar={registrar}
