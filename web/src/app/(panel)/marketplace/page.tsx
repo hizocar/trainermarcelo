@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Logo from '@/components/Logo';
 import { requireCoach } from '@/lib/guard';
 import { FREE_MONTH_STATUS } from '@/lib/marketplace';
-import { signOut } from '../actions';
+import { signOut } from '@/app/actions';
 import RequestList, { type OpenRequest } from './RequestList';
 import MyApplications, { type MyApplication } from './MyApplications';
 

@@ -741,6 +741,85 @@ a {
   margin-top: 16px;
 }
 
+/* ── El riel del panel ───────────────────────────────── */
+/* Columna fija de íconos a la izquierda (grupo de rutas (panel)); en
+   pantallas angostas baja a barra inferior, como la tab bar de la app.
+   El activo se marca con brillo y un filo claro, no con color. */
+.panel-rail {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 68px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--bg, #00030d);
+  border-right: 1px solid var(--border);
+}
+.panel-rail-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 0 14px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.panel-rail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  overflow-y: auto;
+}
+.panel-rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 11px 0 9px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s;
+}
+.panel-rail-item span {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.panel-rail-item:hover { color: var(--text-secondary); }
+.panel-rail-item.activo {
+  color: var(--text);
+  border-left-color: var(--accent);
+}
+.panel-main { margin-left: 68px; }
+
+@media (max-width: 720px) {
+  .panel-rail {
+    top: auto; right: 0; bottom: 0; left: 0;
+    width: auto; height: 60px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+  .panel-rail-brand { display: none; }
+  .panel-rail-items {
+    flex-direction: row;
+    flex: 1;
+    justify-content: space-around;
+    padding: 0;
+    overflow-y: visible;
+  }
+  .panel-rail-item {
+    flex: 1;
+    padding: 8px 0 6px;
+    border-left: none;
+    border-top: 2px solid transparent;
+  }
+  .panel-rail-item.activo { border-top-color: var(--accent); }
+  .panel-main { margin-left: 0; padding-bottom: 72px; }
+}
+
 /* ── Panel (dashboard + editor) ──────────────────────── */
 .app-header {
   border-bottom: 1px solid var(--border);
