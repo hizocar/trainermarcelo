@@ -150,7 +150,7 @@ a {
 .brand-dot {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--accent);
   box-shadow: 0 0 16px var(--accent);
   flex-shrink: 0;
@@ -720,7 +720,7 @@ a {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: 12px;
   padding: 13px 14px;
   color: var(--text);
   font-size: 15px;
@@ -820,6 +820,40 @@ a {
 .board-scroll::-webkit-scrollbar-track { background: transparent; }
 .board-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 .board-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Movimiento del panel: poco, rápido y con propósito ─────────
+   Tres momentos y nada más: el contenido entra con un respiro tras el
+   esqueleto (evita el cambio de golpe), los modales nacen desde su tamaño
+   (97% → 100%, nunca desde cero), y las tarjetas del tablero se presentan
+   en cascada breve al abrir un programa. Todo transform+opacity, todo bajo
+   250ms, y con prefers-reduced-motion prácticamente apagado. */
+@keyframes panel-sube {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.page-enter { animation: panel-sube 220ms ease-out both; }
+
+@keyframes panel-fade {
+  from { opacity: 0; }
+}
+.modal-overlay { animation: panel-fade 160ms ease-out both; }
+
+@keyframes modal-nace {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+}
+.modal-card { animation: modal-nace 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+
+.board-card { animation: panel-sube 240ms ease-out both; }
+.board-col-edit .board-card:nth-child(3) { animation-delay: 40ms; }
+.board-col-edit .board-card:nth-child(4) { animation-delay: 80ms; }
+.board-col-edit .board-card:nth-child(5) { animation-delay: 120ms; }
+.board-col-edit .board-card:nth-child(6) { animation-delay: 160ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .modal-overlay, .modal-card, .board-card {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
 
 /* esqueleto de carga: brillo que recorre, marca que pulsa */
 .skel-brand {
@@ -972,7 +1006,7 @@ a {
 .day-badge {
   width: 42px;
   height: 42px;
-  border-radius: 11px;
+  border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--accent);
   color: var(--accent);
@@ -1039,7 +1073,7 @@ a {
   gap: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 8px 8px 8px 12px;
 }
 .board-ex-name {
@@ -1166,7 +1200,7 @@ a {
 .board-day-week {
   background: rgba(0, 3, 13, 0.12);
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   color: var(--bg, #00030d);
   font-size: 12px;
   font-weight: 700;
@@ -1226,7 +1260,7 @@ a {
   letter-spacing: 1px;
   color: var(--text-muted);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 1px 6px;
 }
 
@@ -1271,7 +1305,7 @@ a {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 9px 10px;
   color: var(--text);
   font-size: 14px;
@@ -1295,7 +1329,7 @@ a {
 .icon-btn {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   width: 34px;
   height: 34px;
   color: var(--text-muted);
@@ -1526,7 +1560,7 @@ a {
 /* ── Capturas de la app ──────────────────────────────── */
 .phone-frame {
   border: 1px solid var(--border-light);
-  border-radius: 22px;
+  border-radius: 20px;
   padding: 5px;
   background: var(--surface);
   width: fit-content;
@@ -1535,7 +1569,7 @@ a {
   display: block;
   width: 300px;
   height: auto;
-  border-radius: 17px;
+  border-radius: 18px;
 }
 @media (max-width: 720px) {
   .phone-shot { width: 60vw; max-width: 300px; }
@@ -1554,7 +1588,7 @@ a {
   width: 560px;
   max-width: 100%;
   height: auto;
-  border-radius: 9px;
+  border-radius: 10px;
 }
 @media (max-width: 720px) {
   .wide-shot { width: 92vw; }
