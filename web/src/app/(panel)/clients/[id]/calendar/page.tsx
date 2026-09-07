@@ -215,7 +215,7 @@ export default async function ClientCalendarPage({
         ) : (
           <div style={{ overflowX: 'auto', marginTop: 20 }}>
             <div style={{ minWidth: 720 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 6 }}>
                 {CABECERA.map((c) => (
                   <div key={c} className="label muted" style={{ fontSize: 9, letterSpacing: 1, textAlign: 'center' }}>
                     {c}
@@ -224,7 +224,7 @@ export default async function ClientCalendarPage({
               </div>
 
               {grid.map((row, ri) => (
-                <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
+                <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 6 }}>
                   {row.map((date) => {
                     const key = cellKey(date);
                     const weekNum = weekNumByCell.get(key) ?? null;
@@ -257,21 +257,25 @@ export default async function ClientCalendarPage({
                       <div
                         key={key}
                         style={{
-                          minHeight: 96,
-                          borderRadius: 8,
+                          minHeight: 102,
+                          borderRadius: 10,
                           border: `1px solid ${hoyCelda ? 'var(--accent)' : 'var(--border)'}`,
-                          background: esDelMes(date) ? 'var(--surface)' : 'transparent',
-                          opacity: esDelMes(date) ? 1 : 0.4,
-                          padding: 6,
+                          boxShadow: hoyCelda ? '0 0 0 1px var(--accent), 0 0 24px rgba(216,217,215,0.10)' : undefined,
+                          background: hoyCelda
+                            ? 'var(--accent-soft)'
+                            : esDelMes(date) ? 'var(--surface)' : 'transparent',
+                          opacity: esDelMes(date) ? 1 : 0.35,
+                          padding: 8,
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: 4,
+                          gap: 5,
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <span style={{
                             fontSize: 12,
-                            fontWeight: hoyCelda ? 900 : 600,
+                            fontFamily: 'var(--font-mono), monospace',
+                            fontWeight: hoyCelda ? 800 : 500,
                             color: hoyCelda ? 'var(--accent)' : 'var(--text-secondary)',
                           }}>
                             {date.getDate()}
