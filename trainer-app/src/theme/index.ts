@@ -1,32 +1,24 @@
-import { Platform } from 'react-native';
+import { Platform, Settings } from 'react-native';
+import { PALETAS, esNombreTema, type NombreTema } from './paletas';
 
-// Monocromo puro: 5 grises, sin matiz de color. La jerarquía se construye por
-// brillo, no por tono — "success" es más claro (vitalidad/progreso), "danger"
-// más oscuro (se apaga), en vez de verde/rojo.
-export const colors = {
-  background: '#00030D',
-  backgroundElevated: '#080B14',
-  surface: '#10131C',
-  card: '#12151E',
-  cardElevated: '#1B1E27',
-  accent: '#D8D9D7',
-  accentDark: '#BFBFBF',
-  accentSoft: 'rgba(216, 217, 215, 0.08)',
-  accentGlow: 'rgba(216, 217, 215, 0.16)',
-  textPrimary: '#D8D9D7',
-  textSecondary: '#949DA6',
-  textMuted: '#626B73',
-  border: '#232732',
-  borderLight: '#333844',
-  danger: '#626B73',
-  // Única excepción al monocromo: se reserva EXCLUSIVAMENTE para "esto
-  // requiere que hagas algo". Por ser el único color de la app, no se puede
-  // ignorar; si se empieza a usar para decorar, pierde todo su valor.
-  warning: '#C9A227',
-  success: '#D8D9D7',
-  info: '#949DA6',
-  overlay: 'rgba(0, 3, 13, 0.78)',
-} as const;
+// El tema se decide UNA sola vez, al evaluarse este módulo — antes que
+// cualquier pantalla, porque todas importan de acá y sus StyleSheet capturan
+// estos valores al cargar. Por eso cambiar de apariencia pide reabrir la app
+// (ver lib/tema.ts). Settings (NSUserDefaults) se lee síncrono en iOS; en
+// jest o si falla, Carbón — el monocromo deliberado de siempre.
+function temaGuardado(): NombreTema {
+  try {
+    if (Platform.OS === 'ios') {
+      const t = Settings.get('tema');
+      if (esNombreTema(t)) return t;
+    }
+  } catch { /* sin Settings disponible: Carbón */ }
+  return 'carbon';
+}
+
+// Las cuatro paletas (y la explicación del monocromo y del ámbar de
+// "requiere acción") viven en ./paletas.ts.
+export const colors = PALETAS[temaGuardado()];
 
 // Anton: display condensada estilo cartel deportivo (una sola weight, usar en mayúsculas)
 // JetBrains Mono: solo para datos medidos (pesos, reps, fechas, %) — cifras tabulares,

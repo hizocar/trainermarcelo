@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Dumbbell } from '@/components/Logo';
 import { signOut } from '@/app/actions';
+import { createClient } from '@/lib/supabase-browser';
 
 // Temas del panel: Carbón (el de siempre) + los tres que nacieron de las
 // paletas del equipo. El atributo vive en <html> mientras se navega el
@@ -57,8 +58,24 @@ export default function PanelRail() {
     } catch { /* almacenamiento bloqueado: se queda Carbón */ }
     setTema(guardado);
     aplicarTema(guardado);
+
+    // la elección de la CUENTA manda sobre la del navegador (v37): así el
+    // tema te sigue entre dispositivos, y desde la app también
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: fila } = await supabase.from('users').select('theme').eq('id', data.user.id).maybeSingle();
+      const t = fila?.theme;
+      if (t && (TEMAS as readonly string[]).includes(t)) {
+        setTema(t as Tema);
+        aplicarTema(t as Tema);
+        try { localStorage.setItem('panel-tema', t); } catch { /* sin persistencia local */ }
+      }
+    });
+
     // al salir del panel, la web pública vuelve a la marca
     return () => document.documentElement.removeAttribute('data-tema');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function cambiarTema() {
@@ -66,6 +83,13 @@ export default function PanelRail() {
     setTema(siguiente);
     aplicarTema(siguiente);
     try { localStorage.setItem('panel-tema', siguiente); } catch { /* sin persistencia */ }
+    // y a la cuenta, para que siga al coach a la app y a otros equipos
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { error } = await supabase.from('users').update({ theme: siguiente }).eq('id', data.user.id);
+      if (error) console.error('[tema] no se pudo guardar en la cuenta:', error.message);
+    });
   }
 
   return (

@@ -3,6 +3,7 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 import { registerPushToken, unregisterPushToken } from '../lib/notifications';
+import { sincronizarTemaLocal } from '../lib/tema';
 
 interface AuthContextType {
   session: Session | null;
@@ -65,6 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         gymStatus = gym?.subscription_status;
       }
       setUser({ ...data, gymStatus });
+      // si la cuenta trae un tema elegido en otro dispositivo o en la web,
+      // se copia al Settings local (se ve en la próxima apertura)
+      sincronizarTemaLocal(data.theme);
       // registra este dispositivo para recibir push de mensajes (silencioso si falla)
       registerPushToken(userId).catch(() => {});
     }
