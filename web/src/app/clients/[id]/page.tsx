@@ -7,6 +7,7 @@ import { santiagoCurrentWeek } from '@/lib/weeks';
 import PlanEditor from './PlanEditor';
 import WeekManager from './WeekManager';
 import CreatePlan from './CreatePlan';
+import ClientFile from './ClientFile';
 import AssignToClients from './AssignToClients';
 import Logo from '@/components/Logo';
 
@@ -44,6 +45,13 @@ export default async function ClientPlanPage({
     .order('name');
 
   const { data: plan } = await supabase.from('workout_plans').select('id').eq('client_id', id).maybeSingle();
+
+  // ficha privada del coach (notas + próxima revisión) — v33
+  const { data: ficha33 } = await supabase
+    .from('client_files')
+    .select('notes, next_review_at')
+    .eq('client_id', id)
+    .maybeSingle();
 
   const { data: weeksData } = plan
     ? await supabase.from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false).order('week_number')
@@ -132,6 +140,13 @@ export default async function ClientPlanPage({
               </Link>
             </div>
           </div>
+
+          <ClientFile
+            clientId={id}
+            coachId={userId}
+            initialNotes={ficha33?.notes ?? ''}
+            initialReview={ficha33?.next_review_at ?? null}
+          />
 
           <div>
             <span className="label muted" style={{ letterSpacing: 2 }}>Qué va a hacer</span>
