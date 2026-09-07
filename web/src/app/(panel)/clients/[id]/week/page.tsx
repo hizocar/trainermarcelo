@@ -40,7 +40,7 @@ export default async function ClientWeekPage({
         .from('training_days')
         .select(`
           id, day_number, name, week_day, archived,
-          exercises ( id, name, unit, order_index, archived,
+          exercises ( id, name, unit, ref_weight, order_index, archived,
             exercise_series ( id, series_number ) )
         `)
         .eq('plan_week_id', activeWeek.id)
@@ -56,14 +56,25 @@ export default async function ClientWeekPage({
     }))
     .sort((a: any, b: any) => a.day_number - b.day_number);
 
-  // logs de esa semana
+  // logs de esta semana Y el último anterior por serie (para precargar el
+  // peso, como hace WorkoutLogScreen en la app): una sola consulta ordenada
+  // de más reciente a más antigua — el primero que aparezca < week gana.
   const seriesIds = days.flatMap((d: any) =>
     d.exercises.flatMap((e: any) => (e.exercise_series ?? []).map((s: any) => s.id)));
-  const { data: logs } = seriesIds.length
+  const { data: todosLogs } = seriesIds.length
     ? await supabase.from('workout_logs')
-        .select('series_id, weight, reps, rir, logged_at')
-        .in('series_id', seriesIds).eq('week_number', week)
+        .select('series_id, week_number, weight, reps, rir, logged_at')
+        .in('series_id', seriesIds).lte('week_number', week)
+        .order('week_number', { ascending: false })
     : { data: null };
+
+  const logs = (todosLogs ?? []).filter((l: any) => l.week_number === week);
+  const previos: Record<string, { weight: number; reps: number; week: number }> = {};
+  (todosLogs ?? []).forEach((l: any) => {
+    if (l.week_number < week && !previos[l.series_id]) {
+      previos[l.series_id] = { weight: l.weight, reps: l.reps, week: l.week_number };
+    }
+  });
 
   // datos serializables para el componente vivo (edición + refresco en línea)
   const diasVivos: DiaSemana[] = days.map((d: any) => ({
@@ -75,6 +86,7 @@ export default async function ClientWeekPage({
       id: e.id,
       name: e.name,
       unit: e.unit,
+      ref_weight: e.ref_weight ?? null,
       series: (e.exercise_series ?? [])
         .slice()
         .sort((a: any, b: any) => a.series_number - b.series_number)
@@ -141,6 +153,7 @@ export default async function ClientWeekPage({
               planWeekId={activeWeek.id}
               days={diasVivos}
               initialLogs={logsVivos}
+              previos={previos}
               cardioMin={cardioMin}
               live={week === currentWeek}
             />
