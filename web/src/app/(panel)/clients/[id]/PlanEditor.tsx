@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import ExerciseVideoCell from '@/components/ExerciseVideoCell';
+import MiniBody from '@/components/MiniBody';
 import type { PlanDay } from '@/lib/types';
 
 const WEEKDAYS = ['—', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -99,6 +100,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
   // formulario "agregar a biblioteca": { di, ei } de la fila que lo abrió
   const [libForm, setLibForm] = useState<{ di: number; ei: number; name: string; nameEn: string; muscle: string; equipment: string } | null>(null);
   const [libSaving, setLibSaving] = useState(false);
+  const [editCard, setEditCard] = useState<{ di: number; ei: number } | null>(null);
 
   // arrastre de filas: fila tomada y fila sobre la que se soltaría
   const [drag, setDrag] = useState<{ di: number; ei: number } | null>(null);
@@ -154,6 +156,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
       });
       return d;
     });
+    setEditCard({ di, ei: days[di].exercises.length });
   }
   function removeExercise(di: number, ei: number) {
     const ex = days[di].exercises[ei];
@@ -161,6 +164,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
         !window.confirm(`¿Quitar "${ex.name}" del plan? El historial del cliente se conserva.`)) return;
     if (!isTmp(ex.id)) setArchEx((x) => [...x, ex.id]);
     mutate((d) => { d[di].exercises.splice(ei, 1); return d; });
+    setEditCard(null);
   }
 
   // reordena un ejercicio dentro de su día — usado por la pizarra semanal
@@ -408,37 +412,34 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
 
   return (
     <div style={{ marginTop: 12 }}>
-      {/* El tablero ES el editor: días como columnas, tarjetas editables.
-          Mismos handlers de siempre (arrastre, teclado, guardado por lotes) —
-          solo cambió la geometría: de tablas apiladas a columnas lado a lado. */}
+      {/* El tablero v2: tarjetas compactas con el músculo encendido; el
+          detalle se edita en un modal. Mismos handlers de siempre. */}
       <div className="board-scroll board-edit">
         {days.map((day, di) => (
           <div key={day.id} className="board-col-edit">
-            <div className="board-day-head">
-              <div className="day-badge">D{di + 1}</div>
+            <div className="board-day-banner">
+              <span className="board-day-num">DÍA {di + 1}</span>
               <input
-                className="ex-input"
-                style={{ flex: 1, minWidth: 0, fontWeight: 700 }}
+                className="board-day-name"
                 value={day.name}
                 onChange={(e) => updateDay(di, { name: e.target.value })}
                 placeholder="Nombre del día"
               />
               <select
-                className="ex-input"
-                style={{ width: 74, flexShrink: 0 }}
+                className="board-day-week"
                 value={WEEKDAY_VALUE.findIndex((v) => v === day.week_day)}
                 onChange={(e) => updateDay(di, { week_day: WEEKDAY_VALUE[Number(e.target.value)] })}
               >
                 {WEEKDAYS.map((w, i) => <option key={i} value={i}>{w}</option>)}
               </select>
-              <button className="icon-btn" title="Quitar día" onClick={() => removeDay(di)}>✕</button>
+              <button className="board-day-x" title="Quitar día" onClick={() => removeDay(di)}>✕</button>
             </div>
 
             {day.exercises.map((ex, ei) => (
               <div
                 key={ex.id}
                 className={[
-                  'board-card',
+                  'board-card', 'board-card-v2',
                   drag?.di === di && drag.ei === ei ? 'row-dragging' : '',
                   dropTarget?.di === di && dropTarget.ei === ei && drag && drag.ei !== ei
                     ? (drag.ei > ei ? 'row-drop-above' : 'row-drop-below')
@@ -448,99 +449,52 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                 onDragOver={(e) => onRowDragOver(di, ei, e)}
                 onDragLeave={(e) => onRowDragLeave(di, ei, e)}
                 onDrop={(e) => onRowDrop(di, ei, e)}
+                onClick={() => setEditCard({ di, ei })}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') setEditCard({ di, ei }); }}
               >
-                <div className="board-card-top">
-                  <button
-                    type="button"
-                    className="drag-handle"
-                    draggable
-                    ref={(el) => { handleRefs.current[ex.id] = el; }}
-                    onDragStart={(e) => onHandleDragStart(di, ei, e)}
-                    onDragEnd={endDrag}
-                    onKeyDown={(e) => onHandleKeyDown(di, ei, e)}
-                    title="Arrastra para reordenar, o usa las flechas ↑ ↓ del teclado"
-                    aria-label={`Reordenar ${ex.name || 'ejercicio'} (${ei + 1} de ${day.exercises.length}): arrástralo, o muévelo con las flechas del teclado`}
-                  >
-                    ⠿
-                  </button>
-                  {ex.library_id || !isTmp(ex.id) ? (
-                    <span className="board-card-name" title="El nombre identifica el historial. Para cambiar el ejercicio, quítalo y agrega otro.">
-                      {ex.name}
-                    </span>
-                  ) : (
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <LibrarySearch
-                        onPick={(item) => pickFromLibrary(di, ei, item)}
-                        onCreate={(query) => setLibForm({ di, ei, name: query, nameEn: '', muscle: '', equipment: '' })}
-                      />
-                    </div>
-                  )}
-                  <button className="icon-btn" title="Quitar (conserva historial)" onClick={() => removeExercise(di, ei)}>✕</button>
-                </div>
-
-                <input
-                  className="ex-input"
-                  style={{ width: '100%', boxSizing: 'border-box', marginTop: 8 }}
-                  value={ex.muscle_group}
-                  onChange={(e) => updateEx(di, ei, { muscle_group: e.target.value })}
-                  placeholder="Grupo muscular"
-                />
-
-                <div className="board-card-grid">
-                  <div className="bfield">
-                    <span>Series</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <button className="icon-btn" style={{ width: 24, height: 24 }} onClick={() => changeSeries(di, ei, -1)}>−</button>
-                      <strong className="ex-mono" style={{ minWidth: 14, textAlign: 'center' }}>{ex.series.length}</strong>
-                      <button className="icon-btn" style={{ width: 24, height: 24 }} onClick={() => changeSeries(di, ei, 1)}>+</button>
-                    </div>
+                <button
+                  type="button"
+                  className="drag-handle"
+                  draggable
+                  ref={(el) => { handleRefs.current[ex.id] = el; }}
+                  onClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => onHandleDragStart(di, ei, e)}
+                  onDragEnd={endDrag}
+                  onKeyDown={(e) => { e.stopPropagation(); onHandleKeyDown(di, ei, e); }}
+                  title="Arrastra para reordenar, o usa las flechas ↑ ↓ del teclado"
+                  aria-label={`Reordenar ${ex.name || 'ejercicio'} (${ei + 1} de ${day.exercises.length})`}
+                >
+                  ⠿
+                </button>
+                <MiniBody grupo={ex.muscle_group} height={62} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="board-card-name">{ex.name || '(elige el ejercicio)'}</div>
+                  <div className="board-card-sub">
+                    {[
+                      ex.muscle_group.trim() || null,
+                      `${ex.series.length} × ${ex.reps_objective.trim() || '—'}`,
+                      ex.rest_seconds.trim() ? `${ex.rest_seconds.trim()}s` : null,
+                      ex.target_rir.trim() ? `RIR ${ex.target_rir.trim()}` : null,
+                    ].filter(Boolean).join(' · ')}
                   </div>
-                  <div className="bfield">
-                    <span>Reps</span>
-                    <input className="ex-input ex-input-mono" value={ex.reps_objective}
-                      onChange={(e) => updateEx(di, ei, { reps_objective: e.target.value })} placeholder="10-12" />
-                  </div>
-                  <div className="bfield">
-                    <span>Ref</span>
-                    <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
-                      <input className="ex-input ex-input-mono" style={{ minWidth: 0 }} value={ex.ref_weight}
-                        onChange={(e) => updateEx(di, ei, { ref_weight: e.target.value })} placeholder="0" inputMode="decimal" />
-                      <select className="ex-input ex-input-mono" style={{ flexShrink: 0, width: 62 }} value={ex.unit}
-                        onChange={(e) => updateEx(di, ei, { unit: e.target.value as 'kg' | 'lb' })}>
-                        <option value="kg">kg</option>
-                        <option value="lb">lb</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="bfield">
-                    <span>Descanso</span>
-                    <input className="ex-input ex-input-mono" value={ex.rest_seconds}
-                      onChange={(e) => updateEx(di, ei, { rest_seconds: e.target.value })} placeholder="seg" inputMode="numeric" />
-                  </div>
-                  <div className="bfield">
-                    <span>RIR</span>
-                    <input className="ex-input ex-input-mono" value={ex.target_rir}
-                      onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
-                  </div>
-                  <div className="bfield">
-                    <span>Biserie</span>
-                    <input
-                      className="ex-input"
-                      value={ex.superseries_group}
-                      onChange={(e) => updateEx(di, ei, { superseries_group: e.target.value })}
-                      placeholder="ej: A"
-                      title="Mismo texto = encadenados como biserie/triserie, agrupados y coloreados para el cliente."
-                    />
+                  <div className="board-card-badges">
+                    {ex.superseries_group.trim() && (
+                      <span className="board-badge" style={{ borderColor: groupColor(ex.superseries_group.trim()), color: groupColor(ex.superseries_group.trim()) }}>
+                        ⛓ {ex.superseries_group.trim().toUpperCase()}
+                      </span>
+                    )}
+                    {ex.video_url && <span className="board-badge">▶ VIDEO</span>}
                   </div>
                 </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <ExerciseVideoCell
-                    videoUrl={ex.video_url}
-                    uid={uid}
-                    onChange={(url) => updateEx(di, ei, { video_url: url })}
-                  />
-                </div>
+                <button
+                  className="icon-btn"
+                  title="Quitar (conserva historial)"
+                  onClick={(e) => { e.stopPropagation(); removeExercise(di, ei); }}
+                >
+                  ✕
+                </button>
               </div>
             ))}
 
@@ -556,6 +510,103 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
           + AGREGAR DÍA
         </button>
       </div>
+
+      {/* Modal de detalle del ejercicio: acá viven todos los campos */}
+      {editCard && days[editCard.di]?.exercises[editCard.ei] && (() => {
+        const { di, ei } = editCard;
+        const ex = days[di].exercises[ei];
+        return (
+          <div className="modal-overlay" onClick={() => setEditCard(null)}>
+            <div className="modal-card" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                <MiniBody grupo={ex.muscle_group} height={84} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {ex.library_id || !isTmp(ex.id) ? (
+                    <h3 style={{ margin: 0 }} title="El nombre identifica el historial. Para cambiar el ejercicio, quítalo y agrega otro.">
+                      {ex.name}
+                    </h3>
+                  ) : (
+                    <LibrarySearch
+                      onPick={(item) => pickFromLibrary(di, ei, item)}
+                      onCreate={(query) => setLibForm({ di, ei, name: query, nameEn: '', muscle: '', equipment: '' })}
+                    />
+                  )}
+                  <input
+                    className="ex-input"
+                    style={{ width: '100%', boxSizing: 'border-box', marginTop: 8 }}
+                    value={ex.muscle_group}
+                    onChange={(e) => updateEx(di, ei, { muscle_group: e.target.value })}
+                    placeholder="Grupo muscular"
+                  />
+                </div>
+              </div>
+
+              <div className="board-card-grid" style={{ marginTop: 14 }}>
+                <div className="bfield">
+                  <span>Series</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={() => changeSeries(di, ei, -1)}>−</button>
+                    <strong className="ex-mono" style={{ minWidth: 16, textAlign: 'center' }}>{ex.series.length}</strong>
+                    <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={() => changeSeries(di, ei, 1)}>+</button>
+                  </div>
+                </div>
+                <div className="bfield">
+                  <span>Reps</span>
+                  <input className="ex-input ex-input-mono" value={ex.reps_objective}
+                    onChange={(e) => updateEx(di, ei, { reps_objective: e.target.value })} placeholder="10-12" />
+                </div>
+                <div className="bfield">
+                  <span>Ref</span>
+                  <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                    <input className="ex-input ex-input-mono" style={{ minWidth: 0 }} value={ex.ref_weight}
+                      onChange={(e) => updateEx(di, ei, { ref_weight: e.target.value })} placeholder="0" inputMode="decimal" />
+                    <select className="ex-input ex-input-mono" style={{ flexShrink: 0, width: 62 }} value={ex.unit}
+                      onChange={(e) => updateEx(di, ei, { unit: e.target.value as 'kg' | 'lb' })}>
+                      <option value="kg">kg</option>
+                      <option value="lb">lb</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="bfield">
+                  <span>Descanso</span>
+                  <input className="ex-input ex-input-mono" value={ex.rest_seconds}
+                    onChange={(e) => updateEx(di, ei, { rest_seconds: e.target.value })} placeholder="seg" inputMode="numeric" />
+                </div>
+                <div className="bfield">
+                  <span>RIR</span>
+                  <input className="ex-input ex-input-mono" value={ex.target_rir}
+                    onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
+                </div>
+                <div className="bfield">
+                  <span>Biserie</span>
+                  <input
+                    className="ex-input"
+                    value={ex.superseries_group}
+                    onChange={(e) => updateEx(di, ei, { superseries_group: e.target.value })}
+                    placeholder="ej: A"
+                    title="Mismo texto = encadenados como biserie/triserie, agrupados y coloreados para el cliente."
+                    style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 10, flexWrap: 'wrap' }}>
+                <ExerciseVideoCell
+                  videoUrl={ex.video_url}
+                  uid={uid}
+                  onChange={(url) => updateEx(di, ei, { video_url: url })}
+                />
+                <button className="btn btn-primary" style={{ padding: '10px 22px' }} onClick={() => setEditCard(null)}>
+                  LISTO
+                </button>
+              </div>
+              <p className="muted" style={{ fontSize: 11, marginTop: 10 }}>
+                Los cambios quedan en el tablero — recuerda GUARDAR CAMBIOS al final.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal: crear ejercicio en la biblioteca */}
       {libForm && (

@@ -1065,6 +1065,103 @@ a {
   width: 100%;
   box-sizing: border-box;
 }
+/* v2: banda de día invertida (el pop de Traineeks, traducido a brillo) */
+.board-day-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.board-day-num {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--bg, #00030d);
+  flex-shrink: 0;
+}
+.board-day-name {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--bg, #00030d);
+  font-family: var(--font-display), sans-serif;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.board-day-name::placeholder { color: rgba(0, 3, 13, 0.4); }
+.board-day-week {
+  background: rgba(0, 3, 13, 0.12);
+  border: none;
+  border-radius: 7px;
+  color: var(--bg, #00030d);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 6px;
+  flex-shrink: 0;
+}
+.board-day-x {
+  background: none;
+  border: none;
+  color: rgba(0, 3, 13, 0.55);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+.board-day-x:hover { color: var(--bg, #00030d); }
+
+/* v2: tarjeta compacta con el músculo encendido */
+.board-card-v2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.board-card-v2:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+.board-card-v2 .board-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-card-sub {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-card-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+.board-badge {
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
 .board-add-day {
   flex: 0 0 170px;
   min-height: 130px;
