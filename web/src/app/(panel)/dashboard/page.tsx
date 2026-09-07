@@ -68,7 +68,10 @@ export default async function DashboardPage() {
                       className="client-card"
                       style={{ borderColor: 'var(--warning)' }}
                     >
-                      <div className="avatar">{(c.name?.[0] ?? '?').toUpperCase()}</div>
+                      <div className="avatar">{c.avatar_url
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={c.avatar_url} alt="" />
+                        : (c.name?.[0] ?? '?').toUpperCase()}</div>
                       <h3>{c.name}</h3>
                       <small style={{ color: 'var(--warning)' }}>{detalle(c)}</small>
                     </Link>
@@ -85,7 +88,10 @@ export default async function DashboardPage() {
                 <div className="client-grid" style={{ marginTop: 12 }}>
                   {alDia.map((c) => (
                     <Link key={c.id} href={`/clients/${c.id}`} className="client-card">
-                      <div className="avatar">{(c.name?.[0] ?? '?').toUpperCase()}</div>
+                      <div className="avatar">{c.avatar_url
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={c.avatar_url} alt="" />
+                        : (c.name?.[0] ?? '?').toUpperCase()}</div>
                       <h3>{c.name}</h3>
                       <small>{detalle(c)}</small>
                     </Link>
