@@ -28,7 +28,7 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
       id, template_id, day_number, name, week_day,
       program_template_exercises (
         id, day_id, name, name_en, library_id, muscle_group, superseries_group,
-        reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, tempo, notes,
+        reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, tempo, notes, video_url,
         program_template_series ( id, exercise_id, series_number )
       )
     `)

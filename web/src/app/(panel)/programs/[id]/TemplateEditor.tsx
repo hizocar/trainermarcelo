@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
+import ExerciseVideoCell from '@/components/ExerciseVideoCell';
 import type { PlanDay } from '@/lib/types';
 
 // Editor de un programa (plantilla sin cliente asignado). Es el mismo
@@ -45,6 +46,7 @@ interface EditExercise {
   rest_seconds: string;
   target_rir: string;
   superseries_group: string;
+  video_url: string | null;
   series: EditSeries[];
 }
 
@@ -80,6 +82,7 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
       target_rir: e.target_rir ?? '',
       superseries_group: e.superseries_group ?? '',
+      video_url: (e as any).video_url ?? null,
       series: (e.exercise_series ?? []).map((s) => ({ id: s.id, series_number: s.series_number })),
     })),
   }));
@@ -149,6 +152,7 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
       d[di].exercises.push({
         id: tmpId(), name: '', library_id: null, name_en: null, muscle_group: '',
         reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', superseries_group: '',
+        video_url: null,
         series: [{ id: tmpId(), series_number: 1 }, { id: tmpId(), series_number: 2 }, { id: tmpId(), series_number: 3 }],
       });
       return d;
@@ -341,6 +345,7 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
             rest_seconds: isNaN(restNum) ? null : restNum,
             target_rir: ex.target_rir.trim() || null,
             superseries_group: ex.superseries_group.trim() || null,
+            video_url: ex.video_url,
             order_index: ei,
           };
           let exId = ex.id;
@@ -478,6 +483,7 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
                   <th>Descanso</th>
                   <th>RIR</th>
                   <th style={{ minWidth: 110 }}>Biserie</th>
+                  <th>Video</th>
                   <th></th>
                 </tr>
               </thead>
@@ -570,12 +576,19 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
                       />
                     </td>
                     <td>
+                      <ExerciseVideoCell
+                        videoUrl={ex.video_url}
+                        uid={uid}
+                        onChange={(url) => updateEx(di, ei, { video_url: url })}
+                      />
+                    </td>
+                    <td>
                       <button className="icon-btn" title="Quitar del programa" onClick={() => removeExercise(di, ei)}>✕</button>
                     </td>
                   </tr>
                 ))}
                 {day.exercises.length === 0 && (
-                  <tr><td colSpan={11} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
+                  <tr><td colSpan={12} className="muted" style={{ padding: 14 }}>Sin ejercicios en este día.</td></tr>
                 )}
               </tbody>
             </table>
