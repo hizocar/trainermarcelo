@@ -4,6 +4,7 @@ import Logo from '@/components/Logo';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase-server';
 import { SERVICIO_LABEL } from '@/lib/marketplace';
+import ProgramStore from './ProgramStore';
 
 export const revalidate = 300;
 
@@ -62,6 +63,15 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
     .eq('coach_slug', slug);
   if (reviewsError) throw reviewsError;
 
+  // rutinas a la venta (store fase 1) — mismo criterio: un error no puede
+  // fingir "no vende nada"
+  const { data: programas, error: programasError } = await supabase
+    .from('public_coach_programs')
+    .select('id, name, level, focus, description, price_clp, duration_weeks, days')
+    .eq('coach_slug', slug)
+    .order('price_clp');
+  if (programasError) throw programasError;
+
   return (
     <>
     {/* Esta URL se comparte suelta (Instagram, WhatsApp): quien llega no vino
@@ -119,6 +129,13 @@ export default async function CoachPage({ params }: { params: Promise<{ slug: st
             </blockquote>
           ))}
         </details>
+      )}
+
+      {(programas ?? []).length > 0 && (
+        <ProgramStore
+          programas={programas!}
+          coachName={coach.name}
+        />
       )}
 
       {coach.instagram && (
