@@ -41,7 +41,7 @@ export default async function ClientCalendarPage({
   const { supabase, userId } = await requireCoach();
 
   const { data: client } = await supabase
-    .from('users').select('id, name, coach_id').eq('id', id).maybeSingle();
+    .from('users').select('id, name, coach_id, avatar_url').eq('id', id).maybeSingle();
   if (!client || (client as AppUser).coach_id !== userId) notFound();
 
   // "hoy" según el alumno (Chile), no según el servidor (UTC)
@@ -179,7 +179,15 @@ export default async function ClientCalendarPage({
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60 }}>
         <span className="label accent">Calendario</span>
-        <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {(client as any).avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={(client as any).avatar_url} alt="" className="head-avatar" />
+          ) : (
+            <div className="head-avatar head-avatar-inicial">{((client as AppUser).name?.[0] ?? '?').toUpperCase()}</div>
+          )}
+          <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+        </div>
         <ClientTabs clientId={id} actual="calendario" />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
