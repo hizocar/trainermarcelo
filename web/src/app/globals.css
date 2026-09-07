@@ -992,6 +992,97 @@ a {
   cursor: not-allowed;
 }
 
+/* ── El tablero-editor: días como columnas, tarjetas editables ── */
+.board-edit {
+  gap: 14px;
+  background: transparent;
+  align-items: flex-start;
+  padding: 4px 2px 10px;
+}
+.board-col-edit {
+  flex: 0 0 340px;
+  min-width: 340px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.board-day-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+.board-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+}
+.board-card.row-dragging { opacity: 0.4; }
+.board-card.row-drop-above { box-shadow: 0 -2px 0 0 var(--accent); }
+.board-card.row-drop-below { box-shadow: 0 2px 0 0 var(--accent); }
+.board-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.board-card-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.bfield {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bfield > span {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.bfield input,
+.bfield select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.board-add-day {
+  flex: 0 0 170px;
+  min-height: 130px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 800;
+  letter-spacing: 1px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.board-add-day:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
 .ex-table {
   width: 100%;
   border-collapse: collapse;
