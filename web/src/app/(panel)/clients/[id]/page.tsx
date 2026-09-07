@@ -24,7 +24,7 @@ export default async function ClientPlanPage({
   // el cliente debe pertenecer a este coach
   const { data: client } = await supabase
     .from('users')
-    .select('id, name, email, coach_id')
+    .select('id, name, email, coach_id, avatar_url')
     .eq('id', id)
     .maybeSingle();
 
@@ -152,7 +152,15 @@ export default async function ClientPlanPage({
       <main className="container" style={{ paddingTop: 34, paddingBottom: 40 }}>
         <span className="label accent">Editar plan</span>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            {(client as any).avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={(client as any).avatar_url} alt="" className="head-avatar" />
+            ) : (
+              <div className="head-avatar head-avatar-inicial">{((client as AppUser).name?.[0] ?? '?').toUpperCase()}</div>
+            )}
+            <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+          </div>
           {plan && (
             <AssignToClients
               sourceClientId={id}

@@ -1,5 +1,7 @@
 'use client';
 
+import MiniBody from '@/components/MiniBody';
+
 import { useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 
@@ -133,9 +135,12 @@ export default function LibraryClient({ initialLibrary, coachId }: { initialLibr
         <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
           {grouped.map(([group, list]) => (
             <div key={group}>
-              <h3 style={{ fontSize: 13, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
-                {group} <span style={{ fontFamily: 'var(--font-mono)' }}>· {list.length}</span>
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <MiniBody grupo={group} height={44} />
+                <h3 style={{ fontSize: 13, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>
+                  {group} <span style={{ fontFamily: 'var(--font-mono)' }}>· {list.length}</span>
+                </h3>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
                 {list.map((i) => (
                   <div key={i.id} className="client-card" style={{ cursor: 'default', padding: 16 }}>

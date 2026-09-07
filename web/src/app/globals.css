@@ -801,7 +801,44 @@ a {
   cursor: pointer;
   font-family: inherit;
 }
-.panel-main { margin-left: 68px; }
+.panel-main {
+  margin-left: 68px;
+  min-height: 100vh;
+  /* la grilla sutil del fondo: profundidad sin color, en todo el panel */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 88px 88px;
+}
+
+/* la selección y el foco también son de la casa */
+.panel-main ::selection { background: rgba(216, 217, 215, 0.25); }
+.panel-main :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* scroll fino para el tablero y todo lo horizontal del panel */
+.board-scroll::-webkit-scrollbar { height: 8px; }
+.board-scroll::-webkit-scrollbar-track { background: transparent; }
+.board-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.board-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* avatar de cabecera: foto real cuando la hay (contenido, no UI — va a color) */
+.head-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.head-avatar-inicial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
 
 @media (max-width: 720px) {
   .panel-rail {
@@ -867,8 +904,8 @@ a {
   transform: translateY(-2px);
 }
 .client-card .avatar {
-  width: 46px;
-  height: 46px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: var(--accent-soft);
   border: 1px solid var(--accent);
@@ -876,9 +913,16 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
-  font-size: 18px;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 400;
+  font-size: 21px;
   margin-bottom: 14px;
+  overflow: hidden;
+}
+.client-card .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .client-card h3 {
   font-size: 17px;
