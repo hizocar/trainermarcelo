@@ -1,6 +1,4 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import Logo from '@/components/Logo';
 import SubscriptionActions from './SubscriptionActions';
 import { requireCoach } from '@/lib/guard';
 
@@ -39,16 +37,6 @@ export default async function SubscriptionPage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href={volver} className="brand">
-            <Logo />
-          </Link>
-          <Link href={volver} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            {locked ? '← SOLICITUDES' : '← CLIENTES'}
-          </Link>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60, maxWidth: 640 }}>
         <span className="label accent">Facturación</span>

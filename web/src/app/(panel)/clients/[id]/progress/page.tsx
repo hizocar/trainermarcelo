@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
-import Logo from '@/components/Logo';
+import ClientTabs from '../ClientTabs';
 import TrendChart from '@/components/TrendChart';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
@@ -82,28 +81,11 @@ export default async function ClientProgressPage({ params }: { params: Promise<{
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand">
-            <Logo />
-          </Link>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              CALENDARIO
-            </Link>
-            <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ESTA SEMANA
-            </Link>
-            <Link href={`/clients/${id}`} className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              ← PLAN
-            </Link>
-          </div>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60, maxWidth: 900 }}>
         <span className="label accent">Progreso</span>
         <h1 className="display" style={{ fontSize: 40 }}>{(client as AppUser).name}</h1>
+        <ClientTabs clientId={id} actual="ejercicio" />
 
         <div className="editor-day" style={{ marginTop: 24 }}>
           <h3 style={{ marginBottom: 4 }}>Carga total por semana</h3>

@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
 import type { AppUser, PlanDay } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
@@ -9,8 +8,8 @@ import PlanEditor from './PlanEditor';
 import WeekManager from './WeekManager';
 import CreatePlan from './CreatePlan';
 import ClientFile from './ClientFile';
+import ClientTabs from './ClientTabs';
 import AssignToClients from './AssignToClients';
-import Logo from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,16 +147,6 @@ export default async function ClientPlanPage({
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand">
-            <Logo />
-          </Link>
-          <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            ← CLIENTES
-          </Link>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 40 }}>
         <span className="label accent">Editar plan</span>
@@ -172,20 +161,7 @@ export default async function ClientPlanPage({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 22 }}>
-          <div>
-            <span className="label muted" style={{ letterSpacing: 2 }}>Cómo va</span>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <Link href={`/clients/${id}/week`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
-                ESTA SEMANA
-              </Link>
-              <Link href={`/clients/${id}/calendar`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
-                CALENDARIO
-              </Link>
-              <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
-                POR EJERCICIO
-              </Link>
-            </div>
-          </div>
+          <ClientTabs clientId={id} actual="plan" />
 
           <div>
             <span className="label muted" style={{ letterSpacing: 2 }}>Cómo viene · últimos 28 días</span>

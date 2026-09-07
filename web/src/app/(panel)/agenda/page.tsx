@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
 import AgendaForm from './AgendaForm';
 import CancelarCita from './CancelarCita';
@@ -46,16 +45,6 @@ export default async function AgendaPage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand" style={{ fontWeight: 900, letterSpacing: 2 }}>
-            ELITEFITNESS
-          </Link>
-          <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            VOLVER
-          </Link>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 40, paddingBottom: 64, maxWidth: 860 }}>
         <span className="label">Agenda</span>

@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Logo from '@/components/Logo';
 import NewProgramButton from './NewProgramButton';
 import ProgramCatalog, { type ProgramaCard } from './ProgramCatalog';
 import RequestsInbox, { type Solicitud } from './RequestsInbox';
@@ -45,17 +43,6 @@ export default async function ProgramsPage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand">
-            <Logo />
-          </Link>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
-            <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>← CLIENTES</Link>
-          </div>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60 }}>
         <span className="label accent">Programas</span>

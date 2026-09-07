@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Logo from '@/components/Logo';
 import LibraryClient from './LibraryClient';
 import { requireCoach } from '@/lib/guard';
 
@@ -16,16 +14,6 @@ export default async function LibraryPage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand">
-            <Logo />
-          </Link>
-          <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            ← CLIENTES
-          </Link>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 34, paddingBottom: 60 }}>
         <span className="label accent">Biblioteca</span>

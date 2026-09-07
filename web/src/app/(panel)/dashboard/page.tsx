@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import { signOut } from '@/app/actions';
-import Logo from '@/components/Logo';
 import { loadCoachDashboard, type CoachDashboardRow } from '@/lib/coachDashboard';
 import { santiagoDayKey } from '@/lib/weeks';
 import { requireCoach } from '@/lib/guard';
@@ -36,32 +34,13 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <div className="brand">
-            <Logo />
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href="/agenda" className="btn btn-ghost" style={{ padding: '10px 18px' }}>AGENDA</Link>
-            <Link href="/programs" className="btn btn-ghost" style={{ padding: '10px 18px' }}>PROGRAMAS</Link>
-            <Link href="/library" className="btn btn-ghost" style={{ padding: '10px 18px' }}>BIBLIOTECA</Link>
-            <Link href="/marketplace" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SOLICITUDES</Link>
-            <Link href="/perfil" className="btn btn-ghost" style={{ padding: '10px 18px' }}>MI PERFIL</Link>
-            {me?.is_platform_admin && (
-              <Link href="/admin/coaches" className="btn btn-ghost" style={{ padding: '10px 18px' }}>ADMIN</Link>
-            )}
-            {me?.is_owner && (
-              <Link href="/subscription" className="btn btn-ghost" style={{ padding: '10px 18px' }}>SUSCRIPCIÓN</Link>
-            )}
-            <form action={signOut}>
-              <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>SALIR</button>
-            </form>
-          </div>
-        </div>
-      </header>
-
       <main className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
-        <span className="label accent">Panel de coach · {me?.name ?? ''}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+          <span className="label accent">Panel de coach · {me?.name ?? ''}</span>
+          {me?.is_platform_admin && (
+            <Link href="/admin/coaches" className="label" style={{ letterSpacing: 2 }}>ADMIN →</Link>
+          )}
+        </div>
         <h1 className="display" style={{ fontSize: 40 }}>Mis clientes</h1>
         <p className="muted" style={{ marginTop: 4 }}>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)', fontWeight: 600 }}>

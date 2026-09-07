@@ -1,8 +1,5 @@
-import Link from 'next/link';
-import Logo from '@/components/Logo';
 import { requireCoach } from '@/lib/guard';
 import { FREE_MONTH_STATUS } from '@/lib/marketplace';
-import { signOut } from '@/app/actions';
 import RequestList, { type OpenRequest } from './RequestList';
 import MyApplications, { type MyApplication } from './MyApplications';
 
@@ -44,24 +41,6 @@ export default async function MarketplacePage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          {/* Al bloqueado el logo no lo puede mandar a /dashboard: el guard lo
-              devuelve acá mismo después de un ida y vuelta. */}
-          <Link href={locked ? '/marketplace' : '/dashboard'} className="brand">
-            <Logo />
-          </Link>
-          {locked ? (
-            <form action={signOut}>
-              <button className="btn btn-ghost" style={{ padding: '10px 18px' }}>CERRAR SESIÓN</button>
-            </form>
-          ) : (
-            <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-              VOLVER
-            </Link>
-          )}
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 32, paddingBottom: 64 }}>
         <h1 className="display">SOLICITUDES</h1>

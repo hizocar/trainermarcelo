@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Logo from '@/components/Logo';
 import { requireCoach } from '@/lib/guard';
 import ProfileForm, { type Profile } from './ProfileForm';
 
@@ -17,16 +15,6 @@ export default async function PerfilPage() {
 
   return (
     <>
-      <header className="app-header">
-        <div className="container inner">
-          <Link href="/dashboard" className="brand">
-            <Logo />
-          </Link>
-          <Link href="/dashboard" className="btn btn-ghost" style={{ padding: '10px 18px' }}>
-            VOLVER
-          </Link>
-        </div>
-      </header>
 
       <main className="container" style={{ paddingTop: 32, paddingBottom: 64 }}>
         <h1 className="display">MI PERFIL</h1>
