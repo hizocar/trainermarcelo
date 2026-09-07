@@ -30,9 +30,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setUser(null); // limpiar siempre antes de cargar el nuevo perfil
-      if (session) fetchProfile(session.user.id);
-      else setLoading(false);
+      // OJO: esto dispara también en TOKEN_REFRESHED — que ocurre justo al
+      // volver del bloqueo de pantalla. Vaciar el usuario ahí dejaba un null
+      // momentáneo que tumbaba a las pantallas montadas leyendo user.id
+      // (Sentry REACT-NATIVE-2: "Cannot read property 'id' of null" un
+      // segundo después del refresh, build 68). Solo se limpia cuando de
+      // verdad cambió la identidad o se cerró la sesión.
+      if (!session) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      setUser((prev) => (prev && prev.id === session.user.id ? prev : null));
+      fetchProfile(session.user.id);
     });
 
     return () => subscription.unsubscribe();
