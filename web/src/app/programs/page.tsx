@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Logo from '@/components/Logo';
 import NewProgramButton from './NewProgramButton';
 import ProgramCatalog, { type ProgramaCard } from './ProgramCatalog';
+import RequestsInbox, { type Solicitud } from './RequestsInbox';
 import { requireCoach } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,24 @@ export default async function ProgramsPage() {
     .select('id, name, created_at, duration_weeks, level, focus, program_template_days(id)')
     .eq('coach_id', userId)
     .order('created_at', { ascending: false });
+
+  // solicitudes de compra pendientes (store fase 1) — el error se propaga,
+  // no puede fingir "nadie quiere comprar"
+  const { data: pendientes, error: pendientesError } = await supabase
+    .from('program_requests')
+    .select('id, name, email, message, created_at, program_templates ( name )')
+    .eq('status', 'nueva')
+    .order('created_at', { ascending: false });
+  if (pendientesError) throw pendientesError;
+
+  const solicitudes: Solicitud[] = (pendientes ?? []).map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    email: s.email,
+    message: s.message,
+    created_at: s.created_at,
+    programa: s.program_templates?.name ?? '(programa borrado)',
+  }));
 
   const programas: ProgramaCard[] = (templates ?? []).map((t: any) => ({
     id: t.id,
@@ -49,6 +68,8 @@ export default async function ProgramsPage() {
           </div>
           <NewProgramButton />
         </div>
+
+        <RequestsInbox solicitudes={solicitudes} />
 
         <ProgramCatalog programas={programas} />
       </main>
