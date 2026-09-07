@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { requireCoach } from '@/lib/guard';
 import type { AppUser, PlanDay } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { santiagoCurrentWeek } from '@/lib/weeks';
+import { santiagoCurrentWeek, santiagoDayKey } from '@/lib/weeks';
+import { etiquetaAnimo, animoPromedio, formatoDuracion, adherencia } from '@/lib/tracking';
 import PlanEditor from './PlanEditor';
 import WeekManager from './WeekManager';
 import CreatePlan from './CreatePlan';
@@ -53,6 +54,29 @@ export default async function ClientPlanPage({
     .eq('client_id', id)
     .maybeSingle();
 
+  // resumen de tracking de los últimos 28 días (consultas de tamaño fijo)
+  const desde = new Date(Date.now() - 28 * 86400000);
+  const { data: sesiones } = await supabase
+    .from('workout_sessions')
+    .select('duration_seconds')
+    .eq('user_id', id)
+    .not('ended_at', 'is', null)
+    .gte('started_at', desde.toISOString());
+
+  const { data: animos } = await supabase
+    .from('mood_logs')
+    .select('mood')
+    .eq('user_id', id)
+    .gte('logged_date', santiagoDayKey(desde));
+
+  const { data: logs28 } = plan
+    ? await supabase
+        .from('workout_logs')
+        .select('rir, logged_at, exercise_series!inner ( exercises!inner ( training_days!inner ( plan_id ) ) )')
+        .eq('exercise_series.exercises.training_days.plan_id', plan.id)
+        .gte('logged_at', desde.toISOString())
+    : { data: null };
+
   const { data: weeksData } = plan
     ? await supabase.from('plan_weeks').select('*').eq('plan_id', plan.id).eq('archived', false).order('week_number')
     : { data: null };
@@ -100,6 +124,28 @@ export default async function ClientPlanPage({
     }))
     .sort((a: PlanDay, b: PlanDay) => a.day_number - b.day_number);
 
+  // síntesis del tracking (los datos ya estaban en la base; esto es la lectura)
+  const numSesiones = (sesiones ?? []).length;
+  const tiempoMedio = numSesiones > 0
+    ? formatoDuracion((sesiones ?? []).reduce((a, s) => a + (s.duration_seconds ?? 0), 0) / numSesiones)
+    : null;
+  const promAnimo = animoPromedio((animos ?? []).map((m: { mood: string }) => m.mood));
+  const rirVals = (logs28 ?? []).map((l: any) => l.rir).filter((r: any): r is number => r != null);
+  const rirMedio = rirVals.length > 0 ? rirVals.reduce((a, r) => a + r, 0) / rirVals.length : null;
+  const diasEntrenados = new Set(
+    (logs28 ?? []).filter((l: any) => l.logged_at).map((l: any) => santiagoDayKey(new Date(l.logged_at))),
+  ).size;
+  const planificadosSemana = days.filter(d => !d.name.toLowerCase().includes('libre')).length;
+  const pctAdherencia = adherencia(diasEntrenados, planificadosSemana, 4);
+
+  const tarjetas = [
+    { v: String(numSesiones), l: 'SESIONES' },
+    { v: tiempoMedio ?? '—', l: 'TIEMPO MEDIO' },
+    { v: promAnimo != null ? (etiquetaAnimo(promAnimo) ?? '—') : '—', l: 'ÁNIMO', chico: true },
+    { v: rirMedio != null ? rirMedio.toFixed(1) : '—', l: 'RIR MEDIO' },
+    { v: pctAdherencia != null ? `${pctAdherencia}%` : '—', l: 'ADHERENCIA' },
+  ];
+
   return (
     <>
       <header className="app-header">
@@ -138,6 +184,20 @@ export default async function ClientPlanPage({
               <Link href={`/clients/${id}/progress`} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
                 POR EJERCICIO
               </Link>
+            </div>
+          </div>
+
+          <div>
+            <span className="label muted" style={{ letterSpacing: 2 }}>Cómo viene · últimos 28 días</span>
+            <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+              {tarjetas.map((t) => (
+                <div key={t.l} className="editor-day" style={{ flex: 1, minWidth: 130, textAlign: 'center', padding: 14 }}>
+                  <div className="display" style={{ fontSize: t.chico ? 17 : 24, color: 'var(--accent)', lineHeight: 1.3 }}>
+                    {t.v}
+                  </div>
+                  <div className="label muted" style={{ fontSize: 9, letterSpacing: 1 }}>{t.l}</div>
+                </div>
+              ))}
             </div>
           </div>
 
