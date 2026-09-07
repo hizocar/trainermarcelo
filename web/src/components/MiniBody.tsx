@@ -53,7 +53,7 @@ export default function MiniBody({ grupo, height = 64 }: { grupo: string; height
           <path
             key={`${p.slug}-${i}`}
             d={d}
-            fill={slug && p.slug === slug ? 'var(--accent)' : 'rgba(255,255,255,0.09)'}
+            fill={slug && p.slug === slug ? 'var(--accent)' : 'var(--body-dim, rgba(255,255,255,0.09))'}
           />
         )),
       )}

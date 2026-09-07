@@ -7,6 +7,12 @@ import PanelRail from '@/components/PanelRail';
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      {/* aplica el tema guardado ANTES del primer pintado: sin parpadeo */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: "try{var t=localStorage.getItem('panel-tema');if(t&&t!=='carbon')document.documentElement.setAttribute('data-tema',t)}catch(e){}",
+        }}
+      />
       <PanelRail />
       <div className="panel-main">{children}</div>
     </>
