@@ -1,9 +1,24 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Dumbbell } from '@/components/Logo';
 import { signOut } from '@/app/actions';
+
+// Temas del panel: Carbón (el de siempre) + los tres que nacieron de las
+// paletas del equipo. El atributo vive en <html> mientras se navega el
+// panel y se limpia al salir — las páginas públicas no cambian de marca.
+const TEMAS = ['carbon', 'marfil', 'electrico', 'neon'] as const;
+type Tema = typeof TEMAS[number];
+const NOMBRE_TEMA: Record<Tema, string> = {
+  carbon: 'Carbón', marfil: 'Marfil', electrico: 'Eléctrico', neon: 'Neón',
+};
+
+function aplicarTema(t: Tema) {
+  if (t === 'carbon') document.documentElement.removeAttribute('data-tema');
+  else document.documentElement.setAttribute('data-tema', t);
+}
 
 // El riel del panel del coach: navegación persistente de íconos, monocroma.
 // En desktop es una columna fija a la izquierda; en pantallas angostas baja
@@ -32,6 +47,26 @@ const ITEMS: { href: string; label: string; icon: keyof typeof ICON; activos: st
 
 export default function PanelRail() {
   const pathname = usePathname();
+  const [tema, setTema] = useState<Tema>('carbon');
+
+  useEffect(() => {
+    let guardado: Tema = 'carbon';
+    try {
+      const t = localStorage.getItem('panel-tema');
+      if (t && (TEMAS as readonly string[]).includes(t)) guardado = t as Tema;
+    } catch { /* almacenamiento bloqueado: se queda Carbón */ }
+    setTema(guardado);
+    aplicarTema(guardado);
+    // al salir del panel, la web pública vuelve a la marca
+    return () => document.documentElement.removeAttribute('data-tema');
+  }, []);
+
+  function cambiarTema() {
+    const siguiente = TEMAS[(TEMAS.indexOf(tema) + 1) % TEMAS.length];
+    setTema(siguiente);
+    aplicarTema(siguiente);
+    try { localStorage.setItem('panel-tema', siguiente); } catch { /* sin persistencia */ }
+  }
 
   return (
     <nav className="panel-rail" aria-label="Panel del coach">
@@ -56,6 +91,18 @@ export default function PanelRail() {
           );
         })}
       </div>
+      <button
+        type="button"
+        className="panel-rail-item panel-rail-tema"
+        onClick={cambiarTema}
+        title={`Tema: ${NOMBRE_TEMA[tema]} — clic para cambiar`}
+      >
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 3a9 9 0 1 0 0 18V3Z" />
+          <path d="M12 3a9 9 0 0 1 0 18V3Z" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        <span>TEMA</span>
+      </button>
       <form action={signOut} className="panel-rail-out">
         <button type="submit" className="panel-rail-item" title="Cerrar sesión">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

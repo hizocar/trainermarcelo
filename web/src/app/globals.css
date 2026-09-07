@@ -17,6 +17,83 @@
   /* Única excepción al monocromo: solo para "esto requiere que hagas algo". */
   --warning: #c9a227;
   --success: #d8d9d7;
+  /* texto sobre superficies rellenas con --accent (botones, bandas de día) */
+  --on-accent: #00030d;
+  /* la grilla del fondo del panel y el cuerpo apagado del MiniBody */
+  --grid-line: rgba(255, 255, 255, 0.018);
+  --body-dim: rgba(255, 255, 255, 0.09);
+}
+
+/* ── Temas del panel (co-creación: Yharel pidió opciones claras) ──
+   Carbón es el de siempre y sigue siendo el predeterminado. Los otros
+   tres nacen de las paletas que eligió el equipo, curadas para que el
+   contraste y la semántica (ámbar/atención) sobrevivan. El atributo
+   data-tema solo existe mientras se navega el panel. */
+html[data-tema='marfil'] {
+  --bg: #faf8f2;
+  --bg-elevated: #ffffff;
+  --surface: #f1ecdf;
+  --card: #fffefa;
+  --card-elevated: #ffffff;
+  --accent: #5f6a8c;
+  --accent-dark: #4d5674;
+  --accent-soft: rgba(95, 106, 140, 0.1);
+  --accent-glow: rgba(95, 106, 140, 0.2);
+  --text: #2b2a24;
+  --text-secondary: #6f6a5b;
+  --text-muted: #8c846d;
+  --border: #e3ddcc;
+  --border-light: #d9d2bf;
+  --danger: #8c846d;
+  --warning: #a9861f;
+  --success: #5f6a8c;
+  --on-accent: #fffefa;
+  --grid-line: rgba(0, 0, 0, 0.028);
+  --body-dim: rgba(0, 0, 0, 0.1);
+}
+html[data-tema='electrico'] {
+  --bg: #f2f2f2;
+  --bg-elevated: #ffffff;
+  --surface: #e9ebee;
+  --card: #ffffff;
+  --card-elevated: #ffffff;
+  --accent: #023e73;
+  --accent-dark: #02305a;
+  --accent-soft: rgba(2, 62, 115, 0.08);
+  --accent-glow: rgba(2, 62, 115, 0.18);
+  --text: #101d2b;
+  --text-secondary: #46586b;
+  --text-muted: #7a8798;
+  --border: #dce0e5;
+  --border-light: #cbd1d9;
+  --danger: #7a8798;
+  --warning: #d3325b;
+  --success: #023e73;
+  --on-accent: #f2f2f2;
+  --grid-line: rgba(2, 62, 115, 0.04);
+  --body-dim: rgba(2, 62, 115, 0.12);
+}
+html[data-tema='neon'] {
+  --bg: #060606;
+  --bg-elevated: #0d0d0d;
+  --surface: #131313;
+  --card: #151515;
+  --card-elevated: #1e1e1e;
+  --accent: #ebd350;
+  --accent-dark: #d4bc3d;
+  --accent-soft: rgba(235, 211, 80, 0.08);
+  --accent-glow: rgba(235, 211, 80, 0.16);
+  --text: #ffffff;
+  --text-secondary: #c1ccd9;
+  --text-muted: #626b6f;
+  --border: #242424;
+  --border-light: #333333;
+  --danger: #626b6f;
+  --warning: #e2762d;
+  --success: #ebd350;
+  --on-accent: #060606;
+  --grid-line: rgba(255, 255, 255, 0.02);
+  --body-dim: rgba(255, 255, 255, 0.09);
 }
 
 * {
@@ -45,7 +122,7 @@ a {
 
 ::selection {
   background: var(--accent);
-  color: #00030d;
+  color: var(--on-accent);
 }
 
 .display {
@@ -98,7 +175,7 @@ a {
 }
 .btn-primary {
   background: var(--accent);
-  color: #00030d;
+  color: var(--on-accent);
   box-shadow: 0 0 0 rgba(216, 217, 215, 0);
 }
 .btn-primary:hover {
@@ -792,7 +869,16 @@ a {
   color: var(--text);
   border-left-color: var(--accent);
 }
-.panel-rail-out { margin-top: auto; padding-bottom: 8px; }
+.panel-rail-tema {
+  margin-top: auto;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+}
+.panel-rail-out { padding-bottom: 8px; }
 .panel-rail-out .panel-rail-item {
   width: 100%;
   background: none;
@@ -806,8 +892,8 @@ a {
   min-height: 100vh;
   /* la grilla sutil del fondo: profundidad sin color, en todo el panel */
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 88px 88px;
 }
 
@@ -921,6 +1007,7 @@ a {
     border-top: 2px solid transparent;
   }
   .panel-rail-item.activo { border-top-color: var(--accent); }
+  .panel-rail-tema { margin-top: 0; flex: 1; border-left: none; border-top: 2px solid transparent; width: auto; }
   .panel-rail-out { margin-top: 0; padding-bottom: 0; display: flex; flex: 1; }
   .panel-rail-out .panel-rail-item { border-left: none; border-top: 2px solid transparent; }
   .panel-main { margin-left: 0; padding-bottom: 72px; }
@@ -1181,7 +1268,7 @@ a {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 1.5px;
-  color: var(--bg, #00030d);
+  color: var(--on-accent);
   flex-shrink: 0;
 }
 .board-day-name {
@@ -1190,18 +1277,18 @@ a {
   background: transparent;
   border: none;
   outline: none;
-  color: var(--bg, #00030d);
+  color: var(--on-accent);
   font-family: var(--font-display), sans-serif;
   font-size: 16px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.board-day-name::placeholder { color: rgba(0, 3, 13, 0.4); }
+.board-day-name::placeholder { color: var(--on-accent); opacity: 0.45; }
 .board-day-week {
-  background: rgba(0, 3, 13, 0.12);
+  background: rgba(0, 0, 0, 0.18);
   border: none;
   border-radius: 8px;
-  color: var(--bg, #00030d);
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 700;
   padding: 5px 6px;
@@ -1210,13 +1297,14 @@ a {
 .board-day-x {
   background: none;
   border: none;
-  color: rgba(0, 3, 13, 0.55);
+  color: var(--on-accent);
+  opacity: 0.6;
   cursor: pointer;
   font-size: 13px;
   padding: 2px 4px;
   flex-shrink: 0;
 }
-.board-day-x:hover { color: var(--bg, #00030d); }
+.board-day-x:hover { opacity: 1; }
 
 /* v2: tarjeta compacta con el músculo encendido */
 .board-card-v2 {
@@ -1227,7 +1315,7 @@ a {
   transition: border-color 0.15s, transform 0.15s;
 }
 .board-card-v2:hover {
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--text-muted);
   transform: translateY(-1px);
 }
 .board-card-v2 .board-card-name {
@@ -1347,7 +1435,7 @@ a {
 .save-bar {
   position: sticky;
   bottom: 0;
-  background: rgba(0, 3, 13, 0.92);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   padding: 14px 0;
