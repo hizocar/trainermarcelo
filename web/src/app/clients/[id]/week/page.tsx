@@ -4,7 +4,8 @@ import { requireCoach } from '@/lib/guard';
 import Logo from '@/components/Logo';
 import type { AppUser } from '@/lib/types';
 import { resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
-import { santiagoCurrentWeek, WEEK_DAYS_SHORT, formatShortDate } from '@/lib/weeks';
+import { santiagoCurrentWeek, formatShortDate } from '@/lib/weeks';
+import WeekLive, { type DiaSemana, type LogSerie } from './WeekLive';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,23 +65,25 @@ export default async function ClientWeekPage({
         .in('series_id', seriesIds).eq('week_number', week)
     : { data: null };
 
-  const seriesMeta = new Map<string, { exId: string; dayId: string; num: number; unit: string }>();
-  days.forEach((d: any) => d.exercises.forEach((e: any) =>
-    (e.exercise_series ?? []).forEach((s: any) =>
-      seriesMeta.set(s.id, { exId: e.id, dayId: d.id, num: s.series_number, unit: e.unit }))));
-
-  const setsByEx = new Map<string, { num: number; weight: number; reps: number; rir: number | null; unit: string }[]>();
-  const dateByDay = new Map<string, string>();
-  (logs ?? []).forEach((l: any) => {
-    const meta = seriesMeta.get(l.series_id);
-    if (!meta) return;
-    const arr = setsByEx.get(meta.exId) ?? [];
-    arr.push({ num: meta.num, weight: l.weight, reps: l.reps, rir: l.rir, unit: meta.unit });
-    setsByEx.set(meta.exId, arr);
-    const prev = dateByDay.get(meta.dayId);
-    if (l.logged_at && (!prev || l.logged_at < prev)) dateByDay.set(meta.dayId, l.logged_at);
-  });
-  setsByEx.forEach((arr) => arr.sort((a, b) => a.num - b.num));
+  // datos serializables para el componente vivo (edición + refresco en línea)
+  const diasVivos: DiaSemana[] = days.map((d: any) => ({
+    id: d.id,
+    day_number: d.day_number,
+    name: d.name,
+    week_day: d.week_day,
+    exercises: d.exercises.map((e: any) => ({
+      id: e.id,
+      name: e.name,
+      unit: e.unit,
+      series: (e.exercise_series ?? [])
+        .slice()
+        .sort((a: any, b: any) => a.series_number - b.series_number)
+        .map((s: any) => ({ id: s.id, num: s.series_number })),
+    })),
+  }));
+  const logsVivos: LogSerie[] = (logs ?? []).map((l: any) => ({
+    series_id: l.series_id, weight: l.weight, reps: l.reps, rir: l.rir, logged_at: l.logged_at,
+  }));
 
   // cardio de esa semana calendario (lun–dom)
   const monday = new Date(Date.now() - (currentWeek - week) * 7 * 86400000);
@@ -93,8 +96,6 @@ export default async function ClientWeekPage({
     .gte('logged_at', monday.toISOString()).lt('logged_at', sunday.toISOString())
     .order('logged_at');
 
-  const totalVolume = Array.from(setsByEx.values()).flat().reduce((a, s) => a + s.weight * s.reps, 0);
-  const totalExercises = days.reduce((a: number, d: any) => a + d.exercises.length, 0);
   const cardioMin = (cardio ?? []).reduce((a, c) => a + c.duration_minutes, 0);
 
   return (
@@ -139,91 +140,16 @@ export default async function ClientWeekPage({
           </p>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
-              {[
-                { v: `${setsByEx.size}/${totalExercises}`, l: 'EJERCICIOS REGISTRADOS' },
-                { v: Math.round(totalVolume).toLocaleString('es-CL'), l: 'KG TOTALES' },
-                { v: String(cardioMin), l: 'MIN CARDIO' },
-              ].map((s) => (
-                <div key={s.l} className="editor-day" style={{ flex: 1, minWidth: 150, textAlign: 'center', padding: 16 }}>
-                  <div className="display" style={{ fontSize: 26, color: 'var(--accent)' }}>{s.v}</div>
-                  <div className="label muted" style={{ fontSize: 9, letterSpacing: 1 }}>{s.l}</div>
-                </div>
-              ))}
-            </div>
-
-            {days.map((day: any) => {
-              const doneInDay = day.exercises.filter((e: any) => setsByEx.has(e.id)).length;
-              const trained = doneInDay > 0;
-              const trainedDate = dateByDay.get(day.id);
-              return (
-                <div key={day.id} className="editor-day" style={{ marginTop: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                    <span style={{
-                      background: trained ? 'var(--accent)' : 'var(--surface)',
-                      color: trained ? 'var(--bg)' : 'var(--text-secondary)',
-                      border: '1px solid var(--border)', borderRadius: 6,
-                      padding: '3px 8px', fontSize: 11, fontWeight: 800, letterSpacing: 1,
-                    }}>
-                      {day.week_day != null ? WEEK_DAYS_SHORT[day.week_day].toUpperCase() : `D${day.day_number}`}
-                    </span>
-                    <h3 style={{ fontSize: 15, margin: 0 }}>{day.name.toUpperCase()}</h3>
-                    <span className="muted" style={{ fontSize: 12, marginLeft: 'auto' }}>
-                      {trained
-                        ? `${doneInDay}/${day.exercises.length} ejercicios${trainedDate ? ` · ${formatShortDate(trainedDate)}` : ''}`
-                        : 'Sin registrar'}
-                    </span>
-                  </div>
-
-                  {day.exercises.map((ex: any) => {
-                    const sets = setsByEx.get(ex.id);
-                    return (
-                      <div key={ex.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
-                        <Link
-                          href={`/clients/${id}/exercise/${ex.id}`}
-                          style={{
-                            fontSize: 13,
-                            fontWeight: sets ? 700 : 400,
-                            color: sets ? 'var(--text)' : 'var(--text-secondary)',
-                            textDecoration: 'none',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                          title={`Ver historial de ${ex.name}`}
-                        >
-                          {ex.name}
-                          <span className="muted" style={{ fontSize: 10 }}>›</span>
-                        </Link>
-                        {sets ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                            {sets.map((s, i) => (
-                              <span key={i} style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 6,
-                                background: 'var(--surface)', border: '1px solid var(--border)',
-                                borderRadius: 6, padding: '3px 8px',
-                              }}>
-                                <b style={{ fontSize: 10, color: 'var(--accent)' }}>S{s.num}</b>
-                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                                  {s.weight}{s.unit} × {s.reps}{s.rir != null ? ` · RIR ${s.rir}` : ''}
-                                </span>
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="muted" style={{ fontSize: 11, fontStyle: 'italic', marginTop: 4 }}>
-                            — sin registro ({(ex.exercise_series ?? []).length} series planificadas)
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {day.exercises.length === 0 && (
-                    <p className="muted" style={{ fontSize: 12 }}>Sin ejercicios en este día.</p>
-                  )}
-                </div>
-              );
-            })}
+            <WeekLive
+              clientId={id}
+              coachId={userId}
+              week={week}
+              planWeekId={activeWeek.id}
+              days={diasVivos}
+              initialLogs={logsVivos}
+              cardioMin={cardioMin}
+              live={week === currentWeek}
+            />
 
             {(cardio ?? []).length > 0 && (
               <div className="editor-day" style={{ marginTop: 16 }}>
