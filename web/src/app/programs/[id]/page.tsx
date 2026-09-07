@@ -6,6 +6,7 @@ import TemplateEditor from './TemplateEditor';
 import AssignTemplateToClients from './AssignTemplateToClients';
 import EditableName from './EditableName';
 import EditableDuration from './EditableDuration';
+import EditableTags from './EditableTags';
 import Logo from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
 
   const { data: template } = await supabase
     .from('program_templates')
-    .select('id, name, coach_id, duration_weeks')
+    .select('id, name, coach_id, duration_weeks, level, focus')
     .eq('id', id)
     .maybeSingle();
 
@@ -81,6 +82,13 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
             <EditableName templateId={id} initialName={template.name} />
             <div style={{ marginTop: 8 }}>
               <EditableDuration templateId={id} initialWeeks={(template as any).duration_weeks ?? null} />
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <EditableTags
+                templateId={id}
+                initialLevel={(template as any).level ?? null}
+                initialFocus={(template as any).focus ?? null}
+              />
             </div>
           </div>
           <AssignTemplateToClients

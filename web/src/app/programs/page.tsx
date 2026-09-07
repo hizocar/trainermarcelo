@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import NewProgramButton from './NewProgramButton';
-import DeleteProgramButton from './DeleteProgramButton';
+import ProgramCatalog, { type ProgramaCard } from './ProgramCatalog';
 import { requireCoach } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
@@ -11,11 +11,18 @@ export default async function ProgramsPage() {
 
   const { data: templates } = await supabase
     .from('program_templates')
-    .select('id, name, created_at, program_template_days(id)')
+    .select('id, name, created_at, duration_weeks, level, focus, program_template_days(id)')
     .eq('coach_id', userId)
     .order('created_at', { ascending: false });
 
-  const list = (templates ?? []) as { id: string; name: string; created_at: string; program_template_days: { id: string }[] }[];
+  const programas: ProgramaCard[] = (templates ?? []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    days: t.program_template_days?.length ?? 0,
+    weeks: t.duration_weeks ?? null,
+    level: t.level ?? null,
+    focus: t.focus ?? null,
+  }));
 
   return (
     <>
@@ -43,24 +50,7 @@ export default async function ProgramsPage() {
           <NewProgramButton />
         </div>
 
-        {list.length === 0 ? (
-          <p style={{ marginTop: 40 }} className="muted">
-            Todavía no tienes programas creados. Empieza con &quot;+ Crear programa&quot;.
-          </p>
-        ) : (
-          <div className="client-grid" style={{ marginTop: 24 }}>
-            {list.map((t) => (
-              <Link key={t.id} href={`/programs/${t.id}`} className="client-card" style={{ position: 'relative' }}>
-                <div className="avatar">📋</div>
-                <h3>{t.name}</h3>
-                <small>{t.program_template_days?.length ?? 0} día{(t.program_template_days?.length ?? 0) === 1 ? '' : 's'}</small>
-                <div style={{ position: 'absolute', top: 12, right: 12 }}>
-                  <DeleteProgramButton templateId={t.id} name={t.name} />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        <ProgramCatalog programas={programas} />
       </main>
     </>
   );
