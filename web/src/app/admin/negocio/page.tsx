@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireAdmin } from '@/lib/guard';
 import { PLANS, clp, mrrClp } from '@/lib/plans';
 import RegalarPanel from './RegalarPanel';
+import TransferirCliente from './TransferirCliente';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,7 @@ export default async function NegocioPage() {
 
         <section style={{ marginTop: 28 }}>
           <RegalarPanel />
+          <TransferirCliente />
         </section>
 
         <section style={{ marginTop: 28 }}>
