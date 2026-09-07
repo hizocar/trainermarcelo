@@ -128,7 +128,11 @@ export default function SettingsScreen() {
       <Card style={styles.card}>
         <TouchableOpacity
           style={styles.row}
-          onPress={() => Linking.openURL('https://wa.me/56949684325')}
+          onPress={() => Linking.openURL('https://wa.me/56949684325').catch(() => {
+            // sin WhatsApp ni navegador que lo tome (Sentry REACT-NATIVE-1):
+            // al menos dejarle el número a mano
+            showAlert('No se pudo abrir WhatsApp', 'Escríbenos al +56 9 4968 4325.');
+          })}
           activeOpacity={0.8}
         >
           <Ionicons name="logo-whatsapp" size={18} color={colors.accent} />
