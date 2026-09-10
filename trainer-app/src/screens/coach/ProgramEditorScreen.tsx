@@ -98,6 +98,8 @@ export default function ProgramEditorScreen() {
 
   useEffect(() => { fetchTemplate(); }, []);
 
+  const semana1Ref = React.useRef<string | null>(null);
+
   async function fetchTemplate() {
     const { data: tpl } = await supabase
       .from('program_templates').select('name, duration_weeks').eq('id', templateId).maybeSingle();
@@ -105,8 +107,23 @@ export default function ProgramEditorScreen() {
       setName(tpl.name);
       setDurationWeeks(tpl.duration_weeks != null ? String(tpl.duration_weeks) : '');
     }
+    // v39: los programas tienen semanas; la app edita la SEMANA 1 (las demás
+    // se manejan en el panel web). Sin semana aún (programa nuevo): se crea.
+    let { data: semana1 } = await supabase
+      .from('program_template_weeks').select('id')
+      .eq('template_id', templateId).order('week_number').limit(1).maybeSingle();
+    if (!semana1) {
+      const { data: creada } = await supabase
+        .from('program_template_weeks')
+        .insert({ template_id: templateId, week_number: 1, name: 'Semana 1' })
+        .select('id').single();
+      semana1 = creada;
+    }
+    semana1Ref.current = semana1?.id ?? null;
     const { data: daysData } = await supabase
-      .from('program_template_days').select('*').eq('template_id', templateId).order('day_number');
+      .from('program_template_days').select('*').eq('template_id', templateId)
+      .eq('template_week_id', semana1Ref.current ?? '00000000-0000-0000-0000-000000000000')
+      .order('day_number');
     const daysWithEx: TplDay[] = [];
     // se guarda la lista CRUDA (antes de normalizar) en `grupoEnBase`: es lo
     // que hay realmente en la base, y contra eso compara `persistGroups`.
@@ -160,7 +177,7 @@ export default function ProgramEditorScreen() {
     const dayNumber = days.length + 1;
     const { data, error } = await supabase
       .from('program_template_days')
-      .insert({ template_id: templateId, day_number: dayNumber, name: newDayName.trim(), week_day: newDayWeekDay })
+      .insert({ template_id: templateId, template_week_id: semana1Ref.current, day_number: dayNumber, name: newDayName.trim(), week_day: newDayWeekDay })
       .select().single();
     if (!error && data) setDays(prev => [...prev, { ...data, exercises: [] }]);
     setShowDayModal(false);

@@ -4,14 +4,17 @@ import type { PlanDay } from '@/lib/types';
 import TemplateEditor from './TemplateEditor';
 import AssignTemplateToClients from './AssignTemplateToClients';
 import EditableName from './EditableName';
-import EditableDuration from './EditableDuration';
 import EditableTags from './EditableTags';
+import TemplateWeekManager, { type TplWeek } from './TemplateWeekManager';
 import SellProgram from './SellProgram';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProgramEditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProgramEditorPage({
+  params, searchParams,
+}: { params: Promise<{ id: string }>; searchParams: Promise<{ week?: string }> }) {
   const { id } = await params;
+  const { week: requestedWeekId } = await searchParams;
   const { supabase, userId } = await requireCoach();
 
   const { data: template } = await supabase
@@ -21,6 +24,15 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
     .maybeSingle();
 
   if (!template || template.coach_id !== userId) notFound();
+
+  // las semanas del programa (v39): la elegida en la URL, o la primera
+  const { data: weeksData } = await supabase
+    .from('program_template_weeks')
+    .select('id, week_number, name')
+    .eq('template_id', id)
+    .order('week_number');
+  const tplWeeks = (weeksData ?? []) as TplWeek[];
+  const selectedWeek = tplWeeks.find(w => w.id === requestedWeekId) ?? tplWeeks[0] ?? null;
 
   const { data: days } = await supabase
     .from('program_template_days')
@@ -33,6 +45,7 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
       )
     `)
     .eq('template_id', id)
+    .eq('template_week_id', selectedWeek?.id ?? '00000000-0000-0000-0000-000000000000')
     .order('day_number');
 
   // adaptar al shape de PlanDay que ya usa el editor (mismos nombres de campo,
@@ -70,9 +83,6 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
           <div style={{ flex: 1, minWidth: 240 }}>
             <EditableName templateId={id} initialName={template.name} />
             <div style={{ marginTop: 8 }}>
-              <EditableDuration templateId={id} initialWeeks={(template as any).duration_weeks ?? null} />
-            </div>
-            <div style={{ marginTop: 8 }}>
               <EditableTags
                 templateId={id}
                 initialLevel={(template as any).level ?? null}
@@ -93,7 +103,13 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
           initialDescription={(template as any).description ?? null}
         />
 
-        <TemplateEditor templateId={id} initialDays={planDays} />
+        <TemplateWeekManager templateId={id} weeks={tplWeeks} selectedWeekId={selectedWeek?.id ?? null} />
+
+        {selectedWeek ? (
+          <TemplateEditor key={selectedWeek.id} templateId={id} templateWeekId={selectedWeek.id} initialDays={planDays} />
+        ) : (
+          <p className="muted" style={{ marginTop: 20 }}>Creando la Semana 1…</p>
+        )}
       </main>
     </>
   );

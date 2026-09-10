@@ -1,8 +1,8 @@
-// Edge Function: copia un programa (plantilla, sin cliente asignado) a uno
-// o varios clientes del coach. Cada copia queda 100% independiente desde
-// el momento en que se crea — la plantilla sigue existiendo tal cual para
-// volver a usarla después. Si el cliente destino ya tenía un plan, sus
-// días actuales se archivan (no se borran: su historial se conserva).
+// Edge Function: copia un programa (plantilla) a uno o varios clientes del
+// coach. Desde la v39 un programa tiene SEMANAS explícitas: la semana N cae
+// en la semana calendario actual+N-1 del alumno y la última queda repitiendo
+// hacia adelante. Cada copia es 100% independiente; la plantilla no se toca.
+// Las semanas pasadas del alumno tampoco: su historial se conserva.
 //
 // Despliegue: supabase functions deploy assign-template
 
@@ -14,12 +14,11 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-
 // La semana de programa "de hoy", con la fecha calendario de Chile — espejo
 // de santiagoCurrentWeek() en web/src/lib/weeks.ts (misma época, misma
 // fórmula). Los días copiados deben colgar de una plan_week: desde la v17
 // cada semana es independiente y TODAS las vistas cargan días por
-// plan_week_id — un día sin semana es invisible (el bug que motivó este fix).
+// plan_week_id — un día sin semana es invisible.
 const TRAINING_EPOCH = new Date('2026-06-15T00:00:00');
 function semanaActualSantiago(): number {
   const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
@@ -66,10 +65,18 @@ Deno.serve(async (req) => {
   const invalidTargets = targetClientIds.filter((id) => byId.get(id)?.coach_id !== authUser.id);
   if (invalidTargets.length > 0) return json({ error: 'Uno o más clientes elegidos no son tuyos' }, 400);
 
+  // las semanas del programa, con sus días; una plantilla anterior a la v39
+  // (días sin semana) actúa como programa de una sola semana
+  const { data: tplWeeks } = await admin
+    .from('program_template_weeks')
+    .select('id, week_number, name')
+    .eq('template_id', templateId)
+    .order('week_number');
+
   const { data: templateDays } = await admin
     .from('program_template_days')
     .select(`
-      id, day_number, name, week_day,
+      id, day_number, name, week_day, template_week_id,
       program_template_exercises (
         id, name, name_en, library_id, muscle_group, superseries_group,
         reps_objective, unit, ref_weight, order_index, image_url, video_url,
@@ -79,10 +86,17 @@ Deno.serve(async (req) => {
     `)
     .eq('template_id', templateId);
 
-  const days = templateDays ?? [];
-  if (days.length === 0) return json({ error: 'Este programa todavía no tiene días para asignar' }, 400);
+  const allDays = templateDays ?? [];
+  if (allDays.length === 0) return json({ error: 'Este programa todavía no tiene días para asignar' }, 400);
 
-  const semana = semanaActualSantiago();
+  const semanasPlantilla = (tplWeeks && tplWeeks.length > 0)
+    ? tplWeeks
+        .map((w) => ({ nombre: w.name, dias: allDays.filter((d) => d.template_week_id === w.id) }))
+        .filter((w) => w.dias.length > 0)
+    : [{ nombre: 'Semana 1', dias: allDays }];
+  if (semanasPlantilla.length === 0) return json({ error: 'Este programa todavía no tiene días para asignar' }, 400);
+
+  const semanaBase = semanaActualSantiago();
 
   let copied = 0;
   for (const targetId of targetClientIds) {
@@ -98,79 +112,89 @@ Deno.serve(async (req) => {
       targetPlan = created;
     }
 
-    // El programa toma la semana ACTUAL del alumno (y las futuras, por
-    // repeat_forever); sus semanas pasadas no se tocan — el historial queda
-    // intacto. plan_weeks tiene unique (plan_id, week_number) sin filtro por
-    // archived, así que si ya hay fila con este número se REUTILIZA.
-    const { data: previa } = await admin
-      .from('plan_weeks').select('id')
-      .eq('plan_id', targetPlan.id).eq('week_number', semana).maybeSingle();
-    let weekId: string;
-    if (previa) {
-      await admin.from('training_days').update({ archived: true })
-        .eq('plan_week_id', previa.id).eq('archived', false);
-      const { error: upErr } = await admin.from('plan_weeks')
-        .update({ name: template.name, is_deload: false, repeat_forever: true, archived: false })
-        .eq('id', previa.id);
-      if (upErr) continue;
-      weekId = previa.id;
-    } else {
-      const { data: creada, error: weekErr } = await admin.from('plan_weeks')
-        .insert({ plan_id: targetPlan.id, week_number: semana, name: template.name, repeat_forever: true })
-        .select('id').single();
-      if (weekErr || !creada) continue;
-      weekId = creada.id;
-    }
-
-    // sanea los días huérfanos que dejó la versión anterior de esta función
+    // sanea los días huérfanos que dejó la versión pre-v17 de esta función
     // (sin plan_week_id: invisibles para todas las vistas)
     await admin.from('training_days').update({ archived: true })
       .eq('plan_id', targetPlan.id).is('plan_week_id', null).eq('archived', false);
 
-    for (const day of days) {
-      const { data: newDay, error: dayErr } = await admin
-        .from('training_days')
-        .insert({ plan_id: targetPlan.id, plan_week_id: weekId, day_number: day.day_number, name: day.name, week_day: day.week_day })
-        .select('id')
-        .single();
-      if (dayErr || !newDay) continue;
+    let okSemanas = 0;
+    for (let i = 0; i < semanasPlantilla.length; i++) {
+      const sem = semanasPlantilla[i];
+      const numero = semanaBase + i;
+      const esUltima = i === semanasPlantilla.length - 1;
+      const nombre = semanasPlantilla.length > 1
+        ? `${template.name} · ${sem.nombre}`
+        : template.name;
 
-      // deno-lint-ignore no-explicit-any
-      for (const ex of (day.program_template_exercises ?? []) as any[]) {
-        const { data: newEx, error: exErr } = await admin
-          .from('exercises')
-          .insert({
-            day_id: newDay.id,
-            name: ex.name,
-            name_en: ex.name_en,
-            library_id: ex.library_id,
-            muscle_group: ex.muscle_group,
-            superseries_group: ex.superseries_group,
-            reps_objective: ex.reps_objective,
-            unit: ex.unit,
-            ref_weight: ex.ref_weight,
-            order_index: ex.order_index,
-            image_url: ex.image_url,
-            video_url: ex.video_url,
-            notes: ex.notes,
-            tempo: ex.tempo,
-            rest_seconds: ex.rest_seconds,
-            target_rir: ex.target_rir,
-          })
+      // El programa toma la semana actual y las siguientes del alumno; las
+      // pasadas no se tocan. plan_weeks tiene unique (plan_id, week_number)
+      // sin filtro por archived: si ya hay fila con ese número se REUTILIZA.
+      const { data: previa } = await admin
+        .from('plan_weeks').select('id')
+        .eq('plan_id', targetPlan.id).eq('week_number', numero).maybeSingle();
+      let weekId: string;
+      if (previa) {
+        await admin.from('training_days').update({ archived: true })
+          .eq('plan_week_id', previa.id).eq('archived', false);
+        const { error: upErr } = await admin.from('plan_weeks')
+          .update({ name: nombre, is_deload: false, repeat_forever: esUltima, archived: false })
+          .eq('id', previa.id);
+        if (upErr) continue;
+        weekId = previa.id;
+      } else {
+        const { data: creada, error: weekErr } = await admin.from('plan_weeks')
+          .insert({ plan_id: targetPlan.id, week_number: numero, name: nombre, repeat_forever: esUltima })
+          .select('id').single();
+        if (weekErr || !creada) continue;
+        weekId = creada.id;
+      }
+
+      for (const day of sem.dias) {
+        const { data: newDay, error: dayErr } = await admin
+          .from('training_days')
+          .insert({ plan_id: targetPlan.id, plan_week_id: weekId, day_number: day.day_number, name: day.name, week_day: day.week_day })
           .select('id')
           .single();
-        if (exErr || !newEx) continue;
+        if (dayErr || !newDay) continue;
 
         // deno-lint-ignore no-explicit-any
-        const seriesRows = (ex.program_template_series ?? []).map((s: any) => ({
-          exercise_id: newEx.id,
-          series_number: s.series_number,
-        }));
-        if (seriesRows.length > 0) await admin.from('exercise_series').insert(seriesRows);
+        for (const ex of (day.program_template_exercises ?? []) as any[]) {
+          const { data: newEx, error: exErr } = await admin
+            .from('exercises')
+            .insert({
+              day_id: newDay.id,
+              name: ex.name,
+              name_en: ex.name_en,
+              library_id: ex.library_id,
+              muscle_group: ex.muscle_group,
+              superseries_group: ex.superseries_group,
+              reps_objective: ex.reps_objective,
+              unit: ex.unit,
+              ref_weight: ex.ref_weight,
+              order_index: ex.order_index,
+              image_url: ex.image_url,
+              video_url: ex.video_url,
+              notes: ex.notes,
+              tempo: ex.tempo,
+              rest_seconds: ex.rest_seconds,
+              target_rir: ex.target_rir,
+            })
+            .select('id')
+            .single();
+          if (exErr || !newEx) continue;
+
+          // deno-lint-ignore no-explicit-any
+          const seriesRows = (ex.program_template_series ?? []).map((s: any) => ({
+            exercise_id: newEx.id,
+            series_number: s.series_number,
+          }));
+          if (seriesRows.length > 0) await admin.from('exercise_series').insert(seriesRows);
+        }
       }
+      okSemanas++;
     }
-    copied++;
+    if (okSemanas > 0) copied++;
   }
 
-  return json({ ok: true, copied, total: targetClientIds.length });
+  return json({ ok: true, copied, total: targetClientIds.length, semanas: semanasPlantilla.length });
 });

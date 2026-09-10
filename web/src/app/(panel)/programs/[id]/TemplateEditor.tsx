@@ -89,7 +89,7 @@ function toEditModel(days: PlanDay[]): EditDay[] {
   }));
 }
 
-export default function TemplateEditor({ templateId, initialDays }: { templateId: string; initialDays: PlanDay[] }) {
+export default function TemplateEditor({ templateId, templateWeekId, initialDays }: { templateId: string; templateWeekId: string; initialDays: PlanDay[] }) {
   const supabase = createClient();
   const [days, setDays] = useState<EditDay[]>(() => toEditModel(initialDays));
   const [delDays, setDelDays] = useState<string[]>([]);
@@ -324,7 +324,7 @@ export default function TemplateEditor({ templateId, initialDays }: { templateId
         if (isTmp(dayId)) {
           const { data, error } = await supabase
             .from('program_template_days')
-            .insert({ template_id: templateId, day_number: dayNumber, name: day.name, week_day: day.week_day })
+            .insert({ template_id: templateId, template_week_id: templateWeekId, day_number: dayNumber, name: day.name, week_day: day.week_day })
             .select('id')
             .single();
           if (error) throw error;
