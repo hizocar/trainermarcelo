@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { firstToken } from '@/lib/env';
+import { santiagoCurrentWeek, weekStartDate, formatShortDate } from '@/lib/weeks';
+import WeekStartPicker from './WeekStartPicker';
 
 interface ClientOption { id: string; name: string; email: string }
 
@@ -15,6 +17,7 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [startWeek, setStartWeek] = useState<number>(() => santiagoCurrentWeek());
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -26,8 +29,9 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
 
   async function confirm() {
     if (selected.size === 0) return;
+    const inicio = formatShortDate(weekStartDate(startWeek).toISOString());
     if (!window.confirm(
-      `¿Asignar este programa a ${selected.size} cliente${selected.size === 1 ? '' : 's'}? Si ya tienen un plan, se reemplaza (su historial se conserva).`,
+      `¿Asignar este programa a ${selected.size} cliente${selected.size === 1 ? '' : 's'}, comenzando la semana del ${inicio}? Sus semanas anteriores no se tocan (el historial se conserva).`,
     )) return;
 
     setSaving(true);
@@ -44,7 +48,7 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
           Authorization: `Bearer ${session.access_token}`,
           apikey: firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
         },
-        body: JSON.stringify({ templateId, targetClientIds: Array.from(selected) }),
+        body: JSON.stringify({ templateId, targetClientIds: Array.from(selected), startWeek }),
       });
       const result = await res.json();
       if (!res.ok || result.error) { setError(result.error ?? 'No se pudo asignar el programa.'); setSaving(false); return; }
@@ -70,7 +74,7 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
 
       {open && (
         <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginBottom: 4 }}>Asignar este programa a clientes</h3>
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
               Se copian todos los días, ejercicios y series como un plan independiente para
@@ -87,6 +91,16 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
                 </label>
               ))}
             </div>
+            <div style={{ marginTop: 14 }}>
+              <span className="label muted" style={{ letterSpacing: 2 }}>Cuándo comienza</span>
+              <p className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
+                Elige la semana del calendario en que parte el programa — hasta entonces, el plan
+                actual del alumno sigue igual. Comienza el <strong style={{ color: 'var(--text)' }}>
+                {formatShortDate(weekStartDate(startWeek).toISOString())}</strong>.
+              </p>
+              <WeekStartPicker value={startWeek} onChange={setStartWeek} />
+            </div>
+
             {error && <div className="form-error" style={{ marginTop: 12 }}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost" style={{ padding: '10px 16px' }} onClick={() => setOpen(false)}>Cancelar</button>
