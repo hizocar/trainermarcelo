@@ -15,6 +15,19 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+
+// La semana de programa "de hoy" en hora de Chile — espejo de
+// santiagoCurrentWeek() (web/src/lib/weeks.ts). Desde la v17 cada semana es
+// independiente y las vistas cargan días por plan_week_id: copiar días sin
+// semana los hacía invisibles (mismo bug que assign-template).
+const TRAINING_EPOCH = new Date('2026-06-15T00:00:00');
+function semanaActualSantiago(): number {
+  const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+  const d = new Date(`${key}T00:00:00`);
+  const diff = Math.floor((d.getTime() - TRAINING_EPOCH.getTime()) / (7 * 86400000));
+  return Math.max(1, diff + 1);
+}
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
@@ -55,26 +68,39 @@ Deno.serve(async (req) => {
   const invalidTargets = targetClientIds.filter((id) => byId.get(id)?.coach_id !== authUser.id);
   if (invalidTargets.length > 0) return json({ error: 'Uno o más clientes destino no son tuyos' }, 400);
 
-  // plan origen completo (solo días/ejercicios activos, no archivados)
+  const semana = semanaActualSantiago();
+
+  // el origen: su semana ACTIVA para la semana calendario de hoy (exacta, o
+  // la última repeat_forever anterior — el mismo resolveActiveWeek de web)
   const { data: sourcePlan } = await admin
-    .from('workout_plans')
+    .from('workout_plans').select('id').eq('client_id', sourceClientId).maybeSingle();
+  if (!sourcePlan) return json({ error: 'El cliente origen no tiene plan' }, 400);
+
+  const { data: sourceWeeks } = await admin
+    .from('plan_weeks').select('id, week_number, name, repeat_forever')
+    .eq('plan_id', sourcePlan.id).eq('archived', false);
+  const exacta = (sourceWeeks ?? []).find((w) => w.week_number === semana);
+  const fallback = (sourceWeeks ?? [])
+    .filter((w) => w.week_number < semana && w.repeat_forever)
+    .sort((a, b) => b.week_number - a.week_number)[0];
+  const sourceWeek = exacta ?? fallback;
+  if (!sourceWeek) return json({ error: 'El cliente origen no tiene una semana activa para copiar' }, 400);
+
+  const { data: sourceDaysData } = await admin
+    .from('training_days')
     .select(`
-      id,
-      training_days (
-        id, day_number, name, week_day, archived,
-        exercises (
-          id, name, name_en, library_id, muscle_group, superseries_group,
-          reps_objective, unit, ref_weight, order_index, image_url, video_url,
-          notes, tempo, rest_seconds, target_rir, archived,
-          exercise_series ( series_number )
-        )
+      id, day_number, name, week_day, archived,
+      exercises (
+        id, name, name_en, library_id, muscle_group, superseries_group,
+        reps_objective, unit, ref_weight, order_index, image_url, video_url,
+        notes, tempo, rest_seconds, target_rir, archived,
+        exercise_series ( series_number )
       )
     `)
-    .eq('client_id', sourceClientId)
-    .maybeSingle();
+    .eq('plan_week_id', sourceWeek.id);
 
   // deno-lint-ignore no-explicit-any
-  const sourceDays = ((sourcePlan as any)?.training_days ?? []).filter((d: any) => !d.archived);
+  const sourceDays = (sourceDaysData ?? []).filter((d: any) => !d.archived);
   if (sourceDays.length === 0) {
     return json({ error: 'El cliente origen no tiene un plan con días para copiar' }, 400);
   }
@@ -94,13 +120,36 @@ Deno.serve(async (req) => {
       targetPlan = created;
     }
 
-    // archivar sus días actuales antes de copiar (no se borran: su historial se conserva)
-    await admin.from('training_days').update({ archived: true }).eq('plan_id', targetPlan.id).eq('archived', false);
+    // la copia toma la semana ACTUAL del destino (unique plan_id+week_number
+    // sin filtro por archived: si la fila existe, se reutiliza)
+    const { data: previa } = await admin
+      .from('plan_weeks').select('id')
+      .eq('plan_id', targetPlan.id).eq('week_number', semana).maybeSingle();
+    let weekId: string;
+    if (previa) {
+      await admin.from('training_days').update({ archived: true })
+        .eq('plan_week_id', previa.id).eq('archived', false);
+      const { error: upErr } = await admin.from('plan_weeks')
+        .update({ name: sourceWeek.name, is_deload: false, repeat_forever: true, archived: false })
+        .eq('id', previa.id);
+      if (upErr) continue;
+      weekId = previa.id;
+    } else {
+      const { data: creada, error: weekErr } = await admin.from('plan_weeks')
+        .insert({ plan_id: targetPlan.id, week_number: semana, name: sourceWeek.name, repeat_forever: true })
+        .select('id').single();
+      if (weekErr || !creada) continue;
+      weekId = creada.id;
+    }
+
+    // sanea días huérfanos de la versión anterior (sin plan_week_id)
+    await admin.from('training_days').update({ archived: true })
+      .eq('plan_id', targetPlan.id).is('plan_week_id', null).eq('archived', false);
 
     for (const day of sourceDays) {
       const { data: newDay, error: dayErr } = await admin
         .from('training_days')
-        .insert({ plan_id: targetPlan.id, day_number: day.day_number, name: day.name, week_day: day.week_day })
+        .insert({ plan_id: targetPlan.id, plan_week_id: weekId, day_number: day.day_number, name: day.name, week_day: day.week_day })
         .select('id')
         .single();
       if (dayErr || !newDay) continue;

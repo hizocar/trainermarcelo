@@ -14,6 +14,20 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+
+// La semana de programa "de hoy", con la fecha calendario de Chile — espejo
+// de santiagoCurrentWeek() en web/src/lib/weeks.ts (misma época, misma
+// fórmula). Los días copiados deben colgar de una plan_week: desde la v17
+// cada semana es independiente y TODAS las vistas cargan días por
+// plan_week_id — un día sin semana es invisible (el bug que motivó este fix).
+const TRAINING_EPOCH = new Date('2026-06-15T00:00:00');
+function semanaActualSantiago(): number {
+  const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+  const d = new Date(`${key}T00:00:00`);
+  const diff = Math.floor((d.getTime() - TRAINING_EPOCH.getTime()) / (7 * 86400000));
+  return Math.max(1, diff + 1);
+}
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
@@ -44,7 +58,7 @@ Deno.serve(async (req) => {
   if (me?.role !== 'coach') return json({ error: 'Solo un coach puede hacer esto' }, 403);
 
   // el coach solo puede asignar SUS propias plantillas a SUS propios clientes
-  const { data: template } = await admin.from('program_templates').select('id, coach_id').eq('id', templateId).maybeSingle();
+  const { data: template } = await admin.from('program_templates').select('id, coach_id, name').eq('id', templateId).maybeSingle();
   if (!template || template.coach_id !== authUser.id) return json({ error: 'Programa inválido' }, 400);
 
   const { data: clients } = await admin.from('users').select('id, name, coach_id').in('id', targetClientIds);
@@ -68,6 +82,8 @@ Deno.serve(async (req) => {
   const days = templateDays ?? [];
   if (days.length === 0) return json({ error: 'Este programa todavía no tiene días para asignar' }, 400);
 
+  const semana = semanaActualSantiago();
+
   let copied = 0;
   for (const targetId of targetClientIds) {
     let { data: targetPlan } = await admin.from('workout_plans').select('id').eq('client_id', targetId).maybeSingle();
@@ -82,12 +98,39 @@ Deno.serve(async (req) => {
       targetPlan = created;
     }
 
-    await admin.from('training_days').update({ archived: true }).eq('plan_id', targetPlan.id).eq('archived', false);
+    // El programa toma la semana ACTUAL del alumno (y las futuras, por
+    // repeat_forever); sus semanas pasadas no se tocan — el historial queda
+    // intacto. plan_weeks tiene unique (plan_id, week_number) sin filtro por
+    // archived, así que si ya hay fila con este número se REUTILIZA.
+    const { data: previa } = await admin
+      .from('plan_weeks').select('id')
+      .eq('plan_id', targetPlan.id).eq('week_number', semana).maybeSingle();
+    let weekId: string;
+    if (previa) {
+      await admin.from('training_days').update({ archived: true })
+        .eq('plan_week_id', previa.id).eq('archived', false);
+      const { error: upErr } = await admin.from('plan_weeks')
+        .update({ name: template.name, is_deload: false, repeat_forever: true, archived: false })
+        .eq('id', previa.id);
+      if (upErr) continue;
+      weekId = previa.id;
+    } else {
+      const { data: creada, error: weekErr } = await admin.from('plan_weeks')
+        .insert({ plan_id: targetPlan.id, week_number: semana, name: template.name, repeat_forever: true })
+        .select('id').single();
+      if (weekErr || !creada) continue;
+      weekId = creada.id;
+    }
+
+    // sanea los días huérfanos que dejó la versión anterior de esta función
+    // (sin plan_week_id: invisibles para todas las vistas)
+    await admin.from('training_days').update({ archived: true })
+      .eq('plan_id', targetPlan.id).is('plan_week_id', null).eq('archived', false);
 
     for (const day of days) {
       const { data: newDay, error: dayErr } = await admin
         .from('training_days')
-        .insert({ plan_id: targetPlan.id, day_number: day.day_number, name: day.name, week_day: day.week_day })
+        .insert({ plan_id: targetPlan.id, plan_week_id: weekId, day_number: day.day_number, name: day.name, week_day: day.week_day })
         .select('id')
         .single();
       if (dayErr || !newDay) continue;
