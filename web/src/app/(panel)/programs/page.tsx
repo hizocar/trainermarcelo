@@ -10,7 +10,7 @@ export default async function ProgramsPage() {
 
   const { data: templates } = await supabase
     .from('program_templates')
-    .select('id, name, created_at, duration_weeks, level, focus, program_template_days(id)')
+    .select('id, name, created_at, duration_weeks, level, focus, program_template_days(id), program_template_weeks(id)')
     .eq('coach_id', userId)
     .order('created_at', { ascending: false });
 
@@ -36,7 +36,7 @@ export default async function ProgramsPage() {
     id: t.id,
     name: t.name,
     days: t.program_template_days?.length ?? 0,
-    weeks: t.duration_weeks ?? null,
+    weeks: (t.program_template_weeks?.length ?? 0) > 0 ? t.program_template_weeks.length : (t.duration_weeks ?? null),
     level: t.level ?? null,
     focus: t.focus ?? null,
   }));
