@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   const { data: { user: authUser }, error: authErr } = await caller.auth.getUser();
   if (authErr || !authUser) return json({ error: 'No autenticado' }, 401);
 
-  let body: { templateId?: string; targetClientIds?: string[] };
+  let body: { templateId?: string; targetClientIds?: string[]; startWeek?: number };
   try { body = await req.json(); } catch { return json({ error: 'Cuerpo inválido' }, 400); }
   const templateId = body.templateId ?? '';
   const targetClientIds = Array.from(new Set(body.targetClientIds ?? []));
@@ -96,7 +96,13 @@ Deno.serve(async (req) => {
     : [{ nombre: 'Semana 1', dias: allDays }];
   if (semanasPlantilla.length === 0) return json({ error: 'Este programa todavía no tiene días para asignar' }, 400);
 
-  const semanaBase = semanaActualSantiago();
+  // la semana de inicio la elige el coach en el calendario; sin ella (o
+  // inválida), el programa parte esta misma semana. Nunca en el pasado.
+  const semanaActual = semanaActualSantiago();
+  const pedida = Number(body.startWeek);
+  const semanaBase = Number.isInteger(pedida) && pedida >= semanaActual && pedida <= semanaActual + 520
+    ? pedida
+    : semanaActual;
 
   let copied = 0;
   for (const targetId of targetClientIds) {
