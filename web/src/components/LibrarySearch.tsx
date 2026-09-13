@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase-browser';
-import { rankLibrary } from '@/lib/libraryRank';
+import { rankLibrary, normalizar } from '@/lib/libraryRank';
 
 export interface LibItem {
   id: string;
@@ -100,10 +100,14 @@ export default function LibrarySearch({
     const query = v.trim();
     if (query.length < 2) { setResults([]); return; }
     timer.current = setTimeout(async () => {
+      // contra las columnas normalizadas (v42): sin tildes ni mayúsculas —
+      // ilike ignora mayúsculas pero NO tildes, y "maquina" no encontraba
+      // "Máquina" (la fila ni llegaba del servidor)
+      const qn = normalizar(query);
       const { data } = await supabase
         .from('exercise_library')
         .select('id, name, name_en, muscle_group, equipment, coach_id')
-        .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
+        .or(`name_norm.ilike.%${qn}%,name_en_norm.ilike.%${qn}%`)
         .limit(40);
       // el ranking decide quién entra a los 8 visibles: básicos y propios
       // primero (antes: limit 6 sin orden = 6 filas arbitrarias de 841)
