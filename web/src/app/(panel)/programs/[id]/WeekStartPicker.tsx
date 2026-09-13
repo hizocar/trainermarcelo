@@ -77,6 +77,9 @@ export default function WeekStartPicker({ value, onChange }: { value: number; on
               dia.setDate(lunes.getDate() + i);
               const delMes = dia.getMonth() === mes.getMonth();
               const esHoy = `${dia.getFullYear()}-${dia.getMonth()}-${dia.getDate()}` === hoyKey;
+              // dentro de la semana en curso, lo ya pasado se atenúa: el
+              // programa rige desde HOY; esos días no se pisan ni se exigen
+              const yaPaso = !pasada && dia < hoy && !esHoy;
               return (
                 <span
                   key={i}
@@ -86,6 +89,7 @@ export default function WeekStartPicker({ value, onChange }: { value: number; on
                     color: elegida ? 'var(--on-accent)' : delMes ? 'var(--text)' : 'var(--text-muted)',
                     fontWeight: esHoy ? 800 : 400,
                     textDecoration: esHoy ? 'underline' : 'none',
+                    opacity: yaPaso ? 0.4 : 1,
                   }}
                 >
                   {dia.getDate()}

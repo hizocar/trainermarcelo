@@ -97,8 +97,10 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
               <p className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
                 {startWeek === semanaActualChile() ? (
                   <>Comienza <strong style={{ color: 'var(--text)' }}>HOY MISMO</strong> — elegir la
-                  semana en curso aplica la rutina al tiro, aunque sea mitad de semana; no hay que
-                  esperar al lunes.</>
+                  semana en curso aplica la rutina al tiro, aunque sea mitad de semana. Los días de
+                  esta semana que ya pasaron quedan como pendientes del programa (el alumno puede
+                  registrarlos tarde u omitirlos), y lo que ya entrenó esta semana se conserva en su
+                  historial.</>
                 ) : (
                   <>Hasta entonces, el plan actual del alumno sigue igual. Comienza el{' '}
                   <strong style={{ color: 'var(--text)' }}>{etiquetaLunes(startWeek)}</strong>.</>
