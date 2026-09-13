@@ -56,6 +56,16 @@ export default function WeekStartPicker({ value, onChange }: { value: number; on
         const numSemana = semanaDeFecha(lunes);
         const pasada = numSemana < semanaActual;
         const elegida = numSemana === value;
+        // el azul empieza donde empieza el programa: si la semana elegida es
+        // la actual, se pintan solo HOY→domingo; lo ya pasado queda sin pintar
+        const dias = Array.from({ length: 7 }, (_, i) => {
+          const dia = new Date(lunes);
+          dia.setDate(lunes.getDate() + i);
+          const esHoy = `${dia.getFullYear()}-${dia.getMonth()}-${dia.getDate()}` === hoyKey;
+          const yaPaso = !pasada && dia < hoy && !esHoy;
+          return { dia, esHoy, yaPaso, pintado: elegida && !yaPaso };
+        });
+        const primerPintado = dias.findIndex(d => d.pintado);
         return (
           <button
             key={lunes.toISOString()}
@@ -64,32 +74,30 @@ export default function WeekStartPicker({ value, onChange }: { value: number; on
             onClick={() => onChange(numSemana)}
             title={pasada ? 'Semana ya pasada' : `Comenzar la semana del lunes ${lunes.getDate()} de ${MESES[lunes.getMonth()].toLowerCase()}`}
             style={{
-              display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, width: '100%',
-              background: elegida ? 'var(--accent)' : 'transparent',
+              display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0, width: '100%',
+              background: 'transparent',
               border: '1px solid ' + (elegida ? 'var(--accent)' : 'transparent'),
               borderRadius: 8, padding: '2px 0', marginBottom: 2,
               cursor: pasada ? 'not-allowed' : 'pointer',
               opacity: pasada ? 0.35 : 1,
             }}
           >
-            {Array.from({ length: 7 }, (_, i) => {
-              const dia = new Date(lunes);
-              dia.setDate(lunes.getDate() + i);
+            {dias.map(({ dia, esHoy, yaPaso, pintado }, i) => {
               const delMes = dia.getMonth() === mes.getMonth();
-              const esHoy = `${dia.getFullYear()}-${dia.getMonth()}-${dia.getDate()}` === hoyKey;
-              // dentro de la semana en curso, lo ya pasado se atenúa: el
-              // programa rige desde HOY; esos días no se pisan ni se exigen
-              const yaPaso = !pasada && dia < hoy && !esHoy;
               return (
                 <span
                   key={i}
                   style={{
                     fontSize: 12, textAlign: 'center', padding: '4px 0',
                     fontFamily: 'var(--font-mono), monospace',
-                    color: elegida ? 'var(--on-accent)' : delMes ? 'var(--text)' : 'var(--text-muted)',
+                    background: pintado ? 'var(--accent)' : 'transparent',
+                    borderRadius: pintado
+                      ? `${i === primerPintado ? '6px' : '0'} ${i === 6 ? '6px' : '0'} ${i === 6 ? '6px' : '0'} ${i === primerPintado ? '6px' : '0'}`
+                      : 0,
+                    color: pintado ? 'var(--on-accent)' : delMes ? 'var(--text)' : 'var(--text-muted)',
                     fontWeight: esHoy ? 800 : 400,
                     textDecoration: esHoy ? 'underline' : 'none',
-                    opacity: yaPaso ? 0.4 : 1,
+                    opacity: yaPaso ? 0.45 : 1,
                   }}
                 >
                   {dia.getDate()}
