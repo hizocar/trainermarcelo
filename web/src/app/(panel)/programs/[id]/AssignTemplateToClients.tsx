@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { firstToken } from '@/lib/env';
-import { santiagoCurrentWeek, weekStartDate, formatShortDate } from '@/lib/weeks';
+import { semanaActualChile, etiquetaLunes } from '@/lib/semanaUTC';
 import WeekStartPicker from './WeekStartPicker';
 
 interface ClientOption { id: string; name: string; email: string }
@@ -17,7 +17,7 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [startWeek, setStartWeek] = useState<number>(() => santiagoCurrentWeek());
+  const [startWeek, setStartWeek] = useState<number>(() => semanaActualChile());
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -29,9 +29,10 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
 
   async function confirm() {
     if (selected.size === 0) return;
-    const inicio = formatShortDate(weekStartDate(startWeek).toISOString());
+    const esHoy = startWeek === semanaActualChile();
+    const inicio = esHoy ? 'HOY mismo (la semana en curso)' : `la semana del ${etiquetaLunes(startWeek)}`;
     if (!window.confirm(
-      `¿Asignar este programa a ${selected.size} cliente${selected.size === 1 ? '' : 's'}, comenzando la semana del ${inicio}? Sus semanas anteriores no se tocan (el historial se conserva).`,
+      `¿Asignar este programa a ${selected.size} cliente${selected.size === 1 ? '' : 's'}, comenzando ${inicio}? Sus semanas anteriores no se tocan (el historial se conserva).`,
     )) return;
 
     setSaving(true);
@@ -94,9 +95,14 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
             <div style={{ marginTop: 14 }}>
               <span className="label muted" style={{ letterSpacing: 2 }}>Cuándo comienza</span>
               <p className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
-                Elige la semana del calendario en que parte el programa — hasta entonces, el plan
-                actual del alumno sigue igual. Comienza el <strong style={{ color: 'var(--text)' }}>
-                {formatShortDate(weekStartDate(startWeek).toISOString())}</strong>.
+                {startWeek === semanaActualChile() ? (
+                  <>Comienza <strong style={{ color: 'var(--text)' }}>HOY MISMO</strong> — elegir la
+                  semana en curso aplica la rutina al tiro, aunque sea mitad de semana; no hay que
+                  esperar al lunes.</>
+                ) : (
+                  <>Hasta entonces, el plan actual del alumno sigue igual. Comienza el{' '}
+                  <strong style={{ color: 'var(--text)' }}>{etiquetaLunes(startWeek)}</strong>.</>
+                )}
               </p>
               <WeekStartPicker value={startWeek} onChange={setStartWeek} />
             </div>

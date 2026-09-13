@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { santiagoCurrentWeek, weekNumberForDate, weekStartDate } from '@/lib/weeks';
+import { semanaActualChile, semanaDeFecha, lunesDeSemana } from '@/lib/semanaUTC';
 
 // Calendario para elegir la SEMANA en que comienza el programa (las semanas
 // del programa corren de lunes a domingo, como todo el sistema). Se navega
@@ -13,8 +13,8 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
 const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 export default function WeekStartPicker({ value, onChange }: { value: number; onChange: (week: number) => void }) {
-  const semanaActual = santiagoCurrentWeek();
-  const inicioSel = weekStartDate(value);
+  const semanaActual = semanaActualChile();
+  const inicioSel = lunesDeSemana(value);
   const [mes, setMes] = useState(() => new Date(inicioSel.getFullYear(), inicioSel.getMonth(), 1));
 
   const hoy = new Date();
@@ -53,7 +53,7 @@ export default function WeekStartPicker({ value, onChange }: { value: number; on
       </div>
 
       {filas.map((lunes) => {
-        const numSemana = weekNumberForDate(lunes);
+        const numSemana = semanaDeFecha(lunes);
         const pasada = numSemana < semanaActual;
         const elegida = numSemana === value;
         return (
