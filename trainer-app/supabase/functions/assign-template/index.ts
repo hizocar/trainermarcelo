@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   const { data: { user: authUser }, error: authErr } = await caller.auth.getUser();
   if (authErr || !authUser) return json({ error: 'No autenticado' }, 401);
 
-  let body: { templateId?: string; targetClientIds?: string[]; startWeek?: number; endWeek?: number | null };
+  let body: { templateId?: string; targetClientIds?: string[]; startDay?: string; endDay?: string | null };
   try { body = await req.json(); } catch { return json({ error: 'Cuerpo inválido' }, 400); }
   const templateId = body.templateId ?? '';
   const targetClientIds = Array.from(new Set(body.targetClientIds ?? []));
@@ -98,30 +98,44 @@ Deno.serve(async (req) => {
 
   // la semana de inicio la elige el coach en el calendario; sin ella (o
   // inválida), el programa parte esta misma semana. Nunca en el pasado.
-  const semanaActual = semanaActualSantiago();
-  const pedida = Number(body.startWeek);
-  const semanaBase = Number.isInteger(pedida) && pedida >= semanaActual && pedida <= semanaActual + 520
-    ? pedida
-    : semanaActual;
+  // rango POR DÍA (a la Google Flights): el programa comienza el día
+  // elegido y, con término, termina ese día exacto — los días del programa
+  // que caen antes del inicio o después del fin en las semanas de borde NO
+  // se copian, y ends_at del plan se fija en el término (la app lo cierra
+  // ese día). Con rango más largo que el programa, las semanas ciclan.
+  const hoyKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+  const esClave = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const semanaDeClave = (key: string) => {
+    const d = new Date(`${key}T00:00:00Z`);
+    return Math.max(1, Math.floor((d.getTime() - Date.UTC(2026, 5, 15)) / (7 * 86400000)) + 1);
+  };
+  const ordenLunes = (key: string) => (new Date(`${key}T00:00:00Z`).getUTCDay() + 6) % 7;
 
-  // término opcional (rango a la Google Flights): con término, las semanas
-  // del programa CICLAN hasta llenarlo y ninguna se repite después — el
-  // programa termina ahí. Sin término: la última repite (modo de siempre).
-  const finPedido = Number(body.endWeek);
-  const semanaFin = Number.isInteger(finPedido) && finPedido >= semanaBase && finPedido <= semanaBase + 103
-    ? finPedido
-    : null;
+  const inicioDia = esClave(body.startDay) && body.startDay >= hoyKey ? body.startDay : hoyKey;
+  const finDia = esClave(body.endDay) && body.endDay >= inicioDia ? body.endDay : null;
+
+  const semanaBase = semanaDeClave(inicioDia);
+  const semanaFin = finDia != null ? Math.min(semanaDeClave(finDia), semanaBase + 103) : null;
+  const ordenInicio = ordenLunes(inicioDia);
+  const ordenFin = finDia != null ? ordenLunes(finDia) : null;
+
+  const ordenDia = (weekDay: number | null) => weekDay == null ? -1 : (weekDay + 6) % 7;
 
   const asignaciones: { nombre: string; dias: typeof allDays; repite: boolean }[] = [];
-  if (semanaFin != null) {
-    const total = semanaFin - semanaBase + 1;
-    for (let i = 0; i < total; i++) {
-      const sem = semanasPlantilla[i % semanasPlantilla.length];
-      asignaciones.push({ nombre: sem.nombre, dias: sem.dias, repite: false });
+  const total = semanaFin != null ? semanaFin - semanaBase + 1 : semanasPlantilla.length;
+  for (let i = 0; i < total; i++) {
+    const sem = semanasPlantilla[i % semanasPlantilla.length];
+    let dias = sem.dias;
+    // semana de inicio: fuera los días del programa anteriores al día elegido
+    if (i === 0) dias = dias.filter((d) => ordenDia(d.week_day) < 0 || ordenDia(d.week_day) >= ordenInicio);
+    // semana de término: fuera los posteriores al día de término
+    if (semanaFin != null && i === total - 1 && ordenFin != null) {
+      dias = dias.filter((d) => ordenDia(d.week_day) < 0 || ordenDia(d.week_day) <= ordenFin);
     }
-  } else {
-    semanasPlantilla.forEach((sem, i) => {
-      asignaciones.push({ nombre: sem.nombre, dias: sem.dias, repite: i === semanasPlantilla.length - 1 });
+    asignaciones.push({
+      nombre: sem.nombre,
+      dias,
+      repite: semanaFin == null && i === semanasPlantilla.length - 1,
     });
   }
 
@@ -138,6 +152,10 @@ Deno.serve(async (req) => {
       if (createErr || !created) continue;
       targetPlan = created;
     }
+
+    // el término del rango es la fecha límite del plan (v36): ese día la
+    // app cierra el programa. Sin término, el plan queda abierto.
+    await admin.from('workout_plans').update({ ends_at: finDia }).eq('id', targetPlan.id);
 
     // sanea los días huérfanos que dejó la versión pre-v17 de esta función
     // (sin plan_week_id: invisibles para todas las vistas)
