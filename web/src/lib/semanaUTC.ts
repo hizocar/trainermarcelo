@@ -53,3 +53,20 @@ export function etiquetaDomingo(n: number): string {
   const d = domingoDeSemana(n);
   return `dom ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`;
 }
+
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+
+/** "jue 17 sep" — cualquier fecha, con su día. */
+export function etiquetaFecha(d: Date): string {
+  return `${DIAS_CORTOS[d.getDay()]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`;
+}
+
+/** 'YYYY-MM-DD' de una fecha local — la moneda de cambio con el servidor. */
+export function claveDia(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Posición lunes-primero de un día JS (lun=0 … dom=6): ordena dentro de la semana. */
+export function ordenLunes(dowJs: number): number {
+  return (dowJs + 6) % 7;
+}
