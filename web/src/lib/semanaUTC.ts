@@ -41,3 +41,15 @@ export function etiquetaLunes(n: number): string {
   const d = lunesDeSemana(n);
   return `lun ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`;
 }
+
+/** El domingo con que termina una semana (lunes + 6), fecha local. */
+export function domingoDeSemana(n: number): Date {
+  const d = lunesDeSemana(n);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6);
+}
+
+/** "dom 20 sep" — para decir cuándo termina el programa. */
+export function etiquetaDomingo(n: number): string {
+  const d = domingoDeSemana(n);
+  return `dom ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`;
+}
