@@ -11,6 +11,7 @@ import { colors, spacing, radius, fonts } from '../../theme';
 import { WEEK_DAYS, getCurrentWeek } from '../../lib/weeks';
 import { track } from '../../lib/analytics';
 import { rankearBiblioteca } from '../../lib/bibliotecaRank';
+import { resolverVideo } from '../../lib/videoBiblioteca';
 
 // La rutina propia: el cliente SIN coach arma su plan él mismo.
 //
@@ -147,12 +148,20 @@ export default function MyRoutineScreen() {
     if (guardando) return;
     setGuardando(true);
     const dia = dias.find(d => d.id === diaId);
+    // hereda el video de la biblioteca (v41): para un alumno, la RLS entrega
+    // los públicos y los de SU coach; el resolutor prefiere el del coach
+    const { data: vids } = await supabase
+      .from('library_videos')
+      .select('library_id, coach_id, video_url, is_public')
+      .eq('library_id', s.id);
+    const video = resolverVideo(vids ?? [], s.id, user?.coach_id ?? null);
     const { data: ex, error } = await supabase
       .from('exercises')
       .insert({
         day_id: diaId, name: s.name, muscle_group: s.muscle_group,
         library_id: s.id, reps_objective: '8-12', unit: 'kg',
         superseries_group: null, order_index: dia?.exercises.length ?? 0,
+        video_url: video,
       })
       .select('id, name').single();
     if (!error && ex) {
