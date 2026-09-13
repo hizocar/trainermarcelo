@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { firstToken } from '@/lib/env';
-import { semanaActualChile, etiquetaLunes } from '@/lib/semanaUTC';
-import WeekStartPicker from './WeekStartPicker';
+import { semanaActualChile, etiquetaLunes, etiquetaDomingo } from '@/lib/semanaUTC';
+import WeekStartPicker, { type RangoSemanas } from './WeekStartPicker';
 
 interface ClientOption { id: string; name: string; email: string }
 
@@ -17,7 +17,7 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [startWeek, setStartWeek] = useState<number>(() => semanaActualChile());
+  const [rango, setRango] = useState<RangoSemanas>(() => ({ inicio: semanaActualChile(), fin: null }));
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -29,10 +29,13 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
 
   async function confirm() {
     if (selected.size === 0) return;
-    const esHoy = startWeek === semanaActualChile();
-    const inicio = esHoy ? 'HOY mismo (la semana en curso)' : `la semana del ${etiquetaLunes(startWeek)}`;
+    const esHoy = rango.inicio === semanaActualChile();
+    const inicio = esHoy ? 'HOY mismo' : `la semana del ${etiquetaLunes(rango.inicio)}`;
+    const termino = rango.fin != null
+      ? ` y terminando el ${etiquetaDomingo(rango.fin)} (${rango.fin - rango.inicio + 1} semanas)`
+      : ' y sin fecha de término (la última semana se repite)';
     if (!window.confirm(
-      `¿Asignar este programa a ${selected.size} cliente${selected.size === 1 ? '' : 's'}, comenzando ${inicio}? Sus semanas anteriores no se tocan (el historial se conserva).`,
+      `¿Asignar este programa a ${selected.size} cliente${selected.size === 1 ? '' : 's'}, comenzando ${inicio}${termino}? Sus semanas anteriores no se tocan (el historial se conserva).`,
     )) return;
 
     setSaving(true);
@@ -49,7 +52,7 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
           Authorization: `Bearer ${session.access_token}`,
           apikey: firstToken(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
         },
-        body: JSON.stringify({ templateId, targetClientIds: Array.from(selected), startWeek }),
+        body: JSON.stringify({ templateId, targetClientIds: Array.from(selected), startWeek: rango.inicio, endWeek: rango.fin }),
       });
       const result = await res.json();
       if (!res.ok || result.error) { setError(result.error ?? 'No se pudo asignar el programa.'); setSaving(false); return; }
@@ -93,20 +96,27 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
               ))}
             </div>
             <div style={{ marginTop: 14 }}>
-              <span className="label muted" style={{ letterSpacing: 2 }}>Cuándo comienza</span>
+              <span className="label muted" style={{ letterSpacing: 2 }}>Cuándo comienza y termina</span>
               <p className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
-                {startWeek === semanaActualChile() ? (
-                  <>Comienza <strong style={{ color: 'var(--text)' }}>HOY MISMO</strong> — elegir la
-                  semana en curso aplica la rutina al tiro, aunque sea mitad de semana. Los días de
-                  esta semana que ya pasaron quedan como pendientes del programa (el alumno puede
-                  registrarlos tarde u omitirlos), y lo que ya entrenó esta semana se conserva en su
-                  historial.</>
+                {rango.inicio === semanaActualChile() ? (
+                  <>Comienza <strong style={{ color: 'var(--text)' }}>HOY MISMO</strong> (mitad de
+                  semana incluida; lo ya entrenado esta semana se conserva).</>
                 ) : (
-                  <>Hasta entonces, el plan actual del alumno sigue igual. Comienza el{' '}
-                  <strong style={{ color: 'var(--text)' }}>{etiquetaLunes(startWeek)}</strong>.</>
+                  <>Comienza el <strong style={{ color: 'var(--text)' }}>{etiquetaLunes(rango.inicio)}</strong> —
+                  hasta entonces, el plan actual sigue igual.</>
+                )}{' '}
+                {rango.fin != null ? (
+                  <>Termina el <strong style={{ color: 'var(--text)' }}>{etiquetaDomingo(rango.fin)}</strong> ·{' '}
+                  {rango.fin - rango.inicio + 1} semanas{' '}
+                  <button type="button" className="accent" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline' }}
+                    onClick={() => setRango(r => ({ inicio: r.inicio, fin: null }))}>quitar término</button>.
+                  Si el rango es más largo que el programa, las semanas se repiten en ciclo.</>
+                ) : (
+                  <>Haz un segundo clic en una semana posterior para fijar el <strong style={{ color: 'var(--text)' }}>término</strong> —
+                  sin término, la última semana del programa se repite indefinidamente.</>
                 )}
               </p>
-              <WeekStartPicker value={startWeek} onChange={setStartWeek} />
+              <WeekStartPicker value={rango} onChange={setRango} />
             </div>
 
             {error && <div className="form-error" style={{ marginTop: 12 }}>{error}</div>}

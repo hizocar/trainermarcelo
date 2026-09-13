@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   const { data: { user: authUser }, error: authErr } = await caller.auth.getUser();
   if (authErr || !authUser) return json({ error: 'No autenticado' }, 401);
 
-  let body: { templateId?: string; targetClientIds?: string[]; startWeek?: number };
+  let body: { templateId?: string; targetClientIds?: string[]; startWeek?: number; endWeek?: number | null };
   try { body = await req.json(); } catch { return json({ error: 'Cuerpo inválido' }, 400); }
   const templateId = body.templateId ?? '';
   const targetClientIds = Array.from(new Set(body.targetClientIds ?? []));
@@ -104,6 +104,27 @@ Deno.serve(async (req) => {
     ? pedida
     : semanaActual;
 
+  // término opcional (rango a la Google Flights): con término, las semanas
+  // del programa CICLAN hasta llenarlo y ninguna se repite después — el
+  // programa termina ahí. Sin término: la última repite (modo de siempre).
+  const finPedido = Number(body.endWeek);
+  const semanaFin = Number.isInteger(finPedido) && finPedido >= semanaBase && finPedido <= semanaBase + 103
+    ? finPedido
+    : null;
+
+  const asignaciones: { nombre: string; dias: typeof allDays; repite: boolean }[] = [];
+  if (semanaFin != null) {
+    const total = semanaFin - semanaBase + 1;
+    for (let i = 0; i < total; i++) {
+      const sem = semanasPlantilla[i % semanasPlantilla.length];
+      asignaciones.push({ nombre: sem.nombre, dias: sem.dias, repite: false });
+    }
+  } else {
+    semanasPlantilla.forEach((sem, i) => {
+      asignaciones.push({ nombre: sem.nombre, dias: sem.dias, repite: i === semanasPlantilla.length - 1 });
+    });
+  }
+
   let copied = 0;
   for (const targetId of targetClientIds) {
     let { data: targetPlan } = await admin.from('workout_plans').select('id').eq('client_id', targetId).maybeSingle();
@@ -124,10 +145,10 @@ Deno.serve(async (req) => {
       .eq('plan_id', targetPlan.id).is('plan_week_id', null).eq('archived', false);
 
     let okSemanas = 0;
-    for (let i = 0; i < semanasPlantilla.length; i++) {
-      const sem = semanasPlantilla[i];
+    for (let i = 0; i < asignaciones.length; i++) {
+      const sem = asignaciones[i];
       const numero = semanaBase + i;
-      const esUltima = i === semanasPlantilla.length - 1;
+      const esUltima = sem.repite;
       const nombre = semanasPlantilla.length > 1
         ? `${template.name} · ${sem.nombre}`
         : template.name;
@@ -202,5 +223,5 @@ Deno.serve(async (req) => {
     if (okSemanas > 0) copied++;
   }
 
-  return json({ ok: true, copied, total: targetClientIds.length, semanas: semanasPlantilla.length });
+  return json({ ok: true, copied, total: targetClientIds.length, semanas: asignaciones.length });
 });
