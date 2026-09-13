@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, fonts } from '../../theme';
 import { WEEK_DAYS, getCurrentWeek } from '../../lib/weeks';
 import { track } from '../../lib/analytics';
-import { rankearBiblioteca } from '../../lib/bibliotecaRank';
+import { rankearBiblioteca, normalizar } from '../../lib/bibliotecaRank';
 import { resolverVideo } from '../../lib/videoBiblioteca';
 
 // La rutina propia: el cliente SIN coach arma su plan él mismo.
@@ -138,7 +138,7 @@ export default function MyRoutineScreen() {
     const { data } = await supabase
       .from('exercise_library')
       .select('id, name, muscle_group, equipment')
-      .ilike('name', `%${texto.trim()}%`)
+      .ilike('name_norm', `%${normalizar(texto)}%`)
       .limit(40);
     setSugerencias(rankearBiblioteca(data ?? [], texto.trim()).slice(0, 8));
   }

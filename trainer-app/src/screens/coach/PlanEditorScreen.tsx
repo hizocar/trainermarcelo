@@ -16,7 +16,7 @@ import { showAlert, showConfirm } from '../../lib/alert';
 import { pickImage, pickVideo, uploadMedia, videoExtension } from '../../lib/media';
 import { WEEK_DAYS_SHORT as WEEK_DAYS } from '../../lib/weeks';
 import { parseRepsRange, formatRepsRange } from '../../lib/reps';
-import { rankearBiblioteca } from '../../lib/bibliotecaRank';
+import { rankearBiblioteca, normalizar } from '../../lib/bibliotecaRank';
 import {
   chainWith, unchain, dissolveGroup, groupNameFor, colorForLabel, normalizeGroups,
   superseriarSeleccion,
@@ -279,7 +279,7 @@ export default function PlanEditorScreen() {
       const { data } = await supabase
         .from('exercise_library')
         .select('id, name, name_en, muscle_group, equipment, coach_id')
-        .or(`name.ilike.%${q}%,name_en.ilike.%${q}%`)
+        .or(`name_norm.ilike.%${normalizar(q)}%,name_en_norm.ilike.%${normalizar(q)}%`)
         .limit(40);
       // ranking: básicos y propios primero (antes: limit 5 sin orden =
       // filas arbitrarias); no sugerir si ya escribió exactamente ese nombre

@@ -5,6 +5,7 @@ import MiniBody from '@/components/MiniBody';
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { type VideoLib } from '@/lib/videoBiblioteca';
+import { normalizar } from '@/lib/libraryRank';
 
 const MUSCLE_GROUPS = [
   'Pecho', 'Espalda alta', 'Espalda baja',
@@ -91,12 +92,12 @@ export default function LibraryClient({ initialLibrary, coachId }: { initialLibr
   }
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizar(query);
     if (!q) return items;
     return items.filter((i) =>
-      i.name.toLowerCase().includes(q) ||
-      (i.name_en ?? '').toLowerCase().includes(q) ||
-      (i.muscle_group ?? '').toLowerCase().includes(q));
+      normalizar(i.name).includes(q) ||
+      normalizar(i.name_en ?? '').includes(q) ||
+      normalizar(i.muscle_group ?? '').includes(q));
   }, [items, query]);
 
   const grouped = useMemo(() => {
