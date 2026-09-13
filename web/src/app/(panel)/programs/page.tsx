@@ -12,6 +12,7 @@ export default async function ProgramsPage() {
     .from('program_templates')
     .select('id, name, created_at, duration_weeks, level, focus, program_template_days(id), program_template_weeks(id)')
     .eq('coach_id', userId)
+    .eq('archived', false)
     .order('created_at', { ascending: false });
 
   // solicitudes de compra pendientes (store fase 1) — el error se propaga,

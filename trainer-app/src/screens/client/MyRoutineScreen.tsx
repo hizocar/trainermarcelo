@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, fonts } from '../../theme';
 import { WEEK_DAYS, getCurrentWeek } from '../../lib/weeks';
 import { track } from '../../lib/analytics';
+import { rankearBiblioteca } from '../../lib/bibliotecaRank';
 
 // La rutina propia: el cliente SIN coach arma su plan él mismo.
 //
@@ -137,8 +138,8 @@ export default function MyRoutineScreen() {
       .from('exercise_library')
       .select('id, name, muscle_group, equipment')
       .ilike('name', `%${texto.trim()}%`)
-      .limit(8);
-    setSugerencias(data ?? []);
+      .limit(40);
+    setSugerencias(rankearBiblioteca(data ?? [], texto.trim()).slice(0, 8));
   }
 
   // Colocar un ejercicio "y ya": 3 series de 8-12, sin más preguntas.

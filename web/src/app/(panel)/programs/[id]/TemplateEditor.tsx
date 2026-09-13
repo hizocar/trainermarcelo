@@ -584,7 +584,16 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
                 <ExerciseVideoCell
                   videoUrl={ex.video_url}
                   uid={uid}
-                  onChange={(url) => updateEx(di, ei, { video_url: url })}
+                  onChange={(url) => {
+                    updateEx(di, ei, { video_url: url });
+                    // el video queda guardado AL INSTANTE en ejercicios ya
+                    // existentes: subirlo y cerrar sin GUARDAR CAMBIOS lo
+                    // perdía ("no se guardan los videos que subo")
+                    if (!isTmp(ex.id)) {
+                      supabase.from('program_template_exercises').update({ video_url: url }).eq('id', ex.id)
+                        .then(({ error: e }) => { if (e) setError(`El video no quedó guardado: ${e.message}`); });
+                    }
+                  }}
                 />
                 <button className="btn btn-primary" style={{ padding: '10px 22px' }} onClick={() => setEditCard(null)}>
                   LISTO

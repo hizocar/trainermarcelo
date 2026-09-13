@@ -33,6 +33,7 @@ export default function ProgramsListScreen() {
     const { data } = await supabase
       .from('program_templates')
       .select('id, name, duration_weeks, program_template_days(id)')
+      .eq('archived', false)
       .order('created_at', { ascending: false });
     setTemplates((data ?? []).map((t: any) => ({
       id: t.id, name: t.name, duration_weeks: t.duration_weeks,
@@ -59,13 +60,15 @@ export default function ProgramsListScreen() {
 
   function deleteTemplate(t: TemplateRow) {
     showConfirm(
-      'Borrar programa',
-      `¿Borrar "${t.name}"? Esto no afecta a los clientes a los que ya se les asignó.`,
+      'Quitar programa',
+      `¿Quitar "${t.name}" de tu catálogo? No afecta a los clientes que ya lo tienen, y si te arrepientes se puede recuperar.`,
       async () => {
-        await supabase.from('program_templates').delete().eq('id', t.id);
+        // archivar, no borrar: el borrado en cascada perdió trabajo real (v40)
+        const { error } = await supabase.from('program_templates').update({ archived: true }).eq('id', t.id);
+        if (error) { showAlert('No se pudo quitar', error.message); return; }
         setTemplates(prev => prev.filter(x => x.id !== t.id));
       },
-      'Borrar',
+      'Quitar',
     );
   }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase-browser';
+import { rankLibrary } from '@/lib/libraryRank';
 
 export interface LibItem {
   id: string;
@@ -31,6 +32,7 @@ export default function LibrarySearch({
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const [mounted, setMounted] = useState(false); // el portal solo existe en el cliente
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uidRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +40,9 @@ export default function LibrarySearch({
 
   useEffect(() => {
     setMounted(true);
+    supabase.auth.getUser().then(({ data }) => { uidRef.current = data.user?.id ?? null; });
     return () => { if (timer.current) clearTimeout(timer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Posición tomada del input: el menú es fixed, así que va en coordenadas de viewport.
@@ -98,10 +102,12 @@ export default function LibrarySearch({
     timer.current = setTimeout(async () => {
       const { data } = await supabase
         .from('exercise_library')
-        .select('id, name, name_en, muscle_group, equipment')
+        .select('id, name, name_en, muscle_group, equipment, coach_id')
         .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
-        .limit(6);
-      setResults((data ?? []) as LibItem[]);
+        .limit(40);
+      // el ranking decide quién entra a los 8 visibles: básicos y propios
+      // primero (antes: limit 6 sin orden = 6 filas arbitrarias de 841)
+      setResults(rankLibrary((data ?? []) as (LibItem & { coach_id: string | null })[], query, uidRef.current).slice(0, 8));
     }, 220);
   }
 
