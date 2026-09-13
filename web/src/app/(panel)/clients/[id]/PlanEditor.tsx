@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import ExerciseVideoCell from '@/components/ExerciseVideoCell';
+import { resolverVideo, type VideoLib } from '@/lib/videoBiblioteca';
 import MiniBody from '@/components/MiniBody';
 import type { PlanDay } from '@/lib/types';
 
@@ -338,13 +339,22 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
     });
   }
 
-  function pickFromLibrary(di: number, ei: number, item: LibItem) {
+  async function pickFromLibrary(di: number, ei: number, item: LibItem) {
     updateEx(di, ei, {
       name: item.name,
       library_id: item.id,
       name_en: item.name_en,
       muscle_group: item.muscle_group ?? '',
     });
+    // hereda el video de la biblioteca (v41): el del propio coach manda;
+    // si no tiene, un público. Un privado ajeno jamás llega hasta acá — la
+    // RLS no lo entrega.
+    const { data } = await supabase
+      .from('library_videos')
+      .select('library_id, coach_id, video_url, is_public')
+      .eq('library_id', item.id);
+    const url = resolverVideo((data ?? []) as VideoLib[], item.id, uid);
+    if (url) updateEx(di, ei, { video_url: url });
   }
 
   async function createInLibrary() {
