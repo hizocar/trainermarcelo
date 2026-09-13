@@ -112,6 +112,10 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
   // arrastre de columnas de día (el video de Yharel): día tomado y destino
   const [dragDia, setDragDia] = useState<number | null>(null);
   const [sobreDia, setSobreDia] = useState<number | null>(null);
+  // columna iluminada mientras un ejercicio de OTRO día pasa por encima
+  const [sobreColEj, setSobreColEj] = useState<number | null>(null);
+  // el clic que sigue a un arrastre no debe abrir el modal
+  const recienArrastro = useRef(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
@@ -256,6 +260,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
   }
 
   function onHandleDragStart(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
+    recienArrastro.current = true;
     setDrag({ di, ei });
     e.dataTransfer.effectAllowed = 'move';
     // el dataTransfer necesita datos (Firefox si no, no arrastra), pero con un tipo
@@ -265,7 +270,13 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
     const row = e.currentTarget.closest('.board-card');
     if (row) e.dataTransfer.setDragImage(row, 12, 12);
   }
-  function endDrag() { setDrag(null); setDropTarget(null); }
+  function endDrag() {
+    setDrag(null);
+    setDropTarget(null);
+    setSobreColEj(null);
+    // el click sintético que dispara el navegador tras soltar no cuenta
+    setTimeout(() => { recienArrastro.current = false; }, 0);
+  }
 
   function onRowDragOver(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
     // Dentro del mismo día reordena; entre días MUEVE (feedback de Yharel).
@@ -487,13 +498,21 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
           <div
             key={day.id}
             className="board-col-edit"
-            onDragOver={(e) => { if (drag && drag.di !== di) e.preventDefault(); }}
+            onDragOver={(e) => { if (drag && drag.di !== di) { e.preventDefault(); setSobreColEj(di); } }}
+            onDragLeave={(e) => {
+              if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
+                setSobreColEj((s) => (s === di ? null : s));
+              }
+            }}
             onDrop={(e) => {
               if (!drag || drag.di === di) return;
               e.preventDefault();
               moverEjercicioEntreDias(drag.di, drag.ei, di, day.exercises.length);
               endDrag();
             }}
+            style={sobreColEj === di && drag && drag.di !== di
+              ? { boxShadow: 'inset 0 0 0 2px var(--accent)' }
+              : undefined}
           >
             <div
               className="board-day-banner"
@@ -557,10 +576,13 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                     : '',
                 ].filter(Boolean).join(' ')}
                 style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
+                draggable
+                onDragStart={(e) => onHandleDragStart(di, ei, e)}
+                onDragEnd={endDrag}
                 onDragOver={(e) => onRowDragOver(di, ei, e)}
                 onDragLeave={(e) => onRowDragLeave(di, ei, e)}
                 onDrop={(e) => onRowDrop(di, ei, e)}
-                onClick={() => setEditCard({ di, ei })}
+                onClick={() => { if (recienArrastro.current) { recienArrastro.current = false; return; } setEditCard({ di, ei }); }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') setEditCard({ di, ei }); }}
