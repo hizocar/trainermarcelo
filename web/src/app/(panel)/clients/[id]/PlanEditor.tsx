@@ -29,6 +29,7 @@ const isTmp = (id: string) => id.startsWith('tmp_');
 // sobre el input del nombre del día — e inserta ahí el texto arrastrado. Un tipo
 // desconocido no tiene comportamiento por defecto: soltar afuera no escribe nada.
 const DRAG_MIME = 'application/x-elitefit-ex';
+const DRAG_MIME_DIA = 'application/x-elitefit-dia';
 
 interface EditSeries { id: string; series_number: number }
 interface EditExercise {
@@ -108,6 +109,9 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
   // asideros por ejercicio, para devolverles el foco tras mover con el teclado
   const handleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [announcement, setAnnouncement] = useState('');
+  // arrastre de columnas de día (el video de Yharel): día tomado y destino
+  const [dragDia, setDragDia] = useState<number | null>(null);
+  const [sobreDia, setSobreDia] = useState<number | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
@@ -192,6 +196,65 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
     setAnnouncement(`${list[from].name || 'Ejercicio'}, posición ${to + 1} de ${list.length}`);
   }
 
+  // ── días completos: mover, duplicar; y ejercicios entre días ──
+  function moverDia(from: number, to: number) {
+    if (to < 0 || to >= days.length || from === to) return;
+    const nombre = days[from].name || 'Día';
+    mutate((d) => { const [x] = d.splice(from, 1); d.splice(to, 0, x); return d; });
+    setAnnouncement(`${nombre}, ahora es el día ${to + 1} de ${days.length}`);
+  }
+
+  function duplicarDia(di: number) {
+    mutate((d) => {
+      const src = d[di];
+      d.splice(di + 1, 0, {
+        id: tmpId(), name: `${src.name} (copia)`, week_day: null,
+        exercises: src.exercises.map((e) => ({
+          ...e, id: tmpId(),
+          series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+        })),
+      });
+      return d;
+    });
+  }
+
+  function duplicarEjercicio(di: number, ei: number) {
+    mutate((d) => {
+      const e = d[di].exercises[ei];
+      d[di].exercises.splice(ei + 1, 0, {
+        ...e, id: tmpId(),
+        series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+      });
+      return d;
+    });
+  }
+
+  function moverEjercicioEntreDias(fromDi: number, fromEi: number, toDi: number, toEi: number) {
+    const nombre = days[fromDi]?.exercises[fromEi]?.name || 'Ejercicio';
+    mutate((d) => {
+      const [ex] = d[fromDi].exercises.splice(fromEi, 1);
+      d[toDi].exercises.splice(Math.min(toEi, d[toDi].exercises.length), 0, ex);
+      return d;
+    });
+    setAnnouncement(`${nombre} movido al día ${toDi + 1}`);
+  }
+
+  // cambiar el ejercicio conservando series y objetivos: el actual sale
+  // (con su historial a salvo) y entra uno nuevo en su lugar, listo para
+  // elegir de la biblioteca — el punto 9 del feedback de Yharel
+  function reemplazarEjercicio(di: number, ei: number) {
+    const ex = days[di].exercises[ei];
+    if (!isTmp(ex.id)) setArchEx((x) => [...x, ex.id]);
+    mutate((d) => {
+      const e = d[di].exercises[ei];
+      d[di].exercises[ei] = {
+        ...e, id: tmpId(), name: '', library_id: null, name_en: null,
+        series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+      };
+      return d;
+    });
+  }
+
   function onHandleDragStart(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
     setDrag({ di, ei });
     e.dataTransfer.effectAllowed = 'move';
@@ -205,10 +268,11 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
   function endDrag() { setDrag(null); setDropTarget(null); }
 
   function onRowDragOver(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
-    // Solo se reordena dentro del mismo día. El estado `drag` ya garantiza que el
-    // arrastre salió de un asidero nuestro; no se consulta dataTransfer.types acá
-    // porque Safari es irregular exponiendo tipos propios durante el dragover.
-    if (!drag || drag.di !== di) return;
+    // Dentro del mismo día reordena; entre días MUEVE (feedback de Yharel).
+    // El estado `drag` ya garantiza que el arrastre salió de un asidero
+    // nuestro; no se consulta dataTransfer.types acá porque Safari es
+    // irregular exponiendo tipos propios durante el dragover.
+    if (!drag) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dropTarget?.di !== di || dropTarget?.ei !== ei) setDropTarget({ di, ei });
@@ -221,12 +285,16 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
     setDropTarget((cur) => (cur?.di === di && cur.ei === ei ? null : cur));
   }
   function onRowDrop(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
-    if (!drag || drag.di !== di) return;
+    if (!drag) return;
     e.preventDefault();
+    e.stopPropagation(); // que no lo procese también la columna
     // el origen viaja en el dataTransfer con nuestro tipo; el estado es el respaldo
     const raw = e.dataTransfer.getData(DRAG_MIME);
     const from = raw === '' ? drag.ei : Number(raw);
-    if (Number.isInteger(from)) reorderExercise(di, from, ei);
+    if (Number.isInteger(from)) {
+      if (drag.di === di) reorderExercise(di, from, ei);
+      else moverEjercicioEntreDias(drag.di, from, di, ei);
+    }
     endDrag();
   }
   // Teclado: el arrastre nativo no funciona con el dedo ni sin mouse.
@@ -373,7 +441,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
             if (error) throw error;
             exId = data.id;
           } else {
-            const { error } = await supabase.from('exercises').update(fields).eq('id', exId);
+            const { error } = await supabase.from('exercises').update({ ...fields, day_id: dayId }).eq('id', exId);
             if (error) throw error;
           }
 
@@ -416,8 +484,50 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
           detalle se edita en un modal. Mismos handlers de siempre. */}
       <div className="board-scroll board-edit">
         {days.map((day, di) => (
-          <div key={day.id} className="board-col-edit">
-            <div className="board-day-banner">
+          <div
+            key={day.id}
+            className="board-col-edit"
+            onDragOver={(e) => { if (drag && drag.di !== di) e.preventDefault(); }}
+            onDrop={(e) => {
+              if (!drag || drag.di === di) return;
+              e.preventDefault();
+              moverEjercicioEntreDias(drag.di, drag.ei, di, day.exercises.length);
+              endDrag();
+            }}
+          >
+            <div
+              className="board-day-banner"
+              onDragOver={(e) => { if (dragDia != null && dragDia !== di) { e.preventDefault(); setSobreDia(di); } }}
+              onDragLeave={() => setSobreDia((s) => (s === di ? null : s))}
+              onDrop={(e) => {
+                if (dragDia == null) return;
+                e.preventDefault();
+                e.stopPropagation();
+                moverDia(dragDia, di);
+                setDragDia(null);
+                setSobreDia(null);
+              }}
+              style={sobreDia === di && dragDia !== di ? { boxShadow: '0 0 0 2px var(--text)' } : undefined}
+            >
+              <button
+                type="button"
+                className="board-day-drag"
+                draggable
+                onDragStart={(e) => {
+                  setDragDia(di);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData(DRAG_MIME_DIA, String(di));
+                }}
+                onDragEnd={() => { setDragDia(null); setSobreDia(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft') { e.preventDefault(); moverDia(di, di - 1); }
+                  if (e.key === 'ArrowRight') { e.preventDefault(); moverDia(di, di + 1); }
+                }}
+                title="Arrastra la columna para reordenar los días (o usa ← →)"
+                aria-label={`Mover el día ${day.name || di + 1} (flechas izquierda y derecha)`}
+              >
+                ⠿
+              </button>
               <span className="board-day-num">DÍA {di + 1}</span>
               <input
                 className="board-day-name"
@@ -432,6 +542,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
               >
                 {WEEKDAYS.map((w, i) => <option key={i} value={i}>{w}</option>)}
               </select>
+              <button className="board-day-x" title="Duplicar día (con sus ejercicios)" onClick={() => duplicarDia(di)}>⧉</button>
               <button className="board-day-x" title="Quitar día" onClick={() => removeDay(di)}>✕</button>
             </div>
 
@@ -441,8 +552,8 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                 className={[
                   'board-card', 'board-card-v2',
                   drag?.di === di && drag.ei === ei ? 'row-dragging' : '',
-                  dropTarget?.di === di && dropTarget.ei === ei && drag && drag.ei !== ei
-                    ? (drag.ei > ei ? 'row-drop-above' : 'row-drop-below')
+                  dropTarget?.di === di && dropTarget.ei === ei && drag && (drag.di !== di || drag.ei !== ei)
+                    ? ((drag.di !== di || drag.ei > ei) ? 'row-drop-above' : 'row-drop-below')
                     : '',
                 ].filter(Boolean).join(' ')}
                 style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
@@ -490,6 +601,13 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                 </div>
                 <button
                   className="icon-btn"
+                  title="Duplicar ejercicio"
+                  onClick={(e) => { e.stopPropagation(); duplicarEjercicio(di, ei); }}
+                >
+                  ⧉
+                </button>
+                <button
+                  className="icon-btn"
                   title="Quitar (conserva historial)"
                   onClick={(e) => { e.stopPropagation(); removeExercise(di, ei); }}
                 >
@@ -522,9 +640,17 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                 <MiniBody grupo={ex.muscle_group} height={84} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {ex.library_id || !isTmp(ex.id) ? (
-                    <h3 style={{ margin: 0 }} title="El nombre identifica el historial. Para cambiar el ejercicio, quítalo y agrega otro.">
-                      {ex.name}
-                    </h3>
+                    <div>
+                      <h3 style={{ margin: 0 }}>{ex.name}</h3>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: '6px 10px', fontSize: 11, marginTop: 8 }}
+                        onClick={() => reemplazarEjercicio(di, ei)}
+                        title="El actual sale (su historial se conserva) y eliges otro manteniendo series y objetivos"
+                      >
+                        ⇄ CAMBIAR EJERCICIO
+                      </button>
+                    </div>
                   ) : (
                     <LibrarySearch
                       onPick={(item) => pickFromLibrary(di, ei, item)}
