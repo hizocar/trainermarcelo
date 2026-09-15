@@ -27,6 +27,7 @@ function aplicarTema(t: Tema) {
 // marca con brillo, no con color — la jerarquía de la casa.
 
 const ICON = {
+  inicio: <path d="M12 3 2 11h3v9a1 1 0 0 0 1 1h5v-6h2v6h5a1 1 0 0 0 1-1v-9h3L12 3Z" />,
   clientes: <path d="M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm8 .5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5v1H2v-1Zm14-.9V20h6v-1.4c0-2.6-2-4.3-4.6-4.3-.9 0-1.8.2-2.5.6 0 .1 1.1 1.5 1.1 3.2Z" />,
   programas: <path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm1 5h8v2H8V8Zm0 4h8v2H8v-2Zm0 4h5v2H8v-2Z" />,
   biblioteca: <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5v-17ZM6.5 4a.5.5 0 0 0-.5.5V17c.16-.03 1.5 0 1.5 0H18V4H6.5ZM6 19a1 1 0 0 0 0 2h14v-2H6Z" />,
@@ -37,7 +38,8 @@ const ICON = {
 } as const;
 
 const ITEMS: { href: string; label: string; icon: keyof typeof ICON; activos: string[] }[] = [
-  { href: '/dashboard', label: 'CLIENTES', icon: 'clientes', activos: ['/dashboard', '/clients'] },
+  { href: '/dashboard', label: 'INICIO', icon: 'inicio', activos: ['/dashboard'] },
+  { href: '/clients', label: 'CLIENTES', icon: 'clientes', activos: ['/clients'] },
   { href: '/programs', label: 'PROGRAMAS', icon: 'programas', activos: ['/programs'] },
   { href: '/library', label: 'BIBLIOTECA', icon: 'biblioteca', activos: ['/library'] },
   { href: '/agenda', label: 'AGENDA', icon: 'agenda', activos: ['/agenda'] },
