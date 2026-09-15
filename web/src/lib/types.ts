@@ -16,6 +16,8 @@ export interface TrainingDay {
   day_number: number;
   name: string;
   week_day?: number | null;
+  /** solo días de programa (program_template_days): la semana a la que pertenece */
+  template_week_id?: string | null;
 }
 
 export interface ExerciseSeries {

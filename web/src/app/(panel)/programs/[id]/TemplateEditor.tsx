@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import ExerciseVideoCell from '@/components/ExerciseVideoCell';
@@ -8,13 +9,15 @@ import { resolverVideo, type VideoLib } from '@/lib/videoBiblioteca';
 import MiniBody from '@/components/MiniBody';
 import type { PlanDay } from '@/lib/types';
 
-// Editor de un programa (plantilla sin cliente asignado). Es el mismo
-// modelo de edición que PlanEditor, pero sobre program_template_* en vez
-// de training_days/exercises — y sin 'archivar': un programa no tiene
-// historial de nadie todavía, así que quitar algo acá lo borra de verdad.
-
-const WEEKDAYS = ['—', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const WEEKDAY_VALUE = [null, 1, 2, 3, 4, 5, 6, 0];
+// Editor de un programa como GRAN CALENDARIO (pedido de Marcelo): todas las
+// semanas apiladas hacia abajo, cada una con sus 7 columnas Lun..Dom. El día
+// de la semana YA NO se elige con un selector — es la celda donde vive el
+// bloque: crear un día en la celda del jueves lo deja en jueves, y arrastrar
+// el bloque a otra celda (de cualquier semana) lo reubica ahí.
+//
+// Las semanas (crear/duplicar/renombrar/quitar) van directo a la base; los
+// días/ejercicios/series se guardan en lote con GUARDAR CAMBIOS, como
+// siempre. Un programa no tiene historial de nadie: quitar borra de verdad.
 
 const MUSCLE_GROUPS = [
   'Pecho', 'Espalda alta', 'Espalda baja',
@@ -25,14 +28,16 @@ const MUSCLE_GROUPS = [
   'Gastrocnemios', 'Core',
 ];
 
+// columnas del calendario (lunes primero) → week_day en numeración JS (0=Dom)
+const COLUMNAS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
+const WEEKDAY_DE_COLUMNA = [1, 2, 3, 4, 5, 6, 0];
+const columnaDeWeekDay = (wd: number | null) => (wd == null ? 0 : (wd + 6) % 7);
+
 let tmpCounter = 0;
 const tmpId = () => `tmp_${Date.now()}_${tmpCounter++}`;
 const isTmp = (id: string) => id.startsWith('tmp_');
 
-// Tipo MIME propio para el arrastre de filas. Con 'text/plain' el navegador aplica
-// su comportamiento por defecto si la fila se suelta fuera de la tabla — por ejemplo
-// sobre el input del nombre del día — e inserta ahí el texto arrastrado. Un tipo
-// desconocido no tiene comportamiento por defecto: soltar afuera no escribe nada.
+// Tipos MIME propios: soltar fuera de un destino válido no escribe nada.
 const DRAG_MIME = 'application/x-elitefit-ex';
 const DRAG_MIME_DIA = 'application/x-elitefit-dia';
 
@@ -53,16 +58,18 @@ interface EditExercise {
   series: EditSeries[];
 }
 
-// Colores estables para biseries/triseries: mismo grupo → mismo color,
-// tanto en la pizarra como en la app del cliente.
 const GROUP_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#22c55e', '#ef4444'];
 function groupColor(group: string) {
   let h = 0;
   for (let i = 0; i < group.length; i++) h = (h * 31 + group.charCodeAt(i)) >>> 0;
   return GROUP_COLORS[h % GROUP_COLORS.length];
 }
+
+export interface TplWeekLite { id: string; name: string }
+
 interface EditDay {
   id: string;
+  weekId: string;
   name: string;
   week_day: number | null;
   exercises: EditExercise[];
@@ -71,6 +78,7 @@ interface EditDay {
 function toEditModel(days: PlanDay[]): EditDay[] {
   return days.map((d) => ({
     id: d.id,
+    weekId: (d as any).template_week_id ?? '',
     name: d.name,
     week_day: d.week_day ?? null,
     exercises: (d.exercises ?? []).map((e) => ({
@@ -91,8 +99,14 @@ function toEditModel(days: PlanDay[]): EditDay[] {
   }));
 }
 
-export default function TemplateEditor({ templateId, templateWeekId, initialDays }: { templateId: string; templateWeekId: string; initialDays: PlanDay[] }) {
+export default function TemplateEditor({ templateId, weeks, initialDays }: {
+  templateId: string;
+  weeks: TplWeekLite[];
+  initialDays: PlanDay[];
+}) {
   const supabase = createClient();
+  const router = useRouter();
+  const [semanas, setSemanas] = useState<TplWeekLite[]>(weeks);
   const [days, setDays] = useState<EditDay[]>(() => toEditModel(initialDays));
   const [delDays, setDelDays] = useState<string[]>([]);
   const [delEx, setDelEx] = useState<string[]>([]);
@@ -107,24 +121,36 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
   const [libSaving, setLibSaving] = useState(false);
   const [editCard, setEditCard] = useState<{ di: number; ei: number } | null>(null);
 
-  // arrastre de filas: fila tomada y fila sobre la que se soltaría
+  // arrastre de ejercicios (tarjeta completa) y de días (bloque completo)
   const [drag, setDrag] = useState<{ di: number; ei: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ di: number; ei: number } | null>(null);
-  // asideros por ejercicio, para devolverles el foco tras mover con el teclado
+  const [dragDia, setDragDia] = useState<number | null>(null);
+  const [sobreCelda, setSobreCelda] = useState<string | null>(null); // `${weekId}:${col}`
+  const [sobreDiaEj, setSobreDiaEj] = useState<number | null>(null);
   const handleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [announcement, setAnnouncement] = useState('');
-  // arrastre de columnas de día (el video de Yharel): día tomado y destino
-  const [dragDia, setDragDia] = useState<number | null>(null);
-  const [sobreDia, setSobreDia] = useState<number | null>(null);
-  // columna iluminada mientras un ejercicio de OTRO día pasa por encima
-  const [sobreColEj, setSobreColEj] = useState<number | null>(null);
-  // el clic que sigue a un arrastre no debe abrir el modal
   const recienArrastro = useRef(false);
+  const creandoSemana1 = useRef(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // un programa recién creado no tiene semanas: nace la Semana 1 sola
+  useEffect(() => {
+    if (semanas.length > 0 || creandoSemana1.current) return;
+    creandoSemana1.current = true;
+    supabase.from('program_template_weeks')
+      .insert({ template_id: templateId, week_number: 1, name: 'Semana 1' })
+      .select('id, name')
+      .single()
+      .then(({ data, error: err }) => {
+        if (err) setError(err.message);
+        else if (data) setSemanas([{ id: data.id, name: data.name }]);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semanas.length]);
 
   function mutate(fn: (draft: EditDay[]) => EditDay[]) {
     setDays((prev) => fn(structuredClone(prev)));
@@ -139,16 +165,18 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
     mutate((d) => { d[di].exercises[ei] = { ...d[di].exercises[ei], ...patch }; return d; });
   }
 
-  function addDay() {
+  // ── días: nacen EN una celda; moverlos es cambiar de celda ──
+  function addDay(weekId: string, weekDayJs: number) {
     mutate((d) => {
-      // Sugerencia: el próximo día de semana libre (Lun..Dom) para que el
-      // split quede distribuido automáticamente en vez de partir sin fecha.
-      const used = new Set(d.map((x) => x.week_day).filter((v) => v != null));
-      const order = [1, 2, 3, 4, 5, 6, 0];
-      const suggested = order.find((v) => !used.has(v)) ?? null;
-      d.push({ id: tmpId(), name: 'Nuevo día', week_day: suggested, exercises: [] });
+      d.push({ id: tmpId(), weekId, name: 'Nuevo día', week_day: weekDayJs, exercises: [] });
       return d;
     });
+  }
+  function moverDiaACelda(di: number, weekId: string, weekDayJs: number) {
+    const dia = days[di];
+    if (!dia || (dia.weekId === weekId && dia.week_day === weekDayJs)) return;
+    updateDay(di, { weekId, week_day: weekDayJs });
+    setAnnouncement(`${dia.name || 'Día'} movido a ${COLUMNAS[columnaDeWeekDay(weekDayJs)]}`);
   }
   function removeDay(di: number) {
     const day = days[di];
@@ -156,6 +184,19 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
         !window.confirm(`¿Quitar "${day.name}" del programa?`)) return;
     if (!isTmp(day.id)) setDelDays((x) => [...x, day.id]);
     mutate((d) => { d.splice(di, 1); return d; });
+  }
+  function duplicarDia(di: number) {
+    mutate((d) => {
+      const src = d[di];
+      d.push({
+        id: tmpId(), weekId: src.weekId, name: `${src.name} (copia)`, week_day: src.week_day,
+        exercises: src.exercises.map((e) => ({
+          ...e, id: tmpId(),
+          series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+        })),
+      });
+      return d;
+    });
   }
 
   function addExercise(di: number) {
@@ -178,18 +219,6 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
     setEditCard(null);
   }
 
-  function moveExercise(di: number, ei: number, dir: -1 | 1) {
-    const j = ei + dir;
-    if (j < 0 || j >= days[di].exercises.length) return;
-    mutate((d) => {
-      const list = d[di].exercises;
-      [list[ei], list[j]] = [list[j], list[ei]];
-      return d;
-    });
-  }
-
-  // mueve un ejercicio a otra posición del mismo día (el orden se persiste solo:
-  // al guardar, order_index sale de la posición en el arreglo)
   function reorderExercise(di: number, from: number, to: number) {
     const list = days[di].exercises;
     if (from === to || to < 0 || to >= list.length) return;
@@ -200,28 +229,6 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
       return d;
     });
     setAnnouncement(`${list[from].name || 'Ejercicio'}, posición ${to + 1} de ${list.length}`);
-  }
-
-  // ── días completos: mover, duplicar; y ejercicios entre días ──
-  function moverDia(from: number, to: number) {
-    if (to < 0 || to >= days.length || from === to) return;
-    const nombre = days[from].name || 'Día';
-    mutate((d) => { const [x] = d.splice(from, 1); d.splice(to, 0, x); return d; });
-    setAnnouncement(`${nombre}, ahora es el día ${to + 1} de ${days.length}`);
-  }
-
-  function duplicarDia(di: number) {
-    mutate((d) => {
-      const src = d[di];
-      d.splice(di + 1, 0, {
-        id: tmpId(), name: `${src.name} (copia)`, week_day: null,
-        exercises: src.exercises.map((e) => ({
-          ...e, id: tmpId(),
-          series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
-        })),
-      });
-      return d;
-    });
   }
 
   function duplicarEjercicio(di: number, ei: number) {
@@ -242,12 +249,9 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
       d[toDi].exercises.splice(Math.min(toEi, d[toDi].exercises.length), 0, ex);
       return d;
     });
-    setAnnouncement(`${nombre} movido al día ${toDi + 1}`);
+    setAnnouncement(`${nombre} movido a ${days[toDi]?.name ?? 'otro día'}`);
   }
 
-  // cambiar el ejercicio conservando series y objetivos: el actual sale
-  // (con su historial a salvo) y entra uno nuevo en su lugar, listo para
-  // elegir de la biblioteca — el punto 9 del feedback de Yharel
   function reemplazarEjercicio(di: number, ei: number) {
     const ex = days[di].exercises[ei];
     if (!isTmp(ex.id)) setDelEx((x) => [...x, ex.id]);
@@ -261,38 +265,137 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
     });
   }
 
+  // ── semanas: directo a la base ──
+  function bloquearPorCambios(): boolean {
+    if (dirty) {
+      setError('Guarda los cambios (botón de abajo) antes de duplicar o quitar semanas.');
+      return true;
+    }
+    return false;
+  }
+
+  async function crearSemana() {
+    setError(null);
+    const { data, error: err } = await supabase
+      .from('program_template_weeks')
+      .insert({ template_id: templateId, week_number: semanas.length + 1, name: `Semana ${semanas.length + 1}` })
+      .select('id, name')
+      .single();
+    if (err || !data) { setError(err?.message ?? 'No se pudo crear la semana.'); return; }
+    setSemanas((s) => [...s, { id: data.id, name: data.name }]);
+  }
+
+  async function renombrarSemana(weekId: string, nombre: string) {
+    const limpio = nombre.trim().slice(0, 60);
+    if (!limpio) return;
+    const { error: err } = await supabase
+      .from('program_template_weeks').update({ name: limpio }).eq('id', weekId);
+    if (err) { setError(err.message); return; }
+    setSemanas((s) => s.map((w) => (w.id === weekId ? { ...w, name: limpio } : w)));
+  }
+
+  async function duplicarSemana(weekId: string) {
+    if (bloquearPorCambios()) return;
+    setError(null);
+    try {
+      const { data: nueva, error: weekErr } = await supabase
+        .from('program_template_weeks')
+        .insert({ template_id: templateId, week_number: semanas.length + 1, name: `${semanas.find(w => w.id === weekId)?.name ?? 'Semana'} (copia)`.slice(0, 60) })
+        .select('id')
+        .single();
+      if (weekErr || !nueva) throw weekErr ?? new Error('No se pudo crear la semana.');
+      const { data: dias, error: diasErr } = await supabase
+        .from('program_template_days')
+        .select(`
+          day_number, name, week_day,
+          program_template_exercises ( name, name_en, library_id, muscle_group, superseries_group,
+            reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, tempo, notes, video_url,
+            program_template_series ( series_number ) )
+        `)
+        .eq('template_week_id', weekId);
+      if (diasErr) throw diasErr;
+      for (const dia of (dias ?? [])) {
+        const { program_template_exercises: ejercicios, ...campos } = dia as any;
+        const { data: nuevoDia, error: diaErr } = await supabase
+          .from('program_template_days')
+          .insert({ ...campos, template_id: templateId, template_week_id: nueva.id })
+          .select('id')
+          .single();
+        if (diaErr || !nuevoDia) throw diaErr ?? new Error('No se pudo copiar un día.');
+        for (const ex of (ejercicios ?? [])) {
+          const { program_template_series: series, ...camposEx } = ex as any;
+          const { data: nuevoEx, error: exErr } = await supabase
+            .from('program_template_exercises')
+            .insert({ ...camposEx, day_id: nuevoDia.id })
+            .select('id')
+            .single();
+          if (exErr || !nuevoEx) throw exErr ?? new Error('No se pudo copiar un ejercicio.');
+          const filas = (series ?? []).map((s: any) => ({ exercise_id: nuevoEx.id, series_number: s.series_number }));
+          if (filas.length > 0) {
+            const { error: serErr } = await supabase.from('program_template_series').insert(filas);
+            if (serErr) throw serErr;
+          }
+        }
+      }
+      router.refresh();
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo duplicar la semana.');
+    }
+  }
+
+  async function quitarSemana(weekId: string) {
+    if (semanas.length <= 1) return;
+    if (bloquearPorCambios()) return;
+    const nombre = semanas.find(w => w.id === weekId)?.name ?? 'esta semana';
+    if (!window.confirm(`¿Quitar "${nombre}" del programa? Sus días se borran (un programa no tiene historial de nadie).`)) return;
+    setError(null);
+    try {
+      const { data: dias, error: dErr } = await supabase
+        .from('program_template_days').select('id, program_template_exercises ( id )')
+        .eq('template_week_id', weekId);
+      if (dErr) throw dErr;
+      const exIds = (dias ?? []).flatMap((d: any) => (d.program_template_exercises ?? []).map((e: any) => e.id));
+      if (exIds.length > 0) {
+        const { error: sErr } = await supabase.from('program_template_series').delete().in('exercise_id', exIds);
+        if (sErr) throw sErr;
+        const { error: eErr } = await supabase.from('program_template_exercises').delete().in('id', exIds);
+        if (eErr) throw eErr;
+      }
+      const { error: ddErr } = await supabase.from('program_template_days').delete().eq('template_week_id', weekId);
+      if (ddErr) throw ddErr;
+      const { error: wErr } = await supabase.from('program_template_weeks').delete().eq('id', weekId);
+      if (wErr) throw wErr;
+      setSemanas((s) => s.filter((w) => w.id !== weekId));
+      setDays((d) => d.filter((x) => x.weekId !== weekId));
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo quitar la semana.');
+    }
+  }
+
+  // ── arrastres ──
   function onHandleDragStart(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
     recienArrastro.current = true;
     setDrag({ di, ei });
     e.dataTransfer.effectAllowed = 'move';
-    // el dataTransfer necesita datos (Firefox si no, no arrastra), pero con un tipo
-    // propio: soltar la fila fuera de la tabla no debe escribir nada en ningún campo
     e.dataTransfer.setData(DRAG_MIME, String(ei));
-    // arrastrar la fila completa, no solo el asidero
     const row = e.currentTarget.closest('.board-card');
     if (row) e.dataTransfer.setDragImage(row, 12, 12);
   }
   function endDrag() {
     setDrag(null);
     setDropTarget(null);
-    setSobreColEj(null);
-    // el click sintético que dispara el navegador tras soltar no cuenta
+    setSobreDiaEj(null);
+    setSobreCelda(null);
+    setDragDia(null);
     setTimeout(() => { recienArrastro.current = false; }, 0);
   }
 
   function onRowDragOver(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
-    // Dentro del mismo día reordena; entre días MUEVE (feedback de Yharel).
-    // El estado `drag` ya garantiza que el arrastre salió de un asidero
-    // nuestro; no se consulta dataTransfer.types acá porque Safari es
-    // irregular exponiendo tipos propios durante el dragover.
     if (!drag) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dropTarget?.di !== di || dropTarget?.ei !== ei) setDropTarget({ di, ei });
   }
-  // Sin esto el resalte queda pegado en la última fila sobrevolada al salir del tbody.
-  // Al pasar de una fila a otra, dragleave llega DESPUÉS del dragover de la nueva:
-  // por eso solo se limpia si el destino sigue siendo esta fila.
   function onRowDragLeave(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
     setDropTarget((cur) => (cur?.di === di && cur.ei === ei ? null : cur));
@@ -300,8 +403,7 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
   function onRowDrop(di: number, ei: number, e: React.DragEvent<HTMLElement>) {
     if (!drag) return;
     e.preventDefault();
-    e.stopPropagation(); // que no lo procese también la columna
-    // el origen viaja en el dataTransfer con nuestro tipo; el estado es el respaldo
+    e.stopPropagation();
     const raw = e.dataTransfer.getData(DRAG_MIME);
     const from = raw === '' ? drag.ei : Number(raw);
     if (Number.isInteger(from)) {
@@ -310,17 +412,14 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
     }
     endDrag();
   }
-  // Teclado: el arrastre nativo no funciona con el dedo ni sin mouse.
   function onHandleKeyDown(di: number, ei: number, e: React.KeyboardEvent) {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    e.preventDefault(); // que las flechas no hagan scroll de la página
+    e.preventDefault();
     const list = days[di].exercises;
     const to = ei + (e.key === 'ArrowUp' ? -1 : 1);
     if (to < 0 || to >= list.length) return;
     const movedId = list[ei].id;
     reorderExercise(di, ei, to);
-    // mover un nodo del DOM es quitarlo e insertarlo, y eso lo desenfoca en Chrome
-    // y Safari: sin esto la segunda flecha ya no movería nada
     requestAnimationFrame(() => handleRefs.current[movedId]?.focus());
   }
 
@@ -346,9 +445,6 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
       name_en: item.name_en,
       muscle_group: item.muscle_group ?? '',
     });
-    // hereda el video de la biblioteca (v41): el del propio coach manda;
-    // si no tiene, un público. Un privado ajeno jamás llega hasta acá — la
-    // RLS no lo entrega.
     const { data } = await supabase
       .from('library_videos')
       .select('library_id, coach_id, video_url, is_public')
@@ -381,8 +477,8 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
   }
 
   async function save() {
-    const unpicked = days.flatMap((d, i) =>
-      d.exercises.some((e) => isTmp(e.id) && !e.library_id) ? [`Día ${i + 1}`] : [],
+    const unpicked = days.flatMap((d) =>
+      d.exercises.some((e) => isTmp(e.id) && !e.library_id) ? [d.name || 'un día'] : [],
     );
     if (unpicked.length > 0) {
       setError(`Hay ejercicios sin elegir de la biblioteca en: ${unpicked.join(', ')}. Selecciónalos o quítalos antes de guardar.`);
@@ -405,75 +501,83 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
         if (error) throw error;
       }
 
-      for (let di = 0; di < days.length; di++) {
-        const day = days[di];
-        const dayNumber = di + 1;
-        let dayId = day.id;
+      // día a día, semana por semana: day_number = orden por columna (Lun..Dom)
+      for (const semana of semanas) {
+        const delWeek = days
+          .map((d, di) => ({ d, di }))
+          .filter(({ d }) => d.weekId === semana.id)
+          .sort((a, b) => columnaDeWeekDay(a.d.week_day) - columnaDeWeekDay(b.d.week_day));
 
-        if (isTmp(dayId)) {
-          const { data, error } = await supabase
-            .from('program_template_days')
-            .insert({ template_id: templateId, template_week_id: templateWeekId, day_number: dayNumber, name: day.name, week_day: day.week_day })
-            .select('id')
-            .single();
-          if (error) throw error;
-          dayId = data.id;
-        } else {
-          const { error } = await supabase
-            .from('program_template_days')
-            .update({ day_number: dayNumber, name: day.name, week_day: day.week_day })
-            .eq('id', dayId);
-          if (error) throw error;
-        }
+        for (let n = 0; n < delWeek.length; n++) {
+          const day = delWeek[n].d;
+          const dayNumber = n + 1;
+          let dayId = day.id;
 
-        for (let ei = 0; ei < day.exercises.length; ei++) {
-          const ex = day.exercises[ei];
-          const refNum = Number(ex.ref_weight.replace(',', '.'));
-          const restNum = parseInt(ex.rest_seconds, 10);
-          const fields = {
-            muscle_group: ex.muscle_group.trim() || null,
-            reps_objective: ex.reps_objective.trim(),
-            unit: ex.unit,
-            ref_weight: ex.ref_weight.trim() === '' || isNaN(refNum) ? null : refNum,
-            rest_seconds: isNaN(restNum) ? null : restNum,
-            target_rir: ex.target_rir.trim() || null,
-            superseries_group: ex.superseries_group.trim() || null,
-            video_url: ex.video_url,
-            order_index: ei,
-          };
-          let exId = ex.id;
-          if (isTmp(exId)) {
+          if (isTmp(dayId)) {
             const { data, error } = await supabase
-              .from('program_template_exercises')
-              .insert({
-                day_id: dayId,
-                name: ex.name,
-                name_en: ex.name_en,
-                library_id: ex.library_id,
-                ...fields,
-              })
+              .from('program_template_days')
+              .insert({ template_id: templateId, template_week_id: day.weekId, day_number: dayNumber, name: day.name, week_day: day.week_day })
               .select('id')
               .single();
             if (error) throw error;
-            exId = data.id;
+            dayId = data.id;
           } else {
-            const { error } = await supabase.from('program_template_exercises').update({ ...fields, day_id: dayId }).eq('id', exId);
+            const { error } = await supabase
+              .from('program_template_days')
+              .update({ template_week_id: day.weekId, day_number: dayNumber, name: day.name, week_day: day.week_day })
+              .eq('id', dayId);
             if (error) throw error;
           }
 
-          for (let si = 0; si < ex.series.length; si++) {
-            const s = ex.series[si];
-            if (isTmp(s.id)) {
-              const { error } = await supabase
-                .from('program_template_series')
-                .insert({ exercise_id: exId, series_number: si + 1 });
+          for (let ei = 0; ei < day.exercises.length; ei++) {
+            const ex = day.exercises[ei];
+            const refNum = Number(ex.ref_weight.replace(',', '.'));
+            const restNum = parseInt(ex.rest_seconds, 10);
+            const fields = {
+              muscle_group: ex.muscle_group.trim() || null,
+              reps_objective: ex.reps_objective.trim(),
+              unit: ex.unit,
+              ref_weight: ex.ref_weight.trim() === '' || isNaN(refNum) ? null : refNum,
+              rest_seconds: isNaN(restNum) ? null : restNum,
+              target_rir: ex.target_rir.trim() || null,
+              superseries_group: ex.superseries_group.trim() || null,
+              video_url: ex.video_url,
+              order_index: ei,
+            };
+            let exId = ex.id;
+            if (isTmp(exId)) {
+              const { data, error } = await supabase
+                .from('program_template_exercises')
+                .insert({
+                  day_id: dayId,
+                  name: ex.name,
+                  name_en: ex.name_en,
+                  library_id: ex.library_id,
+                  ...fields,
+                })
+                .select('id')
+                .single();
               if (error) throw error;
+              exId = data.id;
             } else {
-              const { error } = await supabase
-                .from('program_template_series')
-                .update({ series_number: si + 1 })
-                .eq('id', s.id);
+              const { error } = await supabase.from('program_template_exercises').update({ ...fields, day_id: dayId }).eq('id', exId);
               if (error) throw error;
+            }
+
+            for (let si = 0; si < ex.series.length; si++) {
+              const s = ex.series[si];
+              if (isTmp(s.id)) {
+                const { error } = await supabase
+                  .from('program_template_series')
+                  .insert({ exercise_id: exId, series_number: si + 1 });
+                if (error) throw error;
+              } else {
+                const { error } = await supabase
+                  .from('program_template_series')
+                  .update({ series_number: si + 1 })
+                  .eq('id', s.id);
+                if (error) throw error;
+              }
             }
           }
         }
@@ -489,166 +593,222 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
     }
   }
 
-  return (
-    <div style={{ marginTop: 12 }}>
-      {/* El tablero v2: tarjetas compactas con el músculo encendido; el
-          detalle se edita en un modal. Mismos handlers de siempre. */}
-      <div className="board-scroll board-edit">
-        {days.map((day, di) => (
-          <div
-            key={day.id}
-            className="board-col-edit"
-            onDragOver={(e) => { if (drag && drag.di !== di) { e.preventDefault(); setSobreColEj(di); } }}
-            onDragLeave={(e) => {
-              if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
-                setSobreColEj((s) => (s === di ? null : s));
-              }
+  // ── tarjeta de un día (bloque) dentro de su celda ──
+  function tarjetaDia(day: EditDay, di: number) {
+    return (
+      <div
+        key={day.id}
+        className="cal-dia"
+        onDragOver={(e) => {
+          if (drag && drag.di !== di) { e.preventDefault(); setSobreDiaEj(di); }
+        }}
+        onDragLeave={(e) => {
+          if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
+            setSobreDiaEj((s) => (s === di ? null : s));
+          }
+        }}
+        onDrop={(e) => {
+          if (!drag || drag.di === di) return;
+          e.preventDefault();
+          e.stopPropagation();
+          moverEjercicioEntreDias(drag.di, drag.ei, di, day.exercises.length);
+          endDrag();
+        }}
+        style={sobreDiaEj === di && drag && drag.di !== di
+          ? { boxShadow: 'inset 0 0 0 2px var(--accent)' }
+          : undefined}
+      >
+        <div className="board-day-banner" style={{ padding: '6px 8px' }}>
+          <button
+            type="button"
+            className="board-day-drag"
+            draggable
+            onDragStart={(e) => {
+              recienArrastro.current = true;
+              setDragDia(di);
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData(DRAG_MIME_DIA, String(di));
+              const bloque = e.currentTarget.closest('.cal-dia');
+              if (bloque) e.dataTransfer.setDragImage(bloque, 12, 12);
             }}
-            onDrop={(e) => {
-              if (!drag || drag.di === di) return;
-              e.preventDefault();
-              moverEjercicioEntreDias(drag.di, drag.ei, di, day.exercises.length);
-              endDrag();
-            }}
-            style={sobreColEj === di && drag && drag.di !== di
-              ? { boxShadow: 'inset 0 0 0 2px var(--accent)' }
-              : undefined}
+            onDragEnd={endDrag}
+            title="Arrastra el día a otra celda del calendario (otro día u otra semana)"
+            aria-label={`Mover el día ${day.name}`}
           >
-            <div
-              className="board-day-banner"
-              onDragOver={(e) => { if (dragDia != null && dragDia !== di) { e.preventDefault(); setSobreDia(di); } }}
-              onDragLeave={() => setSobreDia((s) => (s === di ? null : s))}
-              onDrop={(e) => {
-                if (dragDia == null) return;
-                e.preventDefault();
-                e.stopPropagation();
-                moverDia(dragDia, di);
-                setDragDia(null);
-                setSobreDia(null);
-              }}
-              style={sobreDia === di && dragDia !== di ? { boxShadow: '0 0 0 2px var(--text)' } : undefined}
+            ⠿
+          </button>
+          <input
+            className="board-day-name"
+            style={{ fontSize: 13 }}
+            value={day.name}
+            onChange={(e) => updateDay(di, { name: e.target.value })}
+            placeholder="Nombre del día"
+          />
+          <button className="board-day-x" title="Duplicar día (con sus ejercicios)" onClick={() => duplicarDia(di)}>⧉</button>
+          <button className="board-day-x" title="Quitar día" onClick={() => removeDay(di)}>✕</button>
+        </div>
+
+        {day.exercises.map((ex, ei) => (
+          <div
+            key={ex.id}
+            className={[
+              'board-card', 'board-card-v2', 'cal-card',
+              drag?.di === di && drag.ei === ei ? 'row-dragging' : '',
+              dropTarget?.di === di && dropTarget.ei === ei && drag && (drag.di !== di || drag.ei !== ei)
+                ? ((drag.di !== di || drag.ei > ei) ? 'row-drop-above' : 'row-drop-below')
+                : '',
+            ].filter(Boolean).join(' ')}
+            style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
+            draggable
+            onDragStart={(e) => onHandleDragStart(di, ei, e)}
+            onDragEnd={endDrag}
+            onDragOver={(e) => onRowDragOver(di, ei, e)}
+            onDragLeave={(e) => onRowDragLeave(di, ei, e)}
+            onDrop={(e) => onRowDrop(di, ei, e)}
+            onClick={() => { if (recienArrastro.current) { recienArrastro.current = false; return; } setEditCard({ di, ei }); }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter') setEditCard({ di, ei }); }}
+          >
+            <button
+              type="button"
+              className="drag-handle"
+              draggable
+              ref={(el) => { handleRefs.current[ex.id] = el; }}
+              onClick={(e) => e.stopPropagation()}
+              onDragStart={(e) => onHandleDragStart(di, ei, e)}
+              onDragEnd={endDrag}
+              onKeyDown={(e) => { e.stopPropagation(); onHandleKeyDown(di, ei, e); }}
+              title="Arrastra para reordenar o mover a otro día"
+              aria-label={`Reordenar ${ex.name || 'ejercicio'} (${ei + 1} de ${day.exercises.length})`}
             >
-              <button
-                type="button"
-                className="board-day-drag"
-                draggable
-                onDragStart={(e) => {
-                  setDragDia(di);
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData(DRAG_MIME_DIA, String(di));
-                }}
-                onDragEnd={() => { setDragDia(null); setSobreDia(null); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowLeft') { e.preventDefault(); moverDia(di, di - 1); }
-                  if (e.key === 'ArrowRight') { e.preventDefault(); moverDia(di, di + 1); }
-                }}
-                title="Arrastra la columna para reordenar los días (o usa ← →)"
-                aria-label={`Mover el día ${day.name || di + 1} (flechas izquierda y derecha)`}
-              >
-                ⠿
-              </button>
-              <span className="board-day-num">DÍA {di + 1}</span>
-              <input
-                className="board-day-name"
-                value={day.name}
-                onChange={(e) => updateDay(di, { name: e.target.value })}
-                placeholder="Nombre del día"
-              />
-              <select
-                className="board-day-week"
-                value={WEEKDAY_VALUE.findIndex((v) => v === day.week_day)}
-                onChange={(e) => updateDay(di, { week_day: WEEKDAY_VALUE[Number(e.target.value)] })}
-              >
-                {WEEKDAYS.map((w, i) => <option key={i} value={i}>{w}</option>)}
-              </select>
-              <button className="board-day-x" title="Duplicar día (con sus ejercicios)" onClick={() => duplicarDia(di)}>⧉</button>
-              <button className="board-day-x" title="Quitar día" onClick={() => removeDay(di)}>✕</button>
-            </div>
-
-            {day.exercises.map((ex, ei) => (
-              <div
-                key={ex.id}
-                className={[
-                  'board-card', 'board-card-v2',
-                  drag?.di === di && drag.ei === ei ? 'row-dragging' : '',
-                  dropTarget?.di === di && dropTarget.ei === ei && drag && (drag.di !== di || drag.ei !== ei)
-                    ? ((drag.di !== di || drag.ei > ei) ? 'row-drop-above' : 'row-drop-below')
-                    : '',
-                ].filter(Boolean).join(' ')}
-                style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
-                draggable
-                onDragStart={(e) => onHandleDragStart(di, ei, e)}
-                onDragEnd={endDrag}
-                onDragOver={(e) => onRowDragOver(di, ei, e)}
-                onDragLeave={(e) => onRowDragLeave(di, ei, e)}
-                onDrop={(e) => onRowDrop(di, ei, e)}
-                onClick={() => { if (recienArrastro.current) { recienArrastro.current = false; return; } setEditCard({ di, ei }); }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter') setEditCard({ di, ei }); }}
-              >
-                <button
-                  type="button"
-                  className="drag-handle"
-                  draggable
-                  ref={(el) => { handleRefs.current[ex.id] = el; }}
-                  onClick={(e) => e.stopPropagation()}
-                  onDragStart={(e) => onHandleDragStart(di, ei, e)}
-                  onDragEnd={endDrag}
-                  onKeyDown={(e) => { e.stopPropagation(); onHandleKeyDown(di, ei, e); }}
-                  title="Arrastra para reordenar, o usa las flechas ↑ ↓ del teclado"
-                  aria-label={`Reordenar ${ex.name || 'ejercicio'} (${ei + 1} de ${day.exercises.length})`}
-                >
-                  ⠿
-                </button>
-                <MiniBody grupo={ex.muscle_group} height={62} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="board-card-name">{ex.name || '(elige el ejercicio)'}</div>
-                  <div className="board-card-sub">
-                    {[
-                      ex.muscle_group.trim() || null,
-                      `${ex.series.length} × ${ex.reps_objective.trim() || '—'}`,
-                      ex.rest_seconds.trim() ? `${ex.rest_seconds.trim()}s` : null,
-                      ex.target_rir.trim() ? `RIR ${ex.target_rir.trim()}` : null,
-                    ].filter(Boolean).join(' · ')}
-                  </div>
-                  <div className="board-card-badges">
-                    {ex.superseries_group.trim() && (
-                      <span className="board-badge" style={{ borderColor: groupColor(ex.superseries_group.trim()), color: groupColor(ex.superseries_group.trim()) }}>
-                        ⛓ {ex.superseries_group.trim().toUpperCase()}
-                      </span>
-                    )}
-                    {ex.video_url && <span className="board-badge">▶ VIDEO</span>}
-                  </div>
-                </div>
-                <button
-                  className="icon-btn"
-                  title="Duplicar ejercicio"
-                  onClick={(e) => { e.stopPropagation(); duplicarEjercicio(di, ei); }}
-                >
-                  ⧉
-                </button>
-                <button
-                  className="icon-btn"
-                  title="Quitar (conserva historial)"
-                  onClick={(e) => { e.stopPropagation(); removeExercise(di, ei); }}
-                >
-                  ✕
-                </button>
+              ⠿
+            </button>
+            <MiniBody grupo={ex.muscle_group} height={44} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="board-card-name" style={{ fontSize: 12 }}>{ex.name || '(elige el ejercicio)'}</div>
+              <div className="board-card-sub" style={{ fontSize: 10 }}>
+                {[
+                  `${ex.series.length} × ${ex.reps_objective.trim() || '—'}`,
+                  ex.target_rir.trim() ? `RIR ${ex.target_rir.trim()}` : null,
+                ].filter(Boolean).join(' · ')}
               </div>
-            ))}
-
-            {day.exercises.length === 0 && <span className="board-empty">Sin ejercicios todavía.</span>}
-
-            <button className="btn btn-ghost" style={{ padding: '9px 12px', fontSize: 12 }} onClick={() => addExercise(di)}>
-              + Agregar ejercicio
+              <div className="board-card-badges">
+                {ex.superseries_group.trim() && (
+                  <span className="board-badge" style={{ borderColor: groupColor(ex.superseries_group.trim()), color: groupColor(ex.superseries_group.trim()) }}>
+                    ⛓ {ex.superseries_group.trim().toUpperCase()}
+                  </span>
+                )}
+                {ex.video_url && <span className="board-badge">▶</span>}
+              </div>
+            </div>
+            <button
+              className="icon-btn"
+              style={{ width: 24, height: 24 }}
+              title="Duplicar ejercicio"
+              onClick={(e) => { e.stopPropagation(); duplicarEjercicio(di, ei); }}
+            >
+              ⧉
+            </button>
+            <button
+              className="icon-btn"
+              style={{ width: 24, height: 24 }}
+              title="Quitar"
+              onClick={(e) => { e.stopPropagation(); removeExercise(di, ei); }}
+            >
+              ✕
             </button>
           </div>
         ))}
 
-        <button type="button" className="board-add-day" onClick={addDay}>
-          + AGREGAR DÍA
+        <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11, width: '100%' }} onClick={() => addExercise(di)}>
+          + EJERCICIO
         </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {/* EL GRAN CALENDARIO: semanas hacia abajo, columnas Lun..Dom. La celda
+          donde vive el bloque ES su día de la semana. */}
+      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{ minWidth: 1400 }}>
+          {semanas.map((semana, si) => (
+            <section key={semana.id} className="cal-semana">
+              <div className="cal-semana-head">
+                <span className="board-day-num" style={{ color: 'var(--accent)' }}>S{si + 1}</span>
+                <input
+                  className="cal-semana-nombre"
+                  defaultValue={semana.name}
+                  onBlur={(e) => { if (e.target.value.trim() !== semana.name) renombrarSemana(semana.id, e.target.value); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  aria-label={`Nombre de la semana ${si + 1}`}
+                />
+                <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => duplicarSemana(semana.id)}>
+                  DUPLICAR SEMANA
+                </button>
+                {semanas.length > 1 && (
+                  <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => quitarSemana(semana.id)}>
+                    QUITAR
+                  </button>
+                )}
+              </div>
+
+              <div className="cal-grilla">
+                {COLUMNAS.map((col, c) => {
+                  const weekDayJs = WEEKDAY_DE_COLUMNA[c];
+                  const clave = `${semana.id}:${c}`;
+                  const bloques = days
+                    .map((d, di) => ({ d, di }))
+                    .filter(({ d }) => d.weekId === semana.id && columnaDeWeekDay(d.week_day) === c && d.week_day != null);
+                  // días heredados sin día asignado: se muestran en Lun
+                  const sueltos = c === 0
+                    ? days.map((d, di) => ({ d, di })).filter(({ d }) => d.weekId === semana.id && d.week_day == null)
+                    : [];
+                  return (
+                    <div
+                      key={c}
+                      className="cal-celda"
+                      onDragOver={(e) => {
+                        if (dragDia != null) { e.preventDefault(); setSobreCelda(clave); }
+                      }}
+                      onDragLeave={(e) => {
+                        if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
+                          setSobreCelda((s) => (s === clave ? null : s));
+                        }
+                      }}
+                      onDrop={(e) => {
+                        if (dragDia == null) return;
+                        e.preventDefault();
+                        moverDiaACelda(dragDia, semana.id, weekDayJs);
+                        endDrag();
+                      }}
+                      style={sobreCelda === clave && dragDia != null
+                        ? { boxShadow: 'inset 0 0 0 2px var(--text)' }
+                        : undefined}
+                    >
+                      <span className="cal-col-label">{col}</span>
+                      {[...bloques, ...sueltos].map(({ d, di }) => tarjetaDia(d, di))}
+                      <button
+                        type="button"
+                        className="cal-add-dia"
+                        onClick={() => addDay(semana.id, weekDayJs)}
+                        title={`Crear un día el ${col.toLowerCase()} de esta semana`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+          <button type="button" className="board-add-day" style={{ width: '100%', minHeight: 56, marginTop: 12 }} onClick={crearSemana}>
+            + AGREGAR SEMANA
+          </button>
+        </div>
       </div>
 
       {/* Modal de detalle del ejercicio: acá viven todos los campos */}
@@ -668,7 +828,7 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
                         className="btn btn-ghost"
                         style={{ padding: '6px 10px', fontSize: 11, marginTop: 8 }}
                         onClick={() => reemplazarEjercicio(di, ei)}
-                        title="El actual sale (su historial se conserva) y eliges otro manteniendo series y objetivos"
+                        title="El actual sale y eliges otro manteniendo series y objetivos"
                       >
                         ⇄ CAMBIAR EJERCICIO
                       </button>
@@ -744,9 +904,6 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
                   uid={uid}
                   onChange={(url) => {
                     updateEx(di, ei, { video_url: url });
-                    // el video queda guardado AL INSTANTE en ejercicios ya
-                    // existentes: subirlo y cerrar sin GUARDAR CAMBIOS lo
-                    // perdía ("no se guardan los videos que subo")
                     if (!isTmp(ex.id)) {
                       supabase.from('program_template_exercises').update({ video_url: url }).eq('id', ex.id)
                         .then(({ error: e }) => { if (e) setError(`El video no quedó guardado: ${e.message}`); });
@@ -758,7 +915,7 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
                 </button>
               </div>
               <p className="muted" style={{ fontSize: 11, marginTop: 10 }}>
-                Los cambios quedan en el tablero — recuerda GUARDAR CAMBIOS al final.
+                Los cambios quedan en el calendario — recuerda GUARDAR CAMBIOS al final.
               </p>
             </div>
           </div>
@@ -806,11 +963,11 @@ export default function TemplateEditor({ templateId, templateWeekId, initialDays
         </div>
       )}
 
-      {/* Anuncio para lectores de pantalla: sin esto, reordenar es mudo. */}
+      {/* Anuncio para lectores de pantalla: sin esto, mover es mudo. */}
       <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
 
       <div className="save-bar">
-        {error && <span style={{ color: 'var(--danger)', fontSize: 13, marginRight: 'auto' }}>{error}</span>}
+        {error && <span style={{ color: 'var(--warning)', fontSize: 13, marginRight: 'auto' }}>{error}</span>}
         {msg && <span className="toast" style={{ marginRight: 'auto' }}>{msg}</span>}
         {dirty && !error && !msg && <span className="muted" style={{ marginRight: 'auto', fontSize: 13 }}>Cambios sin guardar</span>}
         <button className="btn btn-primary" onClick={save} disabled={saving || !dirty}>
