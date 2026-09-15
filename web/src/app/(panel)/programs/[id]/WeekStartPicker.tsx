@@ -1,26 +1,36 @@
 'use client';
 
 import { useState } from 'react';
-import { claveDia } from '@/lib/semanaUTC';
+import { claveDia, sumarDias } from '@/lib/semanaUTC';
 
 // Calendario de rango POR DÍA, a la Google Flights: el primer clic marca el
-// DÍA de inicio del programa, el segundo el DÍA de término; un clic anterior
-// al inicio (o con el rango cerrado) reinicia. Se pinta exactamente de día a
-// día. Los días pasados quedan deshabilitados.
+// DÍA de inicio del programa y el término queda SUGERIDO según cuántas
+// semanas dura (inicio + semanas·7 − 1, borde punteado). Un clic posterior
+// fija el término a mano; un clic anterior al inicio (o con un término
+// manual ya fijado) reinicia el rango. Los días pasados quedan deshabilitados.
 
 export interface RangoDias {
   /** 'YYYY-MM-DD' local */
   inicio: string;
   fin: string | null;
+  /** true si `fin` lo propuso el sistema por la duración del programa */
+  finSugerido?: boolean;
+}
+
+/** El término que sugiere la duración: inicio + semanas·7 − 1 días. */
+export function finSugeridoPara(inicio: string, semanas: number): string | null {
+  return semanas >= 1 ? sumarDias(inicio, semanas * 7 - 1) : null;
 }
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-export default function WeekStartPicker({ value, onChange }: {
+export default function WeekStartPicker({ value, onChange, semanas = 0 }: {
   value: RangoDias;
   onChange: (rango: RangoDias) => void;
+  /** semanas del programa: alimenta el término sugerido (0 = sin sugerencia) */
+  semanas?: number;
 }) {
   const hoy = new Date();
   const hoyKey = claveDia(hoy);
@@ -43,8 +53,15 @@ export default function WeekStartPicker({ value, onChange }: {
   }
 
   function elegir(key: string) {
-    if (value.fin != null || key <= value.inicio) onChange({ inicio: key, fin: null });
-    else onChange({ inicio: value.inicio, fin: key });
+    const finManual = value.fin != null && !value.finSugerido;
+    if (key <= value.inicio || finManual) {
+      // nuevo inicio: el término vuelve a ser la sugerencia del programa
+      const fin = finSugeridoPara(key, semanas);
+      onChange({ inicio: key, fin, finSugerido: fin != null });
+    } else {
+      // clic posterior con término sugerido (o sin término): lo fija a mano
+      onChange({ inicio: value.inicio, fin: key, finSugerido: false });
+    }
   }
 
   return (
@@ -74,6 +91,7 @@ export default function WeekStartPicker({ value, onChange }: {
             const pasado = key < hoyKey;
             const enRango = key >= value.inicio && key <= (value.fin ?? value.inicio);
             const esBorde = key === value.inicio || key === value.fin;
+            const esFinSugerido = value.finSugerido === true && key === value.fin;
             return (
               <button
                 key={i}
@@ -82,16 +100,20 @@ export default function WeekStartPicker({ value, onChange }: {
                 onClick={() => elegir(key)}
                 title={pasado
                   ? 'Día ya pasado'
-                  : value.fin == null && key > value.inicio
-                    ? 'Terminar el programa este día'
-                    : 'Comenzar el programa este día'}
+                  : esFinSugerido
+                    ? 'Término sugerido por la duración del programa — clic en otro día posterior para cambiarlo'
+                    : (value.fin == null || value.finSugerido) && key > value.inicio
+                      ? 'Terminar el programa este día'
+                      : 'Comenzar el programa este día'}
                 style={{
                   fontSize: 12, textAlign: 'center', padding: '6px 0',
                   fontFamily: 'var(--font-mono), monospace',
                   background: enRango ? 'var(--accent)' : 'transparent',
                   border: 'none',
                   opacity: pasado ? 0.3 : enRango && !esBorde ? 0.85 : 1,
-                  outline: esBorde ? '2px solid var(--accent-dark)' : 'none',
+                  outline: esBorde
+                    ? `2px ${esFinSugerido ? 'dashed' : 'solid'} var(--accent-dark)`
+                    : 'none',
                   outlineOffset: -2,
                   borderRadius: enRango
                     ? `${key === value.inicio ? '6px' : '0'} ${key === (value.fin ?? value.inicio) ? '6px' : '0'} ${key === (value.fin ?? value.inicio) ? '6px' : '0'} ${key === value.inicio ? '6px' : '0'}`

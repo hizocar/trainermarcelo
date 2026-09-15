@@ -4,20 +4,29 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { firstToken } from '@/lib/env';
 import { claveDia, etiquetaFecha } from '@/lib/semanaUTC';
-import WeekStartPicker, { type RangoDias } from './WeekStartPicker';
+import WeekStartPicker, { finSugeridoPara, type RangoDias } from './WeekStartPicker';
 
 interface ClientOption { id: string; name: string; email: string }
 
 // Asigna este programa (plantilla) a uno o varios clientes — el programa
 // sigue existiendo tal cual para volver a usarlo después.
-export default function AssignTemplateToClients({ templateId, clients }: { templateId: string; clients: ClientOption[] }) {
+export default function AssignTemplateToClients({ templateId, clients, semanasPrograma = 0 }: {
+  templateId: string;
+  clients: ClientOption[];
+  /** cuántas semanas tiene el programa: alimenta el término sugerido */
+  semanasPrograma?: number;
+}) {
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [rango, setRango] = useState<RangoDias>(() => ({ inicio: claveDia(new Date()), fin: null }));
+  const [rango, setRango] = useState<RangoDias>(() => {
+    const hoy = claveDia(new Date());
+    const fin = finSugeridoPara(hoy, semanasPrograma);
+    return { inicio: hoy, fin, finSugerido: fin != null };
+  });
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -105,16 +114,19 @@ export default function AssignTemplateToClients({ templateId, clients }: { templ
                   hasta entonces, el plan actual sigue igual.</>
                 )}{' '}
                 {rango.fin != null ? (
-                  <>Termina el <strong style={{ color: 'var(--text)' }}>{etiquetaFecha(new Date(`${rango.fin}T00:00:00`))}</strong>{' '}
+                  <>Termina el <strong style={{ color: 'var(--text)' }}>{etiquetaFecha(new Date(`${rango.fin}T00:00:00`))}</strong>
+                  {rango.finSugerido && semanasPrograma >= 1 && (
+                    <> (sugerido: el programa dura {semanasPrograma} semana{semanasPrograma === 1 ? '' : 's'} — clic en otro día para cambiarlo)</>
+                  )}{' '}
                   <button type="button" className="accent" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline' }}
-                    onClick={() => setRango(r => ({ inicio: r.inicio, fin: null }))}>quitar término</button>.
+                    onClick={() => setRango(r => ({ inicio: r.inicio, fin: null, finSugerido: false }))}>quitar término</button>.
                   Ese día la app cierra el programa; si el rango es más largo que el programa, las semanas se repiten en ciclo.</>
                 ) : (
                   <>Haz un segundo clic en un día posterior para fijar el <strong style={{ color: 'var(--text)' }}>término</strong> —
                   sin término, la última semana del programa se repite indefinidamente.</>
                 )}
               </p>
-              <WeekStartPicker value={rango} onChange={setRango} />
+              <WeekStartPicker value={rango} onChange={setRango} semanas={semanasPrograma} />
             </div>
 
             {error && <div className="form-error" style={{ marginTop: 12 }}>{error}</div>}

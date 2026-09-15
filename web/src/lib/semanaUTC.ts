@@ -70,3 +70,10 @@ export function claveDia(d: Date): string {
 export function ordenLunes(dowJs: number): number {
   return (dowJs + 6) % 7;
 }
+
+/** clave + n días de calendario puros → 'YYYY-MM-DD' (inmune al cambio de hora). */
+export function sumarDias(clave: string, n: number): string {
+  const [y, m, d] = clave.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d) + n * 86400000);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
+}
