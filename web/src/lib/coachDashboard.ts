@@ -2,6 +2,7 @@ import { clientStatus, type ClientStatus } from './clientStatus';
 import { resolveActiveWeek, type PlanWeek } from './planWeeks';
 import { santiagoCurrentWeek, santiagoWeekDay, santiagoDayKey } from './weeks';
 import { atribuirRegistros } from './dashboardAttribution';
+import { sumarDias } from './semanaUTC';
 
 // Datos de la lista de alumnos del coach, cargados EN BLOQUE.
 //
@@ -28,6 +29,23 @@ export interface CoachDashboardRow {
   planExists: boolean;
   /** ¿esa fila (si existe) tiene una plan_week activa esta semana de programa? */
   activeWeekExists: boolean;
+}
+
+/** "entrenó hoy" / "entrenó ayer" / "hace N días" / "sin registros en 2 semanas" */
+export function ultimaVezTexto(row: CoachDashboardRow, hoyKey: string): string {
+  if (!row.lastTrainedKey) return 'sin registros en 2 semanas';
+  if (row.lastTrainedKey === hoyKey) return 'entrenó hoy';
+  if (row.lastTrainedKey === sumarDias(hoyKey, -1)) return 'entrenó ayer';
+  const dias = Math.round((Date.parse(hoyKey) - Date.parse(row.lastTrainedKey)) / 86400000);
+  return `hace ${dias} días`;
+}
+
+/** La línea bajo el nombre del alumno: qué le pasa a su semana. */
+export function detalleTexto(row: CoachDashboardRow, hoyKey: string): string {
+  if (!row.planExists) return 'sin plan asignado';
+  if (!row.activeWeekExists) return 'sin semana planificada';
+  if (row.status.total === 0) return 'semana sin días';
+  return `${row.status.done} de ${row.status.total} días · ${ultimaVezTexto(row, hoyKey)}`;
 }
 
 export async function loadCoachDashboard(
