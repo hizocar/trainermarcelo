@@ -1456,6 +1456,28 @@ a {
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.25;
+  font-size: 12px;
+}
+.cal-card .board-card-sub {
+  font-size: 10px;
+}
+.cal-dia .board-day-name {
+  font-size: 13px;
+}
+/* vista ampliada: columnas anchas, letra de lectura */
+.cal-amplio .cal-card .board-card-name {
+  font-size: 13.5px;
+  -webkit-line-clamp: 3;
+}
+.cal-amplio .cal-card .board-card-sub {
+  font-size: 11.5px;
+  white-space: normal;
+}
+.cal-amplio .cal-dia .board-day-name {
+  font-size: 15px;
+}
+.cal-amplio .cal-celda {
+  min-height: 180px;
 }
 /* duplicar/quitar aparecen al pasar el mouse: la tarjeta chica queda limpia */
 .cal-card > .icon-btn {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { semanaDeFecha, lunesDeSemana, etiquetaLunes } from '../semanaUTC';
+import { semanaDeFecha, lunesDeSemana, etiquetaLunes, sumarDias } from '../semanaUTC';
 
 // El caso que rompió producción: tras el cambio de hora de septiembre en
 // Chile, la resta en hora local dejaba los lunes con una hora menos y el
@@ -37,5 +37,15 @@ describe('semanaUTC', () => {
   it('la época es la semana 1', () => {
     expect(semanaDeFecha(new Date(2026, 5, 15))).toBe(1);
     expect(semanaDeFecha(new Date(2026, 5, 21))).toBe(1);
+  });
+
+  it('sumarDias es calendario puro: cruza mes, año y el cambio de hora', () => {
+    // el término sugerido de un programa: inicio + semanas*7 - 1
+    expect(sumarDias('2026-09-14', 3 * 7 - 1)).toBe('2026-10-04');
+    expect(sumarDias('2026-09-30', 1)).toBe('2026-10-01');
+    expect(sumarDias('2026-12-31', 1)).toBe('2027-01-01');
+    // atraviesa el 5-6 sep (DST chileno) sin perder un día
+    expect(sumarDias('2026-09-04', 7)).toBe('2026-09-11');
+    expect(sumarDias('2026-02-28', 1)).toBe('2026-03-01');
   });
 });

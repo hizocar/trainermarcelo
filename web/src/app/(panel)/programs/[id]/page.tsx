@@ -91,6 +91,7 @@ export default async function ProgramEditorPage({
           <AssignTemplateToClients
             templateId={id}
             clients={(clients ?? []) as { id: string; name: string; email: string }[]}
+            semanasPrograma={tplWeeks.length}
           />
         </div>
 

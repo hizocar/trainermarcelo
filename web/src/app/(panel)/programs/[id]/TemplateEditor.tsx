@@ -132,6 +132,19 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
   const recienArrastro = useRef(false);
   const creandoSemana1 = useRef(false);
 
+  // vista ampliada: columnas más anchas para leer los ejercicios de corrido.
+  // Se lee en efecto (no en el init) para no desalinear la hidratación de SSR.
+  const [ampliado, setAmpliado] = useState(false);
+  useEffect(() => {
+    try { setAmpliado(localStorage.getItem('cal-amplio') === '1'); } catch { /* sin storage */ }
+  }, []);
+  function toggleAmpliado() {
+    setAmpliado((v) => {
+      try { localStorage.setItem('cal-amplio', v ? '0' : '1'); } catch { /* sin storage */ }
+      return !v;
+    });
+  }
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -639,7 +652,6 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
           </button>
           <input
             className="board-day-name"
-            style={{ fontSize: 13 }}
             value={day.name}
             onChange={(e) => updateDay(di, { name: e.target.value })}
             placeholder="Nombre del día"
@@ -684,10 +696,10 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
             >
               ⠿
             </button>
-            <MiniBody grupo={ex.muscle_group} height={44} />
+            <MiniBody grupo={ex.muscle_group} height={ampliado ? 58 : 44} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="board-card-name" style={{ fontSize: 12 }}>{ex.name || '(elige el ejercicio)'}</div>
-              <div className="board-card-sub" style={{ fontSize: 10 }}>
+              <div className="board-card-name">{ex.name || '(elige el ejercicio)'}</div>
+              <div className="board-card-sub">
                 {[
                   `${ex.series.length} × ${ex.reps_objective.trim() || '—'}`,
                   ex.target_rir.trim() ? `RIR ${ex.target_rir.trim()}` : null,
@@ -732,8 +744,19 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
     <div style={{ marginTop: 12 }}>
       {/* EL GRAN CALENDARIO: semanas hacia abajo, columnas Lun..Dom. La celda
           donde vive el bloque ES su día de la semana. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ padding: '6px 12px', fontSize: 11 }}
+          onClick={toggleAmpliado}
+          title={ampliado ? 'Volver a la vista compacta' : 'Columnas más anchas para leer los ejercicios de cada día'}
+        >
+          {ampliado ? '⤡ COMPACTAR' : '⤢ AMPLIAR'}
+        </button>
+      </div>
       <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
-        <div style={{ minWidth: 1400 }}>
+        <div className={ampliado ? 'cal-amplio' : undefined} style={{ minWidth: ampliado ? 2360 : 1400 }}>
           {semanas.map((semana, si) => (
             <section key={semana.id} className="cal-semana">
               <div className="cal-semana-head">
