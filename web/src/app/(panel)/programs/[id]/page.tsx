@@ -1,20 +1,18 @@
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/guard';
 import type { PlanDay } from '@/lib/types';
-import TemplateEditor from './TemplateEditor';
+import TemplateEditor, { type TplWeekLite } from './TemplateEditor';
 import AssignTemplateToClients from './AssignTemplateToClients';
 import EditableName from './EditableName';
 import EditableTags from './EditableTags';
-import TemplateWeekManager, { type TplWeek } from './TemplateWeekManager';
 import SellProgram from './SellProgram';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ProgramEditorPage({
-  params, searchParams,
-}: { params: Promise<{ id: string }>; searchParams: Promise<{ week?: string }> }) {
+  params,
+}: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { week: requestedWeekId } = await searchParams;
   const { supabase, userId } = await requireCoach();
 
   const { data: template } = await supabase
@@ -25,19 +23,19 @@ export default async function ProgramEditorPage({
 
   if (!template || template.coach_id !== userId) notFound();
 
-  // las semanas del programa (v39): la elegida en la URL, o la primera
+  // TODAS las semanas y TODOS los días: el editor es un gran calendario
+  // (semanas apiladas), ya no hay semana "seleccionada" por URL.
   const { data: weeksData } = await supabase
     .from('program_template_weeks')
     .select('id, week_number, name')
     .eq('template_id', id)
     .order('week_number');
-  const tplWeeks = (weeksData ?? []) as TplWeek[];
-  const selectedWeek = tplWeeks.find(w => w.id === requestedWeekId) ?? tplWeeks[0] ?? null;
+  const tplWeeks: TplWeekLite[] = (weeksData ?? []).map((w) => ({ id: w.id, name: w.name }));
 
   const { data: days } = await supabase
     .from('program_template_days')
     .select(`
-      id, template_id, day_number, name, week_day,
+      id, template_id, template_week_id, day_number, name, week_day,
       program_template_exercises (
         id, day_id, name, name_en, library_id, muscle_group, superseries_group,
         reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, tempo, notes, video_url,
@@ -45,7 +43,6 @@ export default async function ProgramEditorPage({
       )
     `)
     .eq('template_id', id)
-    .eq('template_week_id', selectedWeek?.id ?? '00000000-0000-0000-0000-000000000000')
     .order('day_number');
 
   // adaptar al shape de PlanDay que ya usa el editor (mismos nombres de campo,
@@ -53,6 +50,7 @@ export default async function ProgramEditorPage({
   const planDays: PlanDay[] = (days ?? []).map((d: any) => ({
     id: d.id,
     plan_id: d.template_id,
+    template_week_id: d.template_week_id,
     day_number: d.day_number,
     name: d.name,
     week_day: d.week_day,
@@ -103,13 +101,7 @@ export default async function ProgramEditorPage({
           initialDescription={(template as any).description ?? null}
         />
 
-        <TemplateWeekManager templateId={id} weeks={tplWeeks} selectedWeekId={selectedWeek?.id ?? null} />
-
-        {selectedWeek ? (
-          <TemplateEditor key={selectedWeek.id} templateId={id} templateWeekId={selectedWeek.id} initialDays={planDays} />
-        ) : (
-          <p className="muted" style={{ marginTop: 20 }}>Creando la Semana 1…</p>
-        )}
+        <TemplateEditor templateId={id} weeks={tplWeeks} initialDays={planDays} />
       </main>
     </>
   );
