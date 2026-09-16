@@ -916,7 +916,11 @@ a {
 @keyframes panel-sube {
   from { opacity: 0; transform: translateY(6px); }
 }
-.page-enter { animation: panel-sube 220ms ease-out both; }
+/* OJO: `backwards`, nunca `both`/`forwards`. Una animación de transform que
+   queda rellenada al terminar convierte a .page-enter en el bloque contenedor
+   de todo position:fixed interno: los modales medían lo que la página (overlay
+   cortado a media pantalla, tarjeta saliéndose por arriba). */
+.page-enter { animation: panel-sube 220ms ease-out backwards; }
 
 @keyframes panel-fade {
   from { opacity: 0; }
@@ -1718,6 +1722,8 @@ a {
 .modal-card {
   width: 100%;
   max-width: 420px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   background: var(--card);
   border: 1px solid var(--border-light);
   border-radius: 20px;
