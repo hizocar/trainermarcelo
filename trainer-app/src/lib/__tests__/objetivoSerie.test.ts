@@ -1,4 +1,4 @@
-import { resolverSerie, aplanarSeries, lineaSerie, partirDescanso, unirDescanso } from '../objetivoSerie';
+import { resolverSerie, aplanarSeries, lineaSerie, leerDescanso, formatoDescanso } from '../objetivoSerie';
 
 // MISMOS casos que el espejo de la otra superficie (web ↔ trainer-app)
 const ej = { reps_objective: '12-15', rest_seconds: 90, target_rir: '2', ref_weight: 20, tempo: null };
@@ -64,15 +64,29 @@ describe('lineaSerie', () => {
   });
 });
 
-describe('descanso min:seg', () => {
-  it('parte y une', () => {
-    expect(partirDescanso(90)).toEqual({ min: '01', seg: '30' });
-    expect(partirDescanso(600)).toEqual({ min: '10', seg: '00' });
-    expect(unirDescanso('01', '30')).toBe(90);
-    expect(partirDescanso(null)).toEqual({ min: '', seg: '' });
-    expect(unirDescanso('1', '30')).toBe(90);
-    expect(unirDescanso('2', '')).toBe(120);
-    expect(unirDescanso('', '')).toBeNull();
-    expect(unirDescanso('x', '10')).toBeNull();
+describe('descanso en un campo', () => {
+  it('lee como escribe un coach', () => {
+    expect(leerDescanso('90')).toBe(90);
+    expect(leerDescanso('2')).toBe(120);
+    expect(leerDescanso('10')).toBe(600);
+    expect(leerDescanso('11')).toBe(11);
+    expect(leerDescanso('1:30')).toBe(90);
+    expect(leerDescanso('01:30')).toBe(90);
+    expect(leerDescanso('1.30')).toBe(90);
+    expect(leerDescanso('1,5')).toBe(90);
+    expect(leerDescanso('45s')).toBe(45);
+    expect(leerDescanso('3m')).toBe(180);
+    expect(leerDescanso(' 2 min ')).toBe(120);
+  });
+  it('vacío es null; basura no toca el valor', () => {
+    expect(leerDescanso('')).toBeNull();
+    expect(leerDescanso('abc')).toBeUndefined();
+    expect(leerDescanso('1:75')).toBeUndefined();
+  });
+  it('formato y tope', () => {
+    expect(formatoDescanso(90)).toBe('01:30');
+    expect(formatoDescanso(0)).toBe('00:00');
+    expect(formatoDescanso(null)).toBe('');
+    expect(leerDescanso('9999')).toBe(3600);
   });
 });

@@ -1325,8 +1325,9 @@ select.set-scale {
 .set-cell:focus, .set-cell:focus-within { border-color: var(--text-muted); }
 .set-cell::placeholder, .set-cell input::placeholder { color: var(--text-muted); font-weight: 600; opacity: 0.7; }
 .set-tempo::placeholder { letter-spacing: 1px; }
-.set-desc, .set-int { display: flex; align-items: center; justify-content: center; }
-.set-desc input, .set-int input {
+.set-cell[list]::-webkit-calendar-picker-indicator { display: none !important; }
+.set-int { display: flex; align-items: center; justify-content: center; }
+.set-int input {
   min-width: 0;
   background: transparent;
   border: none;
@@ -1336,8 +1337,6 @@ select.set-scale {
   font: inherit;
   text-align: center;
 }
-.set-desc { gap: 10px; }
-.set-desc > span { color: var(--text-muted); font-weight: 700; }
 .set-int { gap: 0; font-size: 13.5px; white-space: nowrap; }
 .set-int-parte { display: inline-flex; align-items: baseline; gap: 4px; }
 .set-int-parte > input + span { margin-left: -3px; }
@@ -1345,7 +1344,7 @@ select.set-scale {
 /* el input mide exactamente su texto donde el navegador lo soporta;
    el ancho en ch del componente queda de respaldo */
 @supports (field-sizing: content) {
-  .set-desc input, .set-int input { field-sizing: content; width: auto !important; min-width: 1ch; }
+  .set-int input { field-sizing: content; width: auto !important; min-width: 1ch; }
 }
 .set-acciones { display: flex; gap: 4px; }
 .set-icono {

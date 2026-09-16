@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import {
-  TIPOS_SET, partirDescanso, unirDescanso,
+  TIPOS_SET, leerDescanso, formatoDescanso, DESCANSOS_COMUNES,
   type EscalaIntensidad, type TipoSet, type TipoVolumen,
 } from '@/lib/objetivoSerie';
 
@@ -66,6 +67,47 @@ const IconoBasura = () => (
   </svg>
 );
 
+// Descanso en UN campo (antes eran dos cajitas min/seg, incómodas — Yharel):
+// se escribe como uno piensa ("90", "2", "1:30", "45s") y al salir queda
+// "01:30". Si lo escrito no se entiende, vuelve al valor anterior en vez de
+// borrarlo. Enter confirma. La lista trae los descansos habituales.
+function CeldaDescanso({ valor, onCambio, etiqueta }: {
+  valor: number | null;
+  onCambio: (seg: number | null) => void;
+  etiqueta: string;
+}) {
+  const [borrador, setBorrador] = useState<string | null>(null);
+  const confirmar = () => {
+    if (borrador == null) return;
+    const seg = leerDescanso(borrador);
+    if (seg !== undefined && seg !== valor) onCambio(seg);
+    setBorrador(null);
+  };
+  return (
+    <input
+      className="set-cell"
+      list="descansos-comunes"
+      value={borrador ?? formatoDescanso(valor)}
+      aria-label={etiqueta}
+      placeholder="–"
+      title='Escribe "90", "2" (minutos), "1:30" o "45s"'
+      onFocus={(e) => { setBorrador(formatoDescanso(valor)); e.currentTarget.select(); }}
+      onChange={(e) => {
+        const v = e.target.value;
+        setBorrador(v);
+        // elegir de la lista confirma al tiro (no hay que salir del campo)
+        if (/^\d{2}:\d{2}$/.test(v) && DESCANSOS_COMUNES.some((d) => formatoDescanso(d) === v)) {
+          const seg = leerDescanso(v);
+          if (seg !== undefined && seg !== valor) onCambio(seg);
+        }
+      }}
+      onBlur={confirmar}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLInputElement).blur(); } }}
+      maxLength={12}
+    />
+  );
+}
+
 export default function SetTable(p: SetTableProps) {
   const clave = claveCombo(p.intensityTypes);
   // una combinación guardada que no está en la lista igual se muestra
@@ -116,7 +158,6 @@ export default function SetTable(p: SetTableProps) {
         </div>
 
         {p.sets.map((s, i) => {
-          const desc = partirDescanso(s.rest_seconds);
           return (
             <div key={s.id} className="set-row" role="row">
               <label className={`set-pill${s.set_type !== 'efectiva' ? ' set-pill-otro' : ''}`} title={`${TIPO_LARGO[s.set_type]} — clic para cambiar el tipo`}>
@@ -132,15 +173,8 @@ export default function SetTable(p: SetTableProps) {
                 onChange={(e) => p.onSet(i, { reps: e.target.value })}
                 placeholder="–" maxLength={20} />
 
-              <div className="set-cell set-desc">
-                <input value={desc.min} style={ancho(desc.min, 2)} aria-label={`Minutos de descanso del set ${i + 1}`}
-                  inputMode="numeric" placeholder="–" maxLength={2}
-                  onChange={(e) => p.onSet(i, { rest_seconds: unirDescanso(e.target.value, desc.seg) })} />
-                <span aria-hidden="true">:</span>
-                <input value={desc.seg} style={ancho(desc.seg, 2)} aria-label={`Segundos de descanso del set ${i + 1}`}
-                  inputMode="numeric" placeholder="–" maxLength={2}
-                  onChange={(e) => p.onSet(i, { rest_seconds: unirDescanso(desc.min, e.target.value) })} />
-              </div>
+              <CeldaDescanso valor={s.rest_seconds} etiqueta={`Descanso del set ${i + 1}`}
+                onCambio={(seg) => p.onSet(i, { rest_seconds: seg })} />
 
               <input className="set-cell set-tempo" value={s.tempo} aria-label={`Tempo del set ${i + 1}`}
                 onChange={(e) => p.onSet(i, { tempo: e.target.value })}
@@ -176,6 +210,9 @@ export default function SetTable(p: SetTableProps) {
         })}
       </div>
       <button type="button" className="set-add" onClick={p.onAdd}>+ AÑADIR SET</button>
+      <datalist id="descansos-comunes">
+        {DESCANSOS_COMUNES.map((d) => <option key={d} value={formatoDescanso(d)} />)}
+      </datalist>
     </div>
   );
 }
