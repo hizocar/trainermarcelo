@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       program_template_exercises (
         id, name, name_en, library_id, muscle_group, superseries_group,
         reps_objective, unit, ref_weight, order_index, image_url, video_url,
-        notes, tempo, rest_seconds, target_rir,
+        notes, tempo, rest_seconds, target_rir, target_pct_1rm, target_rpe,
         program_template_series ( series_number )
       )
     `)
@@ -223,6 +223,8 @@ Deno.serve(async (req) => {
               tempo: ex.tempo,
               rest_seconds: ex.rest_seconds,
               target_rir: ex.target_rir,
+              target_pct_1rm: ex.target_pct_1rm,
+              target_rpe: ex.target_rpe,
             })
             .select('id')
             .single();

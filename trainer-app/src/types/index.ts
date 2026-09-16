@@ -65,6 +65,8 @@ export interface Exercise {
   tempo?: string;
   rest_seconds?: number;
   target_rir?: string;
+  target_pct_1rm?: string | null;
+  target_rpe?: string | null;
 }
 
 export interface MoodLog {

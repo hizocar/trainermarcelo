@@ -39,6 +39,8 @@ export interface Exercise {
   order_index: number;
   notes?: string | null;
   tempo?: string | null;
+  target_pct_1rm?: string | null;
+  target_rpe?: string | null;
   rest_seconds?: number | null;
   target_rir?: string | null;
   exercise_series?: ExerciseSeries[];

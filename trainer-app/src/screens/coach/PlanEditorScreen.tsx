@@ -124,6 +124,7 @@ export default function PlanEditorScreen() {
       unit: e.unit, ref_weight: e.ref_weight ?? null,
       superseries_group: e.superseries_group ?? null,
       tempo: e.tempo ?? null, rest_seconds: e.rest_seconds ?? null, target_rir: e.target_rir ?? null,
+      target_pct_1rm: e.target_pct_1rm ?? null, target_rpe: e.target_rpe ?? null,
       notes: e.notes ?? null, image_url: e.image_url ?? null, video_url: e.video_url ?? null,
     }));
     const { error } = await supabase.from('day_templates').insert({
