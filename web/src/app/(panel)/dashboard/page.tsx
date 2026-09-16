@@ -3,6 +3,7 @@ import { loadCoachDashboard, detalleTexto, type CoachDashboardRow } from '@/lib/
 import { santiagoDayKey } from '@/lib/weeks';
 import { sumarDias, etiquetaFecha } from '@/lib/semanaUTC';
 import { requireCoach } from '@/lib/guard';
+import InviteClientButton from '../clients/InviteClientButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -162,7 +163,7 @@ export default async function InicioPage() {
 
       {list.length === 0 ? (
         <p className="muted" style={{ marginTop: 30 }}>
-          Todavía no tienes alumnos. Invita al primero con “+ Cliente” desde la app,
+          Todavía no tienes alumnos. Crea el primero con “+ Cliente”,
           o deja listo un <Link href="/programs" className="accent">programa</Link> para cuando llegue.
         </p>
       ) : (
@@ -237,7 +238,8 @@ export default async function InicioPage() {
 
       {/* accesos rápidos: seguir trabajando donde quedaste */}
       <div style={{ marginTop: 34, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span className="label muted" style={{ letterSpacing: 2 }}>Programas</span>
+        <InviteClientButton variant="ghost" />
+        <span className="label muted" style={{ letterSpacing: 2, marginLeft: 8 }}>Programas</span>
         {programasRecientes.map((t) => (
           <Link key={t.id} href={`/programs/${t.id}`} className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: 12 }}>
             {t.name}

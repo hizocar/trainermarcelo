@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { loadCoachDashboard, detalleTexto, type CoachDashboardRow } from '@/lib/coachDashboard';
 import { santiagoDayKey } from '@/lib/weeks';
 import { requireCoach } from '@/lib/guard';
+import InviteClientButton from './InviteClientButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,13 +19,16 @@ export default async function ClientsPage() {
   return (
     <main className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
       <span className="label accent">Clientes</span>
-      <h1 className="display" style={{ fontSize: 40 }}>
-        {list.length === 0 ? 'Tus alumnos' : `${list.length} alumno${list.length === 1 ? '' : 's'}`}
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <h1 className="display" style={{ fontSize: 40 }}>
+          {list.length === 0 ? 'Tus alumnos' : `${list.length} alumno${list.length === 1 ? '' : 's'}`}
+        </h1>
+        <InviteClientButton />
+      </div>
 
       {list.length === 0 ? (
         <p className="muted" style={{ marginTop: 30 }}>
-          Todavía no tienes alumnos. Invita al primero con “+ Cliente” desde la app.
+          Todavía no tienes alumnos. Crea el primero con “+ Cliente”.
         </p>
       ) : (
         <>
