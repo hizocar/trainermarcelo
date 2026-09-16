@@ -53,6 +53,9 @@ interface EditExercise {
   ref_weight: string;
   rest_seconds: string;
   target_rir: string;
+  tempo: string;
+  /** observaciones del coach: el alumno las ve en su tarjeta */
+  notes: string;
   superseries_group: string;
   video_url: string | null;
   series: EditSeries[];
@@ -92,6 +95,8 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       ref_weight: e.ref_weight != null ? String(e.ref_weight) : '',
       rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
       target_rir: e.target_rir ?? '',
+      tempo: e.tempo ?? '',
+      notes: e.notes ?? '',
       superseries_group: e.superseries_group ?? '',
       video_url: (e as any).video_url ?? null,
       series: (e.exercise_series ?? []).map((s) => ({ id: s.id, series_number: s.series_number })),
@@ -216,7 +221,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
     mutate((d) => {
       d[di].exercises.push({
         id: tmpId(), name: '', library_id: null, name_en: null, muscle_group: '',
-        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', superseries_group: '',
+        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', tempo: '', notes: '', superseries_group: '',
         video_url: null,
         series: [{ id: tmpId(), series_number: 1 }, { id: tmpId(), series_number: 2 }, { id: tmpId(), series_number: 3 }],
       });
@@ -553,6 +558,8 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
               ref_weight: ex.ref_weight.trim() === '' || isNaN(refNum) ? null : refNum,
               rest_seconds: isNaN(restNum) ? null : restNum,
               target_rir: ex.target_rir.trim() || null,
+              tempo: ex.tempo.trim() || null,
+              notes: ex.notes.trim() || null,
               superseries_group: ex.superseries_group.trim() || null,
               video_url: ex.video_url,
               order_index: ei,
@@ -660,6 +667,11 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
           <button className="board-day-x" title="Quitar día" onClick={() => removeDay(di)}>✕</button>
         </div>
 
+        {/* arriba: en un día largo, abajo quedaba lejos (pedido de Yharel) */}
+        <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11, width: '100%' }} onClick={() => addExercise(di)}>
+          + EJERCICIO
+        </button>
+
         {day.exercises.map((ex, ei) => (
           <div
             key={ex.id}
@@ -712,6 +724,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                   </span>
                 )}
                 {ex.video_url && <span className="board-badge">▶</span>}
+                {ex.notes.trim() && <span className="board-badge" title={ex.notes.trim()}>✎</span>}
               </div>
             </div>
             <button
@@ -733,9 +746,6 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
           </div>
         ))}
 
-        <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11, width: '100%' }} onClick={() => addExercise(di)}>
-          + EJERCICIO
-        </button>
       </div>
     );
   }
@@ -909,6 +919,12 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                     onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
                 </div>
                 <div className="bfield">
+                  <span>Tempo</span>
+                  <input className="ex-input ex-input-mono" value={ex.tempo}
+                    onChange={(e) => updateEx(di, ei, { tempo: e.target.value })} placeholder="3-1-1-0"
+                    title="Excéntrica-pausa-concéntrica-pausa, en segundos" />
+                </div>
+                <div className="bfield" style={{ gridColumn: '1 / -1' }}>
                   <span>Biserie</span>
                   <input
                     className="ex-input"
@@ -916,9 +932,23 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                     onChange={(e) => updateEx(di, ei, { superseries_group: e.target.value })}
                     placeholder="ej: A"
                     title="Mismo texto = encadenados como biserie/triserie, agrupados y coloreados para el cliente."
-                    style={ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : undefined}
+                    style={{ maxWidth: 120, ...(ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : {}) }}
                   />
+                <small className="muted" style={{ fontSize: 11 }}>Misma letra en varios ejercicios = se hacen encadenados (biserie/triserie).</small>
                 </div>
+              </div>
+
+              <div className="bfield" style={{ marginTop: 12 }}>
+                <span>Observaciones del coach</span>
+                <textarea
+                  className="ex-input"
+                  rows={3}
+                  value={ex.notes}
+                  onChange={(e) => updateEx(di, ei, { notes: e.target.value })}
+                  placeholder="Ej: codos pegados al cuerpo, controla la bajada. Si molesta el hombro, baja el peso."
+                  style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.45 }}
+                />
+                <small className="muted" style={{ fontSize: 11 }}>El alumno las ve en la tarjeta del ejercicio mientras entrena.</small>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 10, flexWrap: 'wrap' }}>
