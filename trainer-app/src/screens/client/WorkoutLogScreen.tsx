@@ -24,6 +24,7 @@ import { suggestProgression } from '../../lib/progress';
 import { restOptions, secondsLeft, formatRest } from '../../lib/restTimer';
 import { scheduleRestAlert, cancelRestAlert } from '../../lib/notifications';
 import { necesitaConfirmar, textoConfirmacion } from '../../lib/overwrite';
+import { lineaIntensidad } from '../../lib/intensidad';
 
 type RouteParams = { exercise: Exercise; week: number; date?: string; athleteId?: string };
 
@@ -48,6 +49,7 @@ export default function WorkoutLogScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const { exercise, week, date } = route.params as RouteParams;
+  const intensidad = lineaIntensidad(exercise);
   const { user } = useAuth();
   // De quién es este entrenamiento. Cuando entra el alumno es él mismo; cuando
   // entra el coach a registrar por su alumno, llega por parámetro. Antes esto y
@@ -474,6 +476,11 @@ export default function WorkoutLogScreen() {
         <Text style={styles.heroMeta}>
           {`${formatShortDate(logDate).toUpperCase()} · OBJETIVO ${exercise.reps_objective}`}
         </Text>
+        {/* intensidad que programó el coach (RIR, RPE, %1RM, tempo): antes no
+            se veía en ninguna parte — el alumno solo anotaba su RIR real */}
+        {intensidad ? (
+          <Text style={styles.heroIntensidad} selectable>{intensidad.toUpperCase()}</Text>
+        ) : null}
       </View>
 
       {/* automaticallyAdjustKeyboardInsets: con el teclado numérico abierto la
@@ -508,12 +515,21 @@ export default function WorkoutLogScreen() {
             })}
           </View>
         </View>
+        {/* Observaciones del coach A LA VISTA: dentro del desplegable de
+            técnica nadie las leía (pedido de Yharel) */}
+        {exercise.notes ? (
+          <View style={styles.coachNote}>
+            <Text style={styles.coachNoteLabel}>NOTA DE TU COACH</Text>
+            <Text style={styles.exampleNotes} selectable>{exercise.notes}</Text>
+          </View>
+        ) : null}
+
         {/* Ejemplo del ejercicio */}
-        {(exercise.image_url || exercise.notes || exercise.video_url || exercise.muscle_group) && (
+        {(exercise.image_url || exercise.video_url || exercise.muscle_group) && (
           <Card style={styles.exampleCard}>
             <TouchableOpacity style={styles.exampleHeader} onPress={() => setShowImage(v => !v)}>
               <Text style={styles.exampleTitle}>
-                {(exercise.image_url || exercise.video_url || exercise.notes) ? 'MÚSCULO Y TÉCNICA' : 'MÚSCULO TRABAJADO'}
+                {(exercise.image_url || exercise.video_url) ? 'MÚSCULO Y TÉCNICA' : 'MÚSCULO TRABAJADO'}
               </Text>
               <Ionicons name={showImage ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
             </TouchableOpacity>
@@ -531,7 +547,6 @@ export default function WorkoutLogScreen() {
                 {exercise.image_url && (
                   <Image source={{ uri: exercise.image_url }} style={styles.exampleImage} resizeMode="cover" />
                 )}
-                {exercise.notes ? <Text style={styles.exampleNotes}>{exercise.notes}</Text> : null}
                 {exercise.video_url ? <ExerciseVideo url={exercise.video_url} /> : null}
               </>
             )}
@@ -775,6 +790,16 @@ const styles = StyleSheet.create({
   headerAction: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted },
   hero: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: 2, paddingBottom: spacing.sm },
   heroMeta: { fontSize: 9, letterSpacing: 2, fontWeight: '800', color: colors.textMuted, marginTop: 4 },
+  heroIntensidad: {
+    fontSize: 10, letterSpacing: 1.5, fontWeight: '800', color: colors.textSecondary,
+    marginTop: 3, fontVariant: ['tabular-nums'],
+  },
+  coachNote: {
+    gap: spacing.xs, padding: spacing.md, marginBottom: spacing.sm,
+    borderRadius: radius.md, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  coachNoteLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
   whenCard: { gap: spacing.sm, marginBottom: spacing.sm },
   whenLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
   whenRow: { flexDirection: 'row', gap: spacing.xs + 2 },

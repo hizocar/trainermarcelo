@@ -6,6 +6,7 @@ import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import ExerciseVideoCell from '@/components/ExerciseVideoCell';
 import { resolverVideo, type VideoLib } from '@/lib/videoBiblioteca';
 import MiniBody from '@/components/MiniBody';
+import IntensidadAvanzada from '@/components/IntensidadAvanzada';
 import type { PlanDay } from '@/lib/types';
 
 const WEEKDAYS = ['—', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -45,6 +46,8 @@ interface EditExercise {
   rest_seconds: string;
   target_rir: string;
   tempo: string;
+  target_pct_1rm: string;
+  target_rpe: string;
   /** observaciones del coach: el alumno las ve en su tarjeta */
   notes: string;
   superseries_group: string;
@@ -84,6 +87,8 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
       target_rir: e.target_rir ?? '',
       tempo: e.tempo ?? '',
+      target_pct_1rm: e.target_pct_1rm ?? '',
+      target_rpe: e.target_rpe ?? '',
       notes: e.notes ?? '',
       superseries_group: e.superseries_group ?? '',
       video_url: (e as any).video_url ?? null,
@@ -164,7 +169,7 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
     mutate((d) => {
       d[di].exercises.push({
         id: tmpId(), name: '', library_id: null, name_en: null, muscle_group: '',
-        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', tempo: '', notes: '', superseries_group: '',
+        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', tempo: '', target_pct_1rm: '', target_rpe: '', notes: '', superseries_group: '',
         video_url: null,
         series: [{ id: tmpId(), series_number: 1 }, { id: tmpId(), series_number: 2 }, { id: tmpId(), series_number: 3 }],
       });
@@ -447,6 +452,8 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
             rest_seconds: isNaN(restNum) ? null : restNum,
             target_rir: ex.target_rir.trim() || null,
             tempo: ex.tempo.trim() || null,
+            target_pct_1rm: ex.target_pct_1rm.trim() || null,
+            target_rpe: ex.target_rpe.trim() || null,
             notes: ex.notes.trim() || null,
             superseries_group: ex.superseries_group.trim() || null,
             video_url: ex.video_url,
@@ -632,6 +639,8 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                       `${ex.series.length} × ${ex.reps_objective.trim() || '—'}`,
                       ex.rest_seconds.trim() ? `${ex.rest_seconds.trim()}s` : null,
                       ex.target_rir.trim() ? `RIR ${ex.target_rir.trim()}` : null,
+                      ex.target_rpe.trim() ? `RPE ${ex.target_rpe.trim()}` : null,
+                      ex.target_pct_1rm.trim() ? `${ex.target_pct_1rm.trim()}%` : null,
                     ].filter(Boolean).join(' · ')}
                   </div>
                   <div className="board-card-badges">
@@ -746,12 +755,6 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                     onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
                 </div>
                 <div className="bfield">
-                  <span>Tempo</span>
-                  <input className="ex-input ex-input-mono" value={ex.tempo}
-                    onChange={(e) => updateEx(di, ei, { tempo: e.target.value })} placeholder="3-1-1-0"
-                    title="Excéntrica-pausa-concéntrica-pausa, en segundos" />
-                </div>
-                <div className="bfield" style={{ gridColumn: '1 / -1' }}>
                   <span>Biserie</span>
                   <input
                     className="ex-input"
@@ -759,11 +762,17 @@ export default function PlanEditor({ planId, planWeekId, initialDays }: { planId
                     onChange={(e) => updateEx(di, ei, { superseries_group: e.target.value })}
                     placeholder="ej: A"
                     title="Mismo texto = encadenados como biserie/triserie, agrupados y coloreados para el cliente."
-                    style={{ maxWidth: 120, ...(ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : {}) }}
+                    style={{ ...(ex.superseries_group.trim() ? { borderLeft: `3px solid ${groupColor(ex.superseries_group.trim())}` } : {}) }}
                   />
-                <small className="muted" style={{ fontSize: 11 }}>Misma letra en varios ejercicios = se hacen encadenados (biserie/triserie).</small>
+                <small className="muted" style={{ fontSize: 11 }}>Misma letra = encadenados</small>
                 </div>
               </div>
+
+              <IntensidadAvanzada
+                key={ex.id}
+                valores={{ target_pct_1rm: ex.target_pct_1rm, target_rpe: ex.target_rpe, tempo: ex.tempo }}
+                onChange={(patch) => updateEx(di, ei, patch)}
+              />
 
               <div className="bfield" style={{ marginTop: 12 }}>
                 <span>Observaciones del coach</span>

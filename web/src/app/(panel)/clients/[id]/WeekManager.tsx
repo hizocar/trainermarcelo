@@ -56,7 +56,8 @@ export default function WeekManager({
         .select(`
           day_number, name, week_day,
           exercises ( name, name_en, library_id, muscle_group, superseries_group,
-            reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, tempo, notes,
+            reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes,
+            video_url, image_url,
             exercise_series ( series_number ) )
         `)
         .eq('plan_week_id', source.id).eq('archived', false);
