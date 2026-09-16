@@ -67,6 +67,9 @@ export interface Exercise {
   target_rir?: string;
   target_pct_1rm?: string | null;
   target_rpe?: string | null;
+  /** v45: qué mide el volumen y con qué escalas se programa la intensidad */
+  volume_type?: 'reps' | 'tiempo';
+  intensity_types?: string[];
 }
 
 export interface MoodLog {
@@ -81,6 +84,15 @@ export interface ExerciseSeries {
   id: string;
   exercise_id: string;
   series_number: number;
+  // v45: objetivo propio del set; null = igual que el ejercicio
+  reps_objective?: string | null;
+  rest_seconds?: number | null;
+  tempo?: string | null;
+  target_rir?: string | null;
+  target_rpe?: string | null;
+  target_pct_1rm?: string | null;
+  ref_weight?: number | null;
+  set_type?: string | null;
 }
 
 export interface WorkoutLog {

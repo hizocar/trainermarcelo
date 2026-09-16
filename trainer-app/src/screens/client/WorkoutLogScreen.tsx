@@ -24,7 +24,7 @@ import { suggestProgression } from '../../lib/progress';
 import { restOptions, secondsLeft, formatRest } from '../../lib/restTimer';
 import { scheduleRestAlert, cancelRestAlert } from '../../lib/notifications';
 import { necesitaConfirmar, textoConfirmacion } from '../../lib/overwrite';
-import { lineaIntensidad } from '../../lib/intensidad';
+import { resolverSerie, lineaSerie } from '../../lib/objetivoSerie';
 
 type RouteParams = { exercise: Exercise; week: number; date?: string; athleteId?: string };
 
@@ -49,7 +49,6 @@ export default function WorkoutLogScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const { exercise, week, date } = route.params as RouteParams;
-  const intensidad = lineaIntensidad(exercise);
   const { user } = useAuth();
   // De quién es este entrenamiento. Cuando entra el alumno es él mismo; cuando
   // entra el coach a registrar por su alumno, llega por parámetro. Antes esto y
@@ -447,6 +446,19 @@ export default function WorkoutLogScreen() {
   // la primera serie sin guardar es la que el alumno está haciendo ahora
   const indiceActivo = entries.findIndex(e => !e.saved);
 
+  // Objetivo de cada set (v45): hereda del ejercicio lo que el set no define.
+  // Si todos los sets piden lo mismo, una sola línea arriba; si difieren,
+  // cada fila muestra el suyo — repetir 4 veces lo mismo es ruido.
+  const lineasObjetivo = entries.map(e => lineaSerie(
+    resolverSerie(exercise, e.series),
+    exercise.intensity_types?.length ? exercise.intensity_types : ['rir'],
+    exercise.volume_type ?? 'reps',
+    exercise.unit,
+  ));
+  const objetivoComun = lineasObjetivo.length > 0 && lineasObjetivo.every(l => l === lineasObjetivo[0])
+    ? lineasObjetivo[0]
+    : null;
+
   if (loading) return (
     <View style={styles.container}>
       <ActivityIndicator color={colors.accent} style={{ marginTop: 100 }} />
@@ -476,10 +488,10 @@ export default function WorkoutLogScreen() {
         <Text style={styles.heroMeta}>
           {`${formatShortDate(logDate).toUpperCase()} · OBJETIVO ${exercise.reps_objective}`}
         </Text>
-        {/* intensidad que programó el coach (RIR, RPE, %1RM, tempo): antes no
-            se veía en ninguna parte — el alumno solo anotaba su RIR real */}
-        {intensidad ? (
-          <Text style={styles.heroIntensidad} selectable>{intensidad.toUpperCase()}</Text>
+        {/* lo que programó el coach (volumen, RIR/RPE/%1RM/carga, tempo): antes
+            la intensidad no se veía en ninguna parte — solo se anotaba el RIR real */}
+        {objetivoComun ? (
+          <Text style={styles.heroIntensidad} selectable>{objetivoComun.toUpperCase()}</Text>
         ) : null}
       </View>
 
@@ -629,6 +641,9 @@ export default function WorkoutLogScreen() {
                   {entry.saved && <Ionicons name="checkmark" size={14} color={colors.textPrimary} />}
                 </View>
               </View>
+              {!objetivoComun && lineasObjetivo[i] ? (
+                <Text style={styles.serieObjetivo} selectable>{lineasObjetivo[i].toUpperCase()}</Text>
+              ) : null}
               {entry.prev && (
                 <Text style={styles.prevText}>
                   ÚLTIMA VEZ (S{entry.prev.week}): {entry.prev.weight}{exercise.unit.toUpperCase()} × {entry.prev.reps}
@@ -800,6 +815,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
   coachNoteLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
+  serieObjetivo: {
+    fontSize: 9.5, letterSpacing: 1.2, fontWeight: '800', color: colors.textSecondary,
+    marginLeft: 34, marginTop: 2, fontVariant: ['tabular-nums'],
+  },
   whenCard: { gap: spacing.sm, marginBottom: spacing.sm },
   whenLabel: { ...typography.label, letterSpacing: 1.5, fontSize: 10 },
   whenRow: { flexDirection: 'row', gap: spacing.xs + 2 },
