@@ -135,15 +135,37 @@ export function lineaSerie(
   ].filter(Boolean).join(' · ');
 }
 
-/** Descanso "01 : 30" para los dos campos del editor. */
-export function partirDescanso(seg: number | null): { min: string; seg: string } {
-  if (seg == null) return { min: '', seg: '' };
-  return { min: String(Math.floor(seg / 60)).padStart(2, '0'), seg: String(seg % 60).padStart(2, '0') };
+/** Descanso como lo escribe un coach, en UN campo:
+ *   "90" → 90 s · "2" → 2 min (hasta 10 se lee como minutos: nadie descansa 2 s)
+ *   "1:30" "1.30" "1,5" → 90 s · "45s" → 45 s · "3m" / "3 min" → 180 s
+ * Vacío → null (sin descanso definido). Basura → undefined (no tocar el valor). */
+export function leerDescanso(texto: string): number | null | undefined {
+  const t = texto.trim().toLowerCase().replace(/\s+/g, '');
+  if (t === '') return null;
+  const tope = (s: number) => Math.min(3600, Math.max(0, Math.round(s)));
+  let m: RegExpMatchArray | null;
+  // 1:30 · 01:30 · 1.30 (con dos dígitos de segundos)
+  if ((m = t.match(/^(\d{1,2})[:.](\d{2})$/))) {
+    const seg = Number(m[2]);
+    return seg < 60 ? tope(Number(m[1]) * 60 + seg) : undefined;
+  }
+  // 45s · 45seg
+  if ((m = t.match(/^(\d+(?:[.,]\d+)?)(s|seg|segs|segundos?)$/))) return tope(Number(m[1].replace(',', '.')));
+  // 3m · 3min · 1,5min
+  if ((m = t.match(/^(\d+(?:[.,]\d+)?)(m|min|mins|minutos?)$/))) return tope(Number(m[1].replace(',', '.')) * 60);
+  // número suelto: decimal o ≤ 10 → minutos; si no, segundos
+  if ((m = t.match(/^(\d+(?:[.,]\d+)?)$/))) {
+    const n = Number(m[1].replace(',', '.'));
+    return /[.,]/.test(m[1]) || n <= 10 ? tope(n * 60) : tope(n);
+  }
+  return undefined;
 }
-export function unirDescanso(min: string, seg: string): number | null {
-  const m = min.trim() === '' ? 0 : Number(min);
-  const s = seg.trim() === '' ? 0 : Number(seg);
-  if (min.trim() === '' && seg.trim() === '') return null;
-  if (!Number.isFinite(m) || !Number.isFinite(s) || m < 0 || s < 0) return null;
-  return Math.min(3600, Math.round(m) * 60 + Math.round(s));
+
+/** 90 → "01:30"; null → "". */
+export function formatoDescanso(seg: number | null): string {
+  if (seg == null) return '';
+  return `${String(Math.floor(seg / 60)).padStart(2, '0')}:${String(seg % 60).padStart(2, '0')}`;
 }
+
+/** Los descansos que más se programan: sugerencias del campo. */
+export const DESCANSOS_COMUNES = [30, 45, 60, 90, 120, 150, 180, 240, 300];
