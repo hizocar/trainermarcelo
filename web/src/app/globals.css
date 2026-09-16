@@ -1241,107 +1241,141 @@ a {
   margin-top: 8px;
 }
 /* ── Tabla de sets del ejercicio (v45) ──
-   Una fila por set: píldora del set · volumen · descanso · tempo · intensidad.
-   Las escalas se eligen en el encabezado; las celdas solo llevan valores. */
-.set-table-wrap { margin-top: 16px; }
+   Referencia visual: Traineeks. Píldora del set en tinta (--text) con texto
+   del fondo: negra en los temas claros, invertida en los oscuros. Celdas
+   rellenas neutras (mezcla de la tinta del tema), números en negrita, la
+   intensidad leída como frase, íconos rellenos sin caja. */
+.set-table-wrap { margin-top: 18px; }
 .set-table { overflow-x: auto; padding-bottom: 2px; }
 .set-row {
   display: grid;
-  grid-template-columns: 104px minmax(88px, 1fr) 118px minmax(96px, 1fr) minmax(170px, 1.7fr) 64px;
-  gap: 8px;
+  grid-template-columns: 128px minmax(110px, 1fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.25fr) 58px;
+  gap: 10px;
   align-items: center;
-  min-width: 700px;
+  min-width: 720px;
   margin-bottom: 8px;
 }
-.set-head { align-items: end; margin-bottom: 6px; }
-.set-head-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.set-head { align-items: end; margin-bottom: 10px; }
+.set-head-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
 .set-head-cell > span:first-child {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
-  letter-spacing: 0.3px;
+  padding-left: 2px;
 }
 .set-scale {
-  height: 32px;
+  height: 34px;
   border: 1px solid var(--border-light);
   border-radius: 999px;
   background: var(--card);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 1px;
-  padding: 0 12px;
+  letter-spacing: 0.6px;
+  padding: 0 14px;
   min-width: 0;
 }
 .set-scale-fija { display: inline-flex; align-items: center; }
-select.set-scale { cursor: pointer; }
+select.set-scale {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+}
 .set-pill {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 38px;
-  padding: 0 10px 0 14px;
+  height: 42px;
+  padding: 0 12px 0 18px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 11px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.4px;
   cursor: pointer;
   white-space: nowrap;
+  margin: 0;
 }
-.set-pill-otro { background: var(--card-elevated); color: var(--text); border: 1px solid var(--border-light); }
-.set-pill-menu { font-size: 15px; line-height: 1; opacity: 0.8; }
+.set-pill-otro { background: transparent; color: var(--text); box-shadow: inset 0 0 0 2px var(--text); }
+.set-pill-menu { font-size: 18px; line-height: 1; font-weight: 900; }
 /* el select nativo queda encima, invisible: accesible y con el menú del sistema */
 .set-pill select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .set-cell {
-  height: 38px;
+  height: 42px;
   min-width: 0;
   width: 100%;
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   border-radius: 999px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--text) 9%, var(--card));
   color: var(--text);
-  font-family: var(--font-mono), monospace;
-  font-size: 13px;
-  font-weight: 700;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
   text-align: center;
-  padding: 0 10px;
+  padding: 0 12px;
   outline: none;
   transition: border-color 0.15s;
 }
 .set-cell:focus, .set-cell:focus-within { border-color: var(--text-muted); }
-.set-cell::placeholder, .set-cell input::placeholder { color: var(--text-muted); font-weight: 500; }
-.set-desc, .set-int { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.set-cell::placeholder, .set-cell input::placeholder { color: var(--text-muted); font-weight: 600; opacity: 0.7; }
+.set-tempo::placeholder { letter-spacing: 1px; }
+.set-desc, .set-int { display: flex; align-items: center; justify-content: center; }
 .set-desc input, .set-int input {
-  width: 100%;
   min-width: 0;
   background: transparent;
   border: none;
   outline: none;
+  padding: 0;
   color: inherit;
   font: inherit;
   text-align: center;
 }
-.set-desc input { max-width: 34px; }
-.set-desc span { color: var(--text-muted); }
-.set-int { gap: 10px; }
-.set-int-campo { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; margin: 0; }
-.set-int-campo > span { font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; color: var(--text-muted); }
-.set-acciones { display: flex; gap: 2px; }
-.set-acciones .icon-btn { width: 30px; height: 30px; }
+.set-desc { gap: 10px; }
+.set-desc > span { color: var(--text-muted); font-weight: 700; }
+.set-int { gap: 0; font-size: 13.5px; white-space: nowrap; }
+.set-int-parte { display: inline-flex; align-items: baseline; gap: 4px; }
+.set-int-parte > input + span { margin-left: -3px; }
+.set-int-sep { margin: 0 6px; color: var(--text-muted); }
+/* el input mide exactamente su texto donde el navegador lo soporta;
+   el ancho en ch del componente queda de respaldo */
+@supports (field-sizing: content) {
+  .set-desc input, .set-int input { field-sizing: content; width: auto !important; min-width: 1ch; }
+}
+.set-acciones { display: flex; gap: 4px; }
+.set-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.set-icono:hover:not(:disabled) { color: var(--text); }
+.set-icono:disabled { opacity: 0.35; cursor: not-allowed; }
 .set-add {
-  margin: 2px 0 0 12px;
+  width: 128px;
+  margin-top: 4px;
   background: none;
   border: none;
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.4px;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 6px 0;
+  text-align: center;
 }
 .set-add:hover { color: var(--text); }
 .bfield {

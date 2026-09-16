@@ -66,7 +66,9 @@ describe('lineaSerie', () => {
 
 describe('descanso min:seg', () => {
   it('parte y une', () => {
-    expect(partirDescanso(90)).toEqual({ min: '1', seg: '30' });
+    expect(partirDescanso(90)).toEqual({ min: '01', seg: '30' });
+    expect(partirDescanso(600)).toEqual({ min: '10', seg: '00' });
+    expect(unirDescanso('01', '30')).toBe(90);
     expect(partirDescanso(null)).toEqual({ min: '', seg: '' });
     expect(unirDescanso('1', '30')).toBe(90);
     expect(unirDescanso('2', '')).toBe(120);

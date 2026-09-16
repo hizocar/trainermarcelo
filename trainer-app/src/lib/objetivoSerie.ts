@@ -135,10 +135,10 @@ export function lineaSerie(
   ].filter(Boolean).join(' · ');
 }
 
-/** Descanso en min:seg para los dos campos del editor. */
+/** Descanso "01 : 30" para los dos campos del editor. */
 export function partirDescanso(seg: number | null): { min: string; seg: string } {
   if (seg == null) return { min: '', seg: '' };
-  return { min: String(Math.floor(seg / 60)), seg: String(seg % 60).padStart(2, '0') };
+  return { min: String(Math.floor(seg / 60)).padStart(2, '0'), seg: String(seg % 60).padStart(2, '0') };
 }
 export function unirDescanso(min: string, seg: string): number | null {
   const m = min.trim() === '' ? 0 : Number(min);

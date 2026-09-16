@@ -1,15 +1,16 @@
 'use client';
 
 import {
-  ESCALAS, TIPOS_SET, partirDescanso, unirDescanso,
+  TIPOS_SET, partirDescanso, unirDescanso,
   type EscalaIntensidad, type TipoSet, type TipoVolumen,
 } from '@/lib/objetivoSerie';
 
-// La tabla de sets del ejercicio (modelo que pidieron Yharel y Marcelo):
-// cada fila es un set con su volumen, descanso, tempo e intensidad. Las
-// ESCALAS se eligen una vez en el encabezado (qué mide el volumen; una o
-// dos escalas de intensidad, p. ej. RIR + %1RM) y cada fila lleva solo
-// valores. Agregar un set copia el último: casi siempre se cambia uno solo.
+// La tabla de sets del ejercicio (modelo que pidieron Yharel y Marcelo, con
+// Traineeks como referencia visual): cada fila es un set con su volumen,
+// descanso, tempo e intensidad. Las ESCALAS se eligen una vez en el
+// encabezado y cada fila lleva solo valores. La intensidad se LEE como una
+// frase ("RIR 2 - 80/85%"): los inputs no tienen caja propia y miden lo que
+// su contenido. Agregar un set copia el último: casi siempre se cambia uno.
 
 export interface EditSet {
   id: string;
@@ -36,15 +37,41 @@ export interface SetTableProps {
   onRemove: (i: number) => void;
 }
 
-const NOMBRE_ESCALA: Record<EscalaIntensidad, string> = { rir: 'RIR', rpe: 'RPE', pct_1rm: '% 1RM', kg: 'CARGA' };
+const NOMBRE_ESCALA: Record<EscalaIntensidad, string> = { rir: 'RIR', rpe: 'RPE', pct_1rm: '%1RM', kg: 'CARGA' };
+// Un solo selector (como la referencia): escalas simples y las combinaciones útiles.
+const COMBINACIONES: EscalaIntensidad[][] = [
+  ['rir'], ['rpe'], ['pct_1rm'], ['kg'],
+  ['rir', 'pct_1rm'], ['rpe', 'pct_1rm'], ['rir', 'kg'], ['rpe', 'kg'], ['pct_1rm', 'kg'], ['rir', 'rpe'],
+];
+const claveCombo = (c: readonly string[]) => c.join('+');
+
 const NOMBRE_TIPO: Record<TipoSet, string> = { efectiva: 'SET', calentamiento: 'CALENT.', drop: 'DROP', fallo: 'FALLO' };
 const TIPO_LARGO: Record<TipoSet, string> = { efectiva: 'Set efectivo', calentamiento: 'Calentamiento', drop: 'Drop set', fallo: 'Al fallo' };
 
-const campoDe = (e: EscalaIntensidad): keyof EditSet =>
+const campoDe = (e: EscalaIntensidad): 'rir' | 'rpe' | 'pct_1rm' | 'peso' =>
   e === 'rir' ? 'rir' : e === 'rpe' ? 'rpe' : e === 'pct_1rm' ? 'pct_1rm' : 'peso';
 
+/** ancho del input según su contenido: la celda se lee como texto corrido */
+const ancho = (v: string, minimo = 1) => ({ width: `calc(${Math.max(minimo, v.length)}ch + 6px)` });
+
+const IconoCopiar = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M8 2h11a3 3 0 0 1 3 3v11a1 1 0 0 1-1 1h-1V5a1 1 0 0 0-1-1H7V3a1 1 0 0 1 1-1Z" />
+    <rect x="2" y="6" width="16" height="16" rx="3" />
+  </svg>
+);
+const IconoBasura = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M9 2h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2H4a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1Zm-4 6h14l-1 12a3 3 0 0 1-3 2.7H9A3 3 0 0 1 6 20L5 8Zm4 3v8h2v-8H9Zm4 0v8h2v-8h-2Z" />
+  </svg>
+);
+
 export default function SetTable(p: SetTableProps) {
-  const [a, b] = p.intensityTypes;
+  const clave = claveCombo(p.intensityTypes);
+  // una combinación guardada que no está en la lista igual se muestra
+  const opciones = COMBINACIONES.some((c) => claveCombo(c) === clave)
+    ? COMBINACIONES
+    : [...COMBINACIONES, p.intensityTypes];
 
   return (
     <div className="set-table-wrap">
@@ -52,38 +79,29 @@ export default function SetTable(p: SetTableProps) {
         <div className="set-row set-head" role="row">
           <span />
           <label className="set-head-cell">
-            <span title="Reps (ej. 12-15) o segundos (ej. 45)">Volumen</span>
+            <span>Volumen</span>
             <select className="set-scale" value={p.volumeType}
               onChange={(e) => p.onScales({ volumeType: e.target.value as TipoVolumen })}>
               <option value="reps">REPS</option>
-              <option value="tiempo">TIEMPO (s)</option>
+              <option value="tiempo">SEGUNDOS</option>
             </select>
           </label>
           <div className="set-head-cell">
             <span>Descanso</span>
-            <span className="set-scale set-scale-fija">MIN : SEG</span>
+            <span className="set-scale set-scale-fija">DESC</span>
           </div>
           <div className="set-head-cell">
             <span>Ejecución</span>
-            <span className="set-scale set-scale-fija">TEMPO</span>
+            <span className="set-scale set-scale-fija" title="Excéntrica-pausa-concéntrica, en segundos">TEMPO</span>
           </div>
-          <div className="set-head-cell">
-            <span title="Ej.: RIR 2 · RPE 8 · %1RM 80/85 · carga 60">Intensidad</span>
+          <label className="set-head-cell">
+            <span>Intensidad</span>
             <div style={{ display: 'flex', gap: 6 }}>
-              <select className="set-scale" value={a} aria-label="Escala de intensidad"
-                onChange={(e) => {
-                  const nueva = e.target.value as EscalaIntensidad;
-                  p.onScales({ intensityTypes: b && b !== nueva ? [nueva, b] : [nueva] });
-                }}>
-                {ESCALAS.map((e) => <option key={e} value={e}>{NOMBRE_ESCALA[e]}</option>)}
-              </select>
-              <select className="set-scale" value={b ?? ''} aria-label="Segunda escala (opcional)"
-                onChange={(e) => {
-                  const v = e.target.value as EscalaIntensidad | '';
-                  p.onScales({ intensityTypes: v ? [a, v] : [a] });
-                }}>
-                <option value="">+ ESCALA</option>
-                {ESCALAS.filter((e) => e !== a).map((e) => <option key={e} value={e}>{NOMBRE_ESCALA[e]}</option>)}
+              <select className="set-scale" style={{ flex: 1 }} value={clave}
+                onChange={(e) => p.onScales({ intensityTypes: e.target.value.split('+') as EscalaIntensidad[] })}>
+                {opciones.map((c) => (
+                  <option key={claveCombo(c)} value={claveCombo(c)}>{c.map((e) => NOMBRE_ESCALA[e]).join(' + ')}</option>
+                ))}
               </select>
               {p.intensityTypes.includes('kg') && (
                 <select className="set-scale" value={p.unit} aria-label="Unidad de carga"
@@ -93,7 +111,7 @@ export default function SetTable(p: SetTableProps) {
                 </select>
               )}
             </div>
-          </div>
+          </label>
           <span />
         </div>
 
@@ -115,34 +133,43 @@ export default function SetTable(p: SetTableProps) {
                 placeholder="–" maxLength={20} />
 
               <div className="set-cell set-desc">
-                <input value={desc.min} aria-label={`Minutos de descanso del set ${i + 1}`} inputMode="numeric" placeholder="–"
+                <input value={desc.min} style={ancho(desc.min, 2)} aria-label={`Minutos de descanso del set ${i + 1}`}
+                  inputMode="numeric" placeholder="–" maxLength={2}
                   onChange={(e) => p.onSet(i, { rest_seconds: unirDescanso(e.target.value, desc.seg) })} />
                 <span aria-hidden="true">:</span>
-                <input value={desc.seg} aria-label={`Segundos de descanso del set ${i + 1}`} inputMode="numeric" placeholder="–"
+                <input value={desc.seg} style={ancho(desc.seg, 2)} aria-label={`Segundos de descanso del set ${i + 1}`}
+                  inputMode="numeric" placeholder="–" maxLength={2}
                   onChange={(e) => p.onSet(i, { rest_seconds: unirDescanso(desc.min, e.target.value) })} />
               </div>
 
-              <input className="set-cell" value={s.tempo} aria-label={`Tempo del set ${i + 1}`}
+              <input className="set-cell set-tempo" value={s.tempo} aria-label={`Tempo del set ${i + 1}`}
                 onChange={(e) => p.onSet(i, { tempo: e.target.value })}
-                placeholder="– – – –" maxLength={20} title="Excéntrica-pausa-concéntrica-pausa, en segundos" />
+                placeholder="-   -   -" maxLength={20} />
 
+              {/* "RIR 2 - 80/85%": cada escala es texto + un input sin caja */}
               <div className="set-cell set-int">
-                {p.intensityTypes.map((e) => (
-                  <label key={e} className="set-int-campo">
-                    <span>{e === 'kg' ? p.unit.toUpperCase() : e === 'pct_1rm' ? '%' : NOMBRE_ESCALA[e]}</span>
-                    <input value={s[campoDe(e)] as string} aria-label={`${NOMBRE_ESCALA[e]} del set ${i + 1}`}
-                      inputMode={e === 'kg' ? 'decimal' : undefined}
-                      onChange={(ev) => p.onSet(i, { [campoDe(e)]: ev.target.value } as Partial<EditSet>)}
-                      placeholder="–" maxLength={20} />
-                  </label>
-                ))}
+                {p.intensityTypes.map((e, k) => {
+                  const campo = campoDe(e);
+                  const v = s[campo];
+                  return (
+                    <span key={e} className="set-int-parte">
+                      {k > 0 && <span className="set-int-sep" aria-hidden="true">-</span>}
+                      {(e === 'rir' || e === 'rpe') && <span>{NOMBRE_ESCALA[e]}</span>}
+                      <input value={v} style={ancho(v)} aria-label={`${NOMBRE_ESCALA[e]} del set ${i + 1}`}
+                        inputMode={e === 'kg' ? 'decimal' : undefined} placeholder="–" maxLength={20}
+                        onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)} />
+                      {e === 'pct_1rm' && <span>%</span>}
+                      {e === 'kg' && <span>{p.unit}</span>}
+                    </span>
+                  );
+                })}
               </div>
 
               <div className="set-acciones">
-                <button type="button" className="icon-btn" title="Duplicar set" aria-label={`Duplicar set ${i + 1}`}
-                  onClick={() => p.onDuplicate(i)}>⧉</button>
-                <button type="button" className="icon-btn" title="Quitar set" aria-label={`Quitar set ${i + 1}`}
-                  disabled={p.sets.length <= 1} onClick={() => p.onRemove(i)}>✕</button>
+                <button type="button" className="set-icono" title="Duplicar set" aria-label={`Duplicar set ${i + 1}`}
+                  onClick={() => p.onDuplicate(i)}><IconoCopiar /></button>
+                <button type="button" className="set-icono" title="Quitar set" aria-label={`Quitar set ${i + 1}`}
+                  disabled={p.sets.length <= 1} onClick={() => p.onRemove(i)}><IconoBasura /></button>
               </div>
             </div>
           );
