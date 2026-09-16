@@ -81,9 +81,9 @@ export default async function ClientPlanPage({
           id, plan_id, day_number, name, week_day, archived,
           exercises (
             id, day_id, name, name_en, library_id, muscle_group, reps_objective, unit,
-            ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes, video_url, archived,
+            ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes, video_url, archived, volume_type, intensity_types,
             superseries_group,
-            exercise_series ( id, exercise_id, series_number )
+            exercise_series ( id, exercise_id, series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type )
           )
         `)
         .eq('plan_week_id', selectedWeek.id)

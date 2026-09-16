@@ -7,7 +7,9 @@ import LibrarySearch, { type LibItem } from '@/components/LibrarySearch';
 import ExerciseVideoCell from '@/components/ExerciseVideoCell';
 import { resolverVideo, type VideoLib } from '@/lib/videoBiblioteca';
 import MiniBody from '@/components/MiniBody';
-import IntensidadAvanzada from '@/components/IntensidadAvanzada';
+import SetTable, { type EditSet } from '@/components/SetTable';
+import { resolverSerie, aplanarSeries, type EscalaIntensidad, type TipoVolumen } from '@/lib/objetivoSerie';
+import { aEditSet, aResuelta, resumenSets } from '@/lib/setsEditor';
 import type { PlanDay } from '@/lib/types';
 
 // Editor de un programa como GRAN CALENDARIO (pedido de Marcelo): todas las
@@ -42,21 +44,18 @@ const isTmp = (id: string) => id.startsWith('tmp_');
 const DRAG_MIME = 'application/x-elitefit-ex';
 const DRAG_MIME_DIA = 'application/x-elitefit-dia';
 
-interface EditSeries { id: string; series_number: number }
+type EditSeries = EditSet;
 interface EditExercise {
   id: string;
   name: string;
   library_id: string | null;
   name_en: string | null;
   muscle_group: string;
-  reps_objective: string;
   unit: 'kg' | 'lb';
-  ref_weight: string;
-  rest_seconds: string;
-  target_rir: string;
-  tempo: string;
-  target_pct_1rm: string;
-  target_rpe: string;
+  /** qué mide el volumen de los sets */
+  volume_type: TipoVolumen;
+  /** 1 o 2 escalas de intensidad (p. ej. RIR + %1RM) */
+  intensity_types: EscalaIntensidad[];
   /** observaciones del coach: el alumno las ve en su tarjeta */
   notes: string;
   superseries_group: string;
@@ -93,18 +92,14 @@ function toEditModel(days: PlanDay[]): EditDay[] {
       library_id: (e as any).library_id ?? null,
       name_en: e.name_en ?? null,
       muscle_group: e.muscle_group ?? '',
-      reps_objective: e.reps_objective ?? '',
       unit: (e.unit as 'kg' | 'lb') ?? 'kg',
-      ref_weight: e.ref_weight != null ? String(e.ref_weight) : '',
-      rest_seconds: e.rest_seconds != null ? String(e.rest_seconds) : '',
-      target_rir: e.target_rir ?? '',
-      tempo: e.tempo ?? '',
-      target_pct_1rm: e.target_pct_1rm ?? '',
-      target_rpe: e.target_rpe ?? '',
+      volume_type: ((e as any).volume_type as TipoVolumen) ?? 'reps',
+      intensity_types: ((e as any).intensity_types as EscalaIntensidad[])?.length ? (e as any).intensity_types : ['rir'],
       notes: e.notes ?? '',
       superseries_group: e.superseries_group ?? '',
       video_url: (e as any).video_url ?? null,
-      series: (e.exercise_series ?? []).map((s) => ({ id: s.id, series_number: s.series_number })),
+      // cada set resuelto con la herencia set → ejercicio (v45)
+      series: (e.exercise_series ?? []).map((s) => aEditSet(resolverSerie(e, s as any), s.id)),
     })),
   }));
 }
@@ -215,7 +210,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
         id: tmpId(), weekId: src.weekId, name: `${src.name} (copia)`, week_day: src.week_day,
         exercises: src.exercises.map((e) => ({
           ...e, id: tmpId(),
-          series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+          series: e.series.map((x) => ({ ...x, id: tmpId() })),
         })),
       });
       return d;
@@ -226,9 +221,9 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
     mutate((d) => {
       d[di].exercises.push({
         id: tmpId(), name: '', library_id: null, name_en: null, muscle_group: '',
-        reps_objective: '', unit: 'kg', ref_weight: '', rest_seconds: '', target_rir: '', tempo: '', target_pct_1rm: '', target_rpe: '', notes: '', superseries_group: '',
+        unit: 'kg', volume_type: 'reps', intensity_types: ['rir'], notes: '', superseries_group: '',
         video_url: null,
-        series: [{ id: tmpId(), series_number: 1 }, { id: tmpId(), series_number: 2 }, { id: tmpId(), series_number: 3 }],
+        series: [nuevoSet(), nuevoSet(), nuevoSet()],
       });
       return d;
     });
@@ -259,7 +254,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
       const e = d[di].exercises[ei];
       d[di].exercises.splice(ei + 1, 0, {
         ...e, id: tmpId(),
-        series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+        series: e.series.map((x) => ({ ...x, id: tmpId() })),
       });
       return d;
     });
@@ -282,7 +277,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
       const e = d[di].exercises[ei];
       d[di].exercises[ei] = {
         ...e, id: tmpId(), name: '', library_id: null, name_en: null,
-        series: e.series.map((_, i) => ({ id: tmpId(), series_number: i + 1 })),
+        series: e.series.map((x) => ({ ...x, id: tmpId() })),
       };
       return d;
     });
@@ -332,8 +327,8 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
         .select(`
           day_number, name, week_day,
           program_template_exercises ( name, name_en, library_id, muscle_group, superseries_group,
-            reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes, video_url,
-            program_template_series ( series_number ) )
+            reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes, video_url, volume_type, intensity_types,
+            program_template_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type ) )
         `)
         .eq('template_week_id', weekId);
       if (diasErr) throw diasErr;
@@ -353,7 +348,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
             .select('id')
             .single();
           if (exErr || !nuevoEx) throw exErr ?? new Error('No se pudo copiar un ejercicio.');
-          const filas = (series ?? []).map((s: any) => ({ exercise_id: nuevoEx.id, series_number: s.series_number }));
+          const filas = (series ?? []).map((s: any) => ({ ...s, exercise_id: nuevoEx.id }));
           if (filas.length > 0) {
             const { error: serErr } = await supabase.from('program_template_series').insert(filas);
             if (serErr) throw serErr;
@@ -446,19 +441,39 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
     requestAnimationFrame(() => handleRefs.current[movedId]?.focus());
   }
 
-  function changeSeries(di: number, ei: number, delta: number) {
-    if (delta < 0) {
-      const list = days[di].exercises[ei].series;
-      if (list.length <= 1) return;
-      const removed = list[list.length - 1];
-      if (!isTmp(removed.id)) setDelSeries((x) => [...x, removed.id]);
-    }
+  // ── sets del ejercicio (tabla de sets) ──
+  function nuevoSet(): EditSet {
+    return aEditSet(resolverSerie({}, {}), tmpId());
+  }
+  function updateSet(di: number, ei: number, si: number, patch: Partial<EditSet>) {
     mutate((d) => {
-      const list = d[di].exercises[ei].series;
-      if (delta > 0) list.push({ id: tmpId(), series_number: list.length + 1 });
-      else if (list.length > 1) list.pop();
+      const sets = d[di].exercises[ei].series;
+      sets[si] = { ...sets[si], ...patch };
       return d;
     });
+  }
+  function addSet(di: number, ei: number) {
+    mutate((d) => {
+      const sets = d[di].exercises[ei].series;
+      // copia el último: casi siempre el set nuevo es igual y se ajusta uno
+      const ultimo = sets[sets.length - 1];
+      sets.push(ultimo ? { ...ultimo, id: tmpId() } : nuevoSet());
+      return d;
+    });
+  }
+  function duplicateSet(di: number, ei: number, si: number) {
+    mutate((d) => {
+      const sets = d[di].exercises[ei].series;
+      sets.splice(si + 1, 0, { ...sets[si], id: tmpId() });
+      return d;
+    });
+  }
+  function removeSet(di: number, ei: number, si: number) {
+    const sets = days[di].exercises[ei].series;
+    if (sets.length <= 1) return;
+    // el marcado para borrar va FUERA del updater: React puede re-ejecutarlo (StrictMode)
+    if (!isTmp(sets[si].id)) setDelSeries((x) => [...x, sets[si].id]);
+    mutate((d) => { d[di].exercises[ei].series.splice(si, 1); return d; });
   }
 
   async function pickFromLibrary(di: number, ei: number, item: LibItem) {
@@ -554,18 +569,15 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
 
           for (let ei = 0; ei < day.exercises.length; ei++) {
             const ex = day.exercises[ei];
-            const refNum = Number(ex.ref_weight.replace(',', '.'));
-            const restNum = parseInt(ex.rest_seconds, 10);
+            // el ejercicio lleva el set 1 (lo que lee la app publicada); cada set, lo distinto
+            const plano = aplanarSeries(ex.series.map(aResuelta));
             const fields = {
               muscle_group: ex.muscle_group.trim() || null,
-              reps_objective: ex.reps_objective.trim(),
+              ...plano.ejercicio,
+              reps_objective: plano.ejercicio.reps_objective ?? '',
               unit: ex.unit,
-              ref_weight: ex.ref_weight.trim() === '' || isNaN(refNum) ? null : refNum,
-              rest_seconds: isNaN(restNum) ? null : restNum,
-              target_rir: ex.target_rir.trim() || null,
-              tempo: ex.tempo.trim() || null,
-              target_pct_1rm: ex.target_pct_1rm.trim() || null,
-              target_rpe: ex.target_rpe.trim() || null,
+              volume_type: ex.volume_type,
+              intensity_types: ex.intensity_types,
               notes: ex.notes.trim() || null,
               superseries_group: ex.superseries_group.trim() || null,
               video_url: ex.video_url,
@@ -596,12 +608,12 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
               if (isTmp(s.id)) {
                 const { error } = await supabase
                   .from('program_template_series')
-                  .insert({ exercise_id: exId, series_number: si + 1 });
+                  .insert({ exercise_id: exId, series_number: si + 1, ...plano.series[si] });
                 if (error) throw error;
               } else {
                 const { error } = await supabase
                   .from('program_template_series')
-                  .update({ series_number: si + 1 })
+                  .update({ series_number: si + 1, ...plano.series[si] })
                   .eq('id', s.id);
                 if (error) throw error;
               }
@@ -719,12 +731,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="board-card-name">{ex.name || '(elige el ejercicio)'}</div>
               <div className="board-card-sub">
-                {[
-                  `${ex.series.length} × ${ex.reps_objective.trim() || '—'}`,
-                  ex.target_rir.trim() ? `RIR ${ex.target_rir.trim()}` : null,
-                  ex.target_rpe.trim() ? `RPE ${ex.target_rpe.trim()}` : null,
-                  ex.target_pct_1rm.trim() ? `${ex.target_pct_1rm.trim()}%` : null,
-                ].filter(Boolean).join(' · ')}
+                {resumenSets(ex.series, ex.intensity_types, ex.volume_type, ex.unit)}
               </div>
               <div className="board-card-badges">
                 {ex.superseries_group.trim() && (
@@ -859,7 +866,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
         const ex = days[di].exercises[ei];
         return (
           <div className="modal-overlay" onClick={() => setEditCard(null)}>
-            <div className="modal-card" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-card" style={{ maxWidth: 860 }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <MiniBody grupo={ex.muscle_group} height={84} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -891,42 +898,23 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                 </div>
               </div>
 
-              <div className="board-card-grid" style={{ marginTop: 14 }}>
-                <div className="bfield">
-                  <span>Series</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={() => changeSeries(di, ei, -1)}>−</button>
-                    <strong className="ex-mono" style={{ minWidth: 16, textAlign: 'center' }}>{ex.series.length}</strong>
-                    <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={() => changeSeries(di, ei, 1)}>+</button>
-                  </div>
-                </div>
-                <div className="bfield">
-                  <span>Reps</span>
-                  <input className="ex-input ex-input-mono" value={ex.reps_objective}
-                    onChange={(e) => updateEx(di, ei, { reps_objective: e.target.value })} placeholder="10-12" />
-                </div>
-                <div className="bfield">
-                  <span>Ref</span>
-                  <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
-                    <input className="ex-input ex-input-mono" style={{ minWidth: 0 }} value={ex.ref_weight}
-                      onChange={(e) => updateEx(di, ei, { ref_weight: e.target.value })} placeholder="0" inputMode="decimal" />
-                    <select className="ex-input ex-input-mono" style={{ flexShrink: 0, width: 62 }} value={ex.unit}
-                      onChange={(e) => updateEx(di, ei, { unit: e.target.value as 'kg' | 'lb' })}>
-                      <option value="kg">kg</option>
-                      <option value="lb">lb</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="bfield">
-                  <span>Descanso</span>
-                  <input className="ex-input ex-input-mono" value={ex.rest_seconds}
-                    onChange={(e) => updateEx(di, ei, { rest_seconds: e.target.value })} placeholder="seg" inputMode="numeric" />
-                </div>
-                <div className="bfield">
-                  <span>RIR</span>
-                  <input className="ex-input ex-input-mono" value={ex.target_rir}
-                    onChange={(e) => updateEx(di, ei, { target_rir: e.target.value })} placeholder="2-3" />
-                </div>
+              <SetTable
+                volumeType={ex.volume_type}
+                intensityTypes={ex.intensity_types}
+                unit={ex.unit}
+                sets={ex.series}
+                onScales={(p) => updateEx(di, ei, {
+                  ...(p.volumeType ? { volume_type: p.volumeType } : {}),
+                  ...(p.intensityTypes ? { intensity_types: p.intensityTypes } : {}),
+                  ...(p.unit ? { unit: p.unit } : {}),
+                })}
+                onSet={(si, p) => updateSet(di, ei, si, p)}
+                onAdd={() => addSet(di, ei)}
+                onDuplicate={(si) => duplicateSet(di, ei, si)}
+                onRemove={(si) => removeSet(di, ei, si)}
+              />
+
+              <div className="board-card-grid" style={{ marginTop: 12, gridTemplateColumns: '160px 1fr' }}>
                 <div className="bfield">
                   <span>Biserie</span>
                   <input
@@ -940,12 +928,6 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                 <small className="muted" style={{ fontSize: 11 }}>Misma letra = encadenados</small>
                 </div>
               </div>
-
-              <IntensidadAvanzada
-                key={ex.id}
-                valores={{ target_pct_1rm: ex.target_pct_1rm, target_rpe: ex.target_rpe, tempo: ex.tempo }}
-                onChange={(patch) => updateEx(di, ei, patch)}
-              />
 
               <div className="bfield" style={{ marginTop: 12 }}>
                 <span>Observaciones del coach</span>

@@ -104,8 +104,8 @@ export default function WeekManagerScreen() {
           day_number, name, week_day,
           exercises ( name, name_en, library_id, muscle_group, superseries_group,
             reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes,
-            image_url, video_url,
-            exercise_series ( series_number ) )
+            image_url, video_url, volume_type, intensity_types,
+            exercise_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type ) )
         `)
         .eq('plan_week_id', source.id).eq('archived', false);
       if (daysErr) throw daysErr;
@@ -125,7 +125,7 @@ export default function WeekManagerScreen() {
           if (exErr || !newEx) throw exErr ?? new Error('No se pudo copiar un ejercicio.');
           if ((exercise_series ?? []).length > 0) {
             await supabase.from('exercise_series').insert(
-              exercise_series.map((s: any) => ({ exercise_id: newEx.id, series_number: s.series_number })),
+              exercise_series.map((s: any) => ({ ...s, exercise_id: newEx.id })),
             );
           }
         }

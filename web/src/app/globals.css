@@ -1240,39 +1240,110 @@ a {
   gap: 8px;
   margin-top: 8px;
 }
-/* intensidad avanzada (%1RM, RPE, tempo): desplegable opcional del modal */
-.intensidad-av {
-  margin-top: 12px;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-}
-.intensidad-av-toggle {
-  display: flex;
-  align-items: baseline;
+/* ── Tabla de sets del ejercicio (v45) ──
+   Una fila por set: píldora del set · volumen · descanso · tempo · intensidad.
+   Las escalas se eligen en el encabezado; las celdas solo llevan valores. */
+.set-table-wrap { margin-top: 16px; }
+.set-table { overflow-x: auto; padding-bottom: 2px; }
+.set-row {
+  display: grid;
+  grid-template-columns: 104px minmax(88px, 1fr) 118px minmax(96px, 1fr) minmax(170px, 1.7fr) 64px;
   gap: 8px;
+  align-items: center;
+  min-width: 700px;
+  margin-bottom: 8px;
+}
+.set-head { align-items: end; margin-bottom: 6px; }
+.set-head-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.set-head-cell > span:first-child {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+.set-scale {
+  height: 32px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 0 12px;
+  min-width: 0;
+}
+.set-scale-fija { display: inline-flex; align-items: center; }
+select.set-scale { cursor: pointer; }
+.set-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  padding: 0 10px 0 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.set-pill-otro { background: var(--card-elevated); color: var(--text); border: 1px solid var(--border-light); }
+.set-pill-menu { font-size: 15px; line-height: 1; opacity: 0.8; }
+/* el select nativo queda encima, invisible: accesible y con el menú del sistema */
+.set-pill select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.set-cell {
+  height: 38px;
+  min-width: 0;
   width: 100%;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.set-cell:focus, .set-cell:focus-within { border-color: var(--text-muted); }
+.set-cell::placeholder, .set-cell input::placeholder { color: var(--text-muted); font-weight: 500; }
+.set-desc, .set-int { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.set-desc input, .set-int input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+.set-desc input { max-width: 34px; }
+.set-desc span { color: var(--text-muted); }
+.set-int { gap: 10px; }
+.set-int-campo { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; margin: 0; }
+.set-int-campo > span { font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; color: var(--text-muted); }
+.set-acciones { display: flex; gap: 2px; }
+.set-acciones .icon-btn { width: 30px; height: 30px; }
+.set-add {
+  margin: 2px 0 0 12px;
   background: none;
   border: none;
-  padding: 2px 0;
-  cursor: pointer;
-  font-family: inherit;
-  color: var(--text-muted);
-  text-align: left;
-}
-.intensidad-av-toggle:hover { color: var(--text); }
-.intensidad-av-chevron { font-size: 10px; width: 10px; }
-.intensidad-av-titulo {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-}
-.intensidad-av-resumen {
-  margin-left: auto;
-  font-family: var(--font-mono), monospace;
-  font-size: 11px;
   color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding: 4px 0;
 }
+.set-add:hover { color: var(--text); }
 .bfield {
   display: flex;
   flex-direction: column;
