@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import { SERVICIOS } from '@/lib/marketplace';
 
 export type Profile = {
+  name: string | null; marketplace_status: string | null;
   slug: string | null; bio: string | null; instagram: string | null;
   specialties: string[] | null; comunas: string[] | null;
   services: string[] | null; accepting_clients: boolean;
@@ -20,6 +22,9 @@ const lista = (s: string) =>
   s.split(',').map((x) => x.trim()).filter(Boolean);
 
 export default function ProfileForm({ initial }: { initial: Profile }) {
+  const router = useRouter();
+  // el alta usaba el correo como nombre: ese valor no se ofrece como nombre
+  const [name, setName] = useState((initial.name ?? '').includes('@') ? '' : (initial.name ?? ''));
   const [bio, setBio] = useState(initial.bio ?? '');
   const [instagram, setInstagram] = useState(initial.instagram ?? '');
   const [specialties, setSpecialties] = useState((initial.specialties ?? []).join(', '));
@@ -46,24 +51,46 @@ export default function ProfileForm({ initial }: { initial: Profile }) {
       return;
     }
 
+    const nombre = name.trim();
+    if (nombre.length < 2 || nombre.length > 60) {
+      setErrorMsg('Escribe tu nombre (entre 2 y 60 caracteres): es el que ven tus alumnos y el directorio.');
+      setState('error');
+      return;
+    }
+    if (nombre.includes('@')) {
+      setErrorMsg('Usa tu nombre, no tu correo.');
+      setState('error');
+      return;
+    }
+
     setState('saving');
     setErrorMsg(null);
     const supabase = createClient();
     const { error } = await supabase.rpc('update_my_profile', {
       p_bio: bio, p_instagram: instagram,
       p_specialties: lista(specialties), p_comunas: lista(comunas),
-      p_services: services, p_accepting: accepting,
+      p_services: services, p_accepting: accepting, p_name: nombre,
     });
     if (error) {
-      setErrorMsg('No se pudo guardar. Inténtalo de nuevo.');
+      // los mensajes de validación del servidor (P0001) están escritos para el coach
+      setErrorMsg(error.code === 'P0001' ? error.message : 'No se pudo guardar. Inténtalo de nuevo.');
       setState('error');
     } else {
       setState('saved');
+      router.refresh(); // el estado de la vitrina puede haber pasado a "En revisión"
     }
   }
 
   return (
     <form onSubmit={save} style={{ display: 'grid', maxWidth: 520 }}>
+      <div className="field">
+        <label htmlFor="perfil-nombre">Tu nombre</label>
+        <input id="perfil-nombre" className="input" value={name} maxLength={60}
+               onChange={(e) => setName(e.target.value)}
+               placeholder="Yharel Martínez" autoComplete="name" />
+        <small className="muted" style={{ fontSize: 12 }}>Lo ven tus alumnos en la app y quienes visitan tu página.</small>
+      </div>
+
       <div className="field">
         <label>Sobre ti</label>
         <textarea className="input" rows={5} maxLength={800} value={bio}
