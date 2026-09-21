@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator,
+  ActivityIndicator, Share,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,10 +22,15 @@ import { getCurrentWeek, formatShortDate } from '../../lib/weeks';
 import {
   MOOD_FACE_LEVELS, moodValueForFace, faceForMoodText, moodFaceLabel, moodChartPoints,
 } from '../../lib/mood';
+import { calcularRacha, textoEstado, textoCompartir, type Racha } from '../../lib/racha';
 
 // fecha local YYYY-MM-DD (no UTC: a las 21:00 de Chile ya sería "mañana" en UTC)
 function todayLocal(): string {
-  const d = new Date();
+  return diaLocal(new Date());
+}
+
+/** 'YYYY-MM-DD' local de una fecha: el día se corta a la medianoche del alumno. */
+function diaLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -42,6 +47,7 @@ export default function HomeScreen() {
   const [groupSets, setGroupSets] = useState<Record<string, number>>({});
   const [weekDays, setWeekDays] = useState<{ id: string; day_number: number; name: string; total: number; done: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [racha, setRacha] = useState<Racha | null>(null);
 
   const currentWeek = getCurrentWeek();
   const today = todayLocal();
@@ -74,6 +80,25 @@ export default function HomeScreen() {
     } else {
       setMoodFailed(false);
       setMoods(moodData ?? []);
+    }
+
+    // RACHA: días con entrenamiento (pesas o cardio) de los últimos 4 meses.
+    // RLS solo devuelve los registros propios del alumno.
+    const desde = new Date(Date.now() - 120 * 86400000).toISOString();
+    const [pesas, cardio] = await Promise.all([
+      supabase.from('workout_logs').select('logged_at').gte('logged_at', desde),
+      supabase.from('cardio_logs').select('logged_at').eq('user_id', user!.id).gte('logged_at', desde),
+    ]);
+    if (pesas.error || cardio.error) {
+      // sin datos ciertos no se dibuja una racha: mentir hacia arriba desmotiva
+      // igual que mentir hacia abajo
+      console.error('inicio: error cargando la racha', pesas.error ?? cardio.error);
+      setRacha(null);
+    } else {
+      const dias = [...(pesas.data ?? []), ...(cardio.data ?? [])]
+        .map((l: { logged_at: string | null }) => (l.logged_at ? diaLocal(new Date(l.logged_at)) : ''))
+        .filter(Boolean);
+      setRacha(calcularRacha(dias, todayLocal()));
     }
 
     // plan completo en una sola consulta anidada
@@ -171,6 +196,42 @@ export default function HomeScreen() {
                 />
               ))}
             </View>
+          </View>
+        )}
+
+        {/* RACHA: el número que hace volver. Se comparte con un toque. */}
+        {racha && (racha.actual > 0 || racha.mejor > 0) && (
+          <View style={styles.rachaCard}>
+            <View style={styles.rachaFila}>
+              <Ionicons
+                name="flame"
+                size={26}
+                color={racha.estado === 'viva' ? colors.accent : colors.textMuted}
+              />
+              <View style={styles.rachaTextos}>
+                <Text style={styles.rachaNumero} selectable>
+                  {racha.actual}
+                  <Text style={styles.rachaUnidad}>{racha.actual === 1 ? ' día' : ' días'}</Text>
+                </Text>
+                <Text style={styles.rachaLabel}>
+                  {racha.estado === 'perdida' ? 'RACHA PERDIDA' : 'DE RACHA'}
+                  {racha.mejor > 0 ? ` · RÉCORD ${racha.mejor}` : ''}
+                </Text>
+              </View>
+              {racha.actual > 0 && (
+                <TouchableOpacity
+                  style={styles.rachaCompartir}
+                  onPress={() => Share.share({ message: textoCompartir(racha, user?.name) })}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Compartir mi racha"
+                >
+                  <Ionicons name="share-outline" size={16} color={colors.textPrimary} />
+                  <Text style={styles.rachaCompartirText}>COMPARTIR</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={styles.rachaEstado}>{textoEstado(racha)}</Text>
           </View>
         )}
 
@@ -338,6 +399,35 @@ const styles = StyleSheet.create({
   dayBars: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
   dayBar: { width: 26, height: 4, borderRadius: radius.full, backgroundColor: colors.surface },
   dayBarDone: { backgroundColor: colors.accent },
+
+  rachaCard: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  rachaFila: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rachaTextos: { flex: 1 },
+  rachaNumero: {
+    ...typography.display,
+    fontSize: 30,
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  rachaUnidad: { ...typography.label, fontSize: 13, color: colors.textSecondary },
+  rachaLabel: { ...typography.label, fontSize: 9, letterSpacing: 1.5, marginTop: 2 },
+  rachaEstado: { ...typography.caption, color: colors.textSecondary },
+  rachaCompartir: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+    borderRadius: radius.full, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border,
+  },
+  rachaCompartirText: { ...typography.label, fontSize: 10, color: colors.textPrimary },
 
   section: { marginBottom: spacing.sm },
 
