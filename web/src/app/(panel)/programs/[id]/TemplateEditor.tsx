@@ -491,6 +491,16 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
       return d;
     });
   }
+  /** los 4 sets suelen ser iguales: se escribe uno y se copia a los demás */
+  function copiarSetATodos(di: number, ei: number, si: number) {
+    mutate((d) => {
+      const sets = d[di].exercises[ei].series;
+      const modelo = sets[si];
+      d[di].exercises[ei].series = sets.map((s, k) =>
+        k === si ? s : { ...modelo, id: s.id, set_type: s.set_type });
+      return d;
+    });
+  }
   function duplicateSet(di: number, ei: number, si: number) {
     mutate((d) => {
       const sets = d[di].exercises[ei].series;
@@ -948,6 +958,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                 onAdd={() => addSet(di, ei)}
                 onDuplicate={(si) => duplicateSet(di, ei, si)}
                 onRemove={(si) => removeSet(di, ei, si)}
+                onCopiarATodos={(si) => copiarSetATodos(di, ei, si)}
               />
 
               <div className="board-card-grid" style={{ marginTop: 12, gridTemplateColumns: '160px 1fr' }}>

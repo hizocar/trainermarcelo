@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  ESCALAS, TIPOS_SET, leerDescanso, formatoDescanso, DESCANSOS_COMUNES,
+  ESCALAS, TIPOS_SET, leerDescanso, formatoDescanso, DESCANSOS_COMUNES, pasoNumero,
   type EscalaIntensidad, type TipoSet, type TipoVolumen,
 } from '@/lib/objetivoSerie';
 
@@ -37,6 +37,8 @@ export interface SetTableProps {
   onAdd: () => void;
   onDuplicate: (i: number) => void;
   onRemove: (i: number) => void;
+  /** copia los valores de un set a todos los demás (lo más pedido: 4 sets iguales) */
+  onCopiarATodos: (i: number) => void;
 }
 
 // Exactamente las cinco de la referencia, UNA a la vez (v46): sin
@@ -47,6 +49,24 @@ const NOMBRE_ESCALA: Record<EscalaIntensidad, string> = {
 
 const NOMBRE_TIPO: Record<TipoSet, string> = { efectiva: 'SET', calentamiento: 'CALENT.', drop: 'DROP', fallo: 'FALLO' };
 const TIPO_LARGO: Record<TipoSet, string> = { efectiva: 'Set efectivo', calentamiento: 'Calentamiento', drop: 'Drop set', fallo: 'Al fallo' };
+
+// Cuánto sube o baja cada flecha ↑ ↓: lo que un coach cambiaría de una vez.
+const PASO: Record<EscalaIntensidad, number> = { rir: 1, rpe: 1, pct_1rm: 5, kg: 2.5, pct_fcmax: 5 };
+
+/** ↑ ↓ cambian el número sin borrar y reescribir. Shift = paso fino. */
+function flechas(
+  e: React.KeyboardEvent<HTMLInputElement>,
+  valor: string,
+  paso: number,
+  aplicar: (v: string) => void,
+) {
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  const fino = e.shiftKey && paso >= 2.5 ? 0.5 : e.shiftKey ? paso : paso;
+  const nuevo = pasoNumero(valor, e.key === 'ArrowUp' ? fino : -fino);
+  if (nuevo == null) return;       // "80/85" y textos libres no se tocan
+  e.preventDefault();
+  aplicar(nuevo);
+}
 
 const campoDe = (e: EscalaIntensidad): 'rir' | 'rpe' | 'pct_1rm' | 'pct_fcmax' | 'peso' =>
   e === 'rir' ? 'rir' : e === 'rpe' ? 'rpe' : e === 'pct_1rm' ? 'pct_1rm'
@@ -102,7 +122,18 @@ function CeldaDescanso({ valor, onCambio, etiqueta }: {
         }
       }}
       onBlur={confirmar}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLInputElement).blur(); } }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLInputElement).blur(); return; }
+        // ↑ ↓ mueven el descanso de 15 en 15 segundos, sin escribir nada
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const base = leerDescanso(borrador ?? formatoDescanso(valor));
+          const actual = typeof base === 'number' ? base : (valor ?? 0);
+          const nuevo = Math.max(0, Math.min(3600, actual + (e.key === 'ArrowUp' ? 15 : -15)));
+          setBorrador(formatoDescanso(nuevo));
+          onCambio(nuevo);
+        }
+      }}
       maxLength={12}
     />
   );
@@ -158,13 +189,19 @@ export default function SetTable(p: SetTableProps) {
                 <span>{NOMBRE_TIPO[s.set_type]} {i + 1}</span>
                 <span aria-hidden="true" className="set-pill-menu">⋮</span>
                 <select value={s.set_type} aria-label={`Tipo del set ${i + 1}`}
-                  onChange={(e) => p.onSet(i, { set_type: e.target.value as TipoSet })}>
+                  onChange={(e) => {
+                    if (e.target.value === 'copiar') { p.onCopiarATodos(i); return; }
+                    p.onSet(i, { set_type: e.target.value as TipoSet });
+                  }}>
                   {TIPOS_SET.map((t) => <option key={t} value={t}>{TIPO_LARGO[t]}</option>)}
+                  {p.sets.length > 1 && <option value="copiar">↓ Copiar valores a los demás sets</option>}
                 </select>
               </label>
 
               <input className="set-cell" value={s.reps} aria-label={`Volumen del set ${i + 1}`}
                 onChange={(e) => p.onSet(i, { reps: e.target.value })}
+                onKeyDown={(e) => flechas(e, s.reps, 1, (v) => p.onSet(i, { reps: v }))}
+                title="↑ ↓ suben o bajan las reps (un rango se mueve entero)"
                 placeholder="–" maxLength={20} />
 
               <CeldaDescanso valor={s.rest_seconds} etiqueta={`Descanso del set ${i + 1}`}
@@ -185,7 +222,9 @@ export default function SetTable(p: SetTableProps) {
                       {(e === 'rir' || e === 'rpe') && <span>{NOMBRE_ESCALA[e]}</span>}
                       <input value={v} style={ancho(v)} aria-label={`${NOMBRE_ESCALA[e]} del set ${i + 1}`}
                         inputMode={e === 'kg' ? 'decimal' : undefined} placeholder="–" maxLength={20}
-                        onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)} />
+                        title={`↑ ↓ cambian de ${PASO[e]} en ${PASO[e]}${e === 'kg' ? ' (Shift: 0,5)' : ''}`}
+                        onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)}
+                        onKeyDown={(ev) => flechas(ev, v, PASO[e], (nv) => p.onSet(i, { [campo]: nv } as Partial<EditSet>))} />
                       {e === 'pct_1rm' && <span>%</span>}
                       {e === 'pct_fcmax' && <span>% FC</span>}
                       {e === 'kg' && <span>{p.unit}</span>}
