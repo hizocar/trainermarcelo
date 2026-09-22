@@ -1763,6 +1763,7 @@ select.set-scale {
   padding: 10px 14px;
   cursor: pointer;
 }
+.lib-item-activo,
 .lib-item:hover {
   background: var(--surface);
 }
