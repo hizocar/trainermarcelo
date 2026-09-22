@@ -25,6 +25,8 @@ export interface PlanWeek {
  *    planes creados antes de esta función siguen funcionando igual).
  * 3) si no hay ninguna: null — "tu coach aún no planificó esta semana".
  */
+export { numeroNuevaSemana } from './semanasPlan';
+
 export function resolveActiveWeek(weeks: PlanWeek[], calendarWeek: number): PlanWeek | null {
   const active = weeks.filter(w => !w.archived);
   const exact = active.find(w => w.week_number === calendarWeek);

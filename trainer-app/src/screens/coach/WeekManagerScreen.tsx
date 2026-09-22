@@ -9,6 +9,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { User } from '../../types';
 import { fetchPlanWeeks, PlanWeek } from '../../lib/plan';
+import { numeroNuevaSemana } from '../../lib/semanasPlan';
+import { getCurrentWeek } from '../../lib/weeks';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import { showAlert, showConfirm } from '../../lib/alert';
@@ -74,7 +76,8 @@ export default function WeekManagerScreen() {
     if (!planId) return;
     const trimmed = newName.trim() || `Semana ${weeks.length + 1}`;
     setBusy(true);
-    const nextNumber = weeks.length > 0 ? Math.max(...weeks.map(w => w.week_number)) + 1 : 1;
+    // nunca en el pasado: una semana anterior a la de hoy no la ve el alumno
+    const nextNumber = numeroNuevaSemana(weeks, getCurrentWeek());
     const { data, error } = await supabase
       .from('plan_weeks')
       .insert({ plan_id: planId, week_number: nextNumber, name: trimmed })
@@ -91,7 +94,7 @@ export default function WeekManagerScreen() {
     if (!planId) return;
     setBusy(true);
     try {
-      const nextNumber = Math.max(...weeks.map(w => w.week_number)) + 1;
+      const nextNumber = numeroNuevaSemana(weeks, getCurrentWeek());
       const { data: newWeek, error: weekErr } = await supabase
         .from('plan_weeks')
         .insert({ plan_id: planId, week_number: nextNumber, name: `${source.name} (copia)`, is_deload: source.is_deload })
