@@ -902,10 +902,43 @@ a {
 .panel-main :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* scroll fino para el tablero y todo lo horizontal del panel */
-.board-scroll::-webkit-scrollbar { height: 8px; }
-.board-scroll::-webkit-scrollbar-track { background: transparent; }
-.board-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
-.board-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* Barra de desplazamiento SIEMPRE visible: en macOS la del sistema aparece
+   solo mientras se desplaza, y sin ella no se ve que hay más días a la
+   derecha (reporte de Sebastián). */
+.board-scroll,
+.cal-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+/* todo lo que se desplaza lleva la misma barra visible: los dos tableros,
+   la tabla de sets y el propio modal cuando no cabe en la pantalla */
+.board-scroll,
+.cal-scroll,
+.set-table,
+.modal-card {
+  scrollbar-width: auto;                       /* Firefox */
+  scrollbar-color: var(--text-muted) var(--surface);
+}
+.board-scroll::-webkit-scrollbar,
+.cal-scroll::-webkit-scrollbar,
+.set-table::-webkit-scrollbar,
+.modal-card::-webkit-scrollbar { height: 12px; width: 12px; }
+.board-scroll::-webkit-scrollbar-track,
+.cal-scroll::-webkit-scrollbar-track,
+.set-table::-webkit-scrollbar-track,
+.modal-card::-webkit-scrollbar-track { background: var(--surface); border-radius: 99px; }
+.board-scroll::-webkit-scrollbar-thumb,
+.cal-scroll::-webkit-scrollbar-thumb,
+.set-table::-webkit-scrollbar-thumb,
+.modal-card::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 99px;
+  border: 3px solid var(--surface);            /* deja respirar el pulgar */
+}
+.board-scroll::-webkit-scrollbar-thumb:hover,
+.cal-scroll::-webkit-scrollbar-thumb:hover,
+.set-table::-webkit-scrollbar-thumb:hover,
+.modal-card::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 
 /* ── Movimiento del panel: poco, rápido y con propósito ─────────
    Tres momentos y nada más: el contenido entra con un respiro tras el
@@ -1630,26 +1663,22 @@ select.set-scale {
   opacity: 1;
 }
 .cal-add-dia {
-  border: none;
+  border: 1px dashed var(--border-light);
   background: transparent;
-  color: var(--text-muted);
-  font-size: 16px;
+  color: var(--text-secondary);
+  font-size: 22px;
+  line-height: 1;
   font-weight: 700;
   cursor: pointer;
-  border-radius: 8px;
-  padding: 4px 0;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
-  margin-top: auto;
+  border-radius: 10px;
+  padding: 8px 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   font-family: inherit;
-}
-.cal-celda:hover .cal-add-dia,
-.cal-add-dia:focus-visible {
-  opacity: 1;
 }
 .cal-add-dia:hover {
   color: var(--text);
   background: var(--surface);
+  border-color: var(--text-muted);
 }
 
 .ex-table {
