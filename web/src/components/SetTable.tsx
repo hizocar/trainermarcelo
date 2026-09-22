@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import {
   ESCALAS, TIPOS_SET, leerDescanso, formatoDescanso, DESCANSOS_COMUNES, pasoNumero,
+  OPCIONES_RIR, OPCIONES_RPE, etiquetaEscala,
   type EscalaIntensidad, type TipoSet, type TipoVolumen,
 } from '@/lib/objetivoSerie';
 
@@ -67,6 +68,11 @@ function flechas(
   e.preventDefault();
   aplicar(nuevo);
 }
+
+// Cada escala se rellena distinto: RIR y RPE se eligen de una lista con las
+// equivalencias del equipo; las demás son un número con su unidad al lado.
+const OPCIONES: Partial<Record<EscalaIntensidad, string[]>> = { rir: OPCIONES_RIR, rpe: OPCIONES_RPE };
+const SIN: Partial<Record<EscalaIntensidad, string>> = { rir: 'SIN RIR', rpe: 'SIN RPE' };
 
 const campoDe = (e: EscalaIntensidad): 'rir' | 'rpe' | 'pct_1rm' | 'pct_fcmax' | 'peso' =>
   e === 'rir' ? 'rir' : e === 'rpe' ? 'rpe' : e === 'pct_1rm' ? 'pct_1rm'
@@ -211,27 +217,46 @@ export default function SetTable(p: SetTableProps) {
                 onChange={(e) => p.onSet(i, { tempo: e.target.value })}
                 placeholder="-   -   -" maxLength={20} />
 
-              {/* "RIR 2 - 80/85%": cada escala es texto + un input sin caja */}
-              <div className="set-cell set-int">
-                {p.intensityTypes.map((e, k) => {
-                  const campo = campoDe(e);
-                  const v = s[campo];
+              {(() => {
+                const campo = campoDe(escala);
+                const v = s[campo];
+                const lista = OPCIONES[escala];
+                // RIR y RPE: lista fija. Un valor viejo que no esté en ella se
+                // suma como opción para no perderlo ("2-3" de antes de v47).
+                if (lista) {
+                  const opciones = lista.includes(v) || v.trim() === '' ? lista : [v, ...lista];
                   return (
-                    <span key={e} className="set-int-parte">
-                      {k > 0 && <span className="set-int-sep" aria-hidden="true">-</span>}
-                      {(e === 'rir' || e === 'rpe') && <span>{NOMBRE_ESCALA[e]}</span>}
-                      <input value={v} style={ancho(v)} aria-label={`${NOMBRE_ESCALA[e]} del set ${i + 1}`}
-                        inputMode={e === 'kg' ? 'decimal' : undefined} placeholder="–" maxLength={20}
-                        title={`↑ ↓ cambian de ${PASO[e]} en ${PASO[e]}${e === 'kg' ? ' (Shift: 0,5)' : ''}`}
-                        onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)}
-                        onKeyDown={(ev) => flechas(ev, v, PASO[e], (nv) => p.onSet(i, { [campo]: nv } as Partial<EditSet>))} />
-                      {e === 'pct_1rm' && <span>%</span>}
-                      {e === 'pct_fcmax' && <span>% FC</span>}
-                      {e === 'kg' && <span>{p.unit}</span>}
-                    </span>
+                    <select
+                      className="set-cell set-cell-lista"
+                      value={v}
+                      aria-label={`${NOMBRE_ESCALA[escala]} del set ${i + 1}`}
+                      onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)}
+                    >
+                      <option value="">{SIN[escala]}</option>
+                      {opciones.map((o) => (
+                        <option key={o} value={o}>{etiquetaEscala(escala as 'rir' | 'rpe', o)}</option>
+                      ))}
+                    </select>
                   );
-                })}
-              </div>
+                }
+                // % RM, % FCMAX y CARGA: el número con su unidad dentro de la casilla
+                return (
+                  <label className="set-cell set-int">
+                    <input
+                      value={v}
+                      aria-label={`${NOMBRE_ESCALA[escala]} del set ${i + 1}`}
+                      inputMode="decimal"
+                      maxLength={20}
+                      title={`↑ ↓ cambian de ${PASO[escala]} en ${PASO[escala]}${escala === 'kg' ? ' (Shift: 0,5)' : ''}`}
+                      onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)}
+                      onKeyDown={(ev) => flechas(ev, v, PASO[escala], (nv) => p.onSet(i, { [campo]: nv } as Partial<EditSet>))}
+                    />
+                    <span className="set-unidad">
+                      {escala === 'kg' ? (p.unit === 'kg' ? 'Kg' : 'Lb') : escala === 'pct_1rm' ? '%1RM' : '%FCMax'}
+                    </span>
+                  </label>
+                );
+              })()}
 
               <div className="set-acciones">
                 <button type="button" className="set-icono" title="Duplicar set" aria-label={`Duplicar set ${i + 1}`}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolverSerie, aplanarSeries, lineaSerie, leerDescanso, formatoDescanso, pasoNumero } from '../objetivoSerie';
+import { resolverSerie, aplanarSeries, lineaSerie, leerDescanso, formatoDescanso, pasoNumero, etiquetaEscala, OPCIONES_RIR, OPCIONES_RPE } from '../objetivoSerie';
 
 // MISMOS casos que el espejo de la otra superficie (web ↔ trainer-app)
 const ej = { reps_objective: '12-15', rest_seconds: 90, target_rir: '2', ref_weight: 20, tempo: null };
@@ -114,5 +114,25 @@ describe('pasoNumero (flechas ↑ ↓ de la tabla)', () => {
   it('lo que no es número se deja como está', () => {
     expect(pasoNumero('80/85', 5)).toBeNull();
     expect(pasoNumero('al fallo', 1)).toBeNull();
+  });
+});
+
+describe('etiquetaEscala (listas fijas de RIR y RPE)', () => {
+  it('antepone la escala solo si el valor empieza con número', () => {
+    expect(etiquetaEscala('rir', '2 - 80/85%')).toBe('RIR 2 - 80/85%');
+    expect(etiquetaEscala('rir', 'SUAVE 50%')).toBe('SUAVE 50%');
+    expect(etiquetaEscala('rpe', '7-8 INTENSO')).toBe('RPE 7-8 INTENSO');
+    expect(etiquetaEscala('rir', '')).toBe('');
+  });
+  it('la línea del alumno usa esas etiquetas', () => {
+    const base = { reps: '8', rest_seconds: null, tempo: '', rir: '2 - 80/85%', rpe: '', pct_1rm: '', pct_fcmax: '', ref_weight: null, set_type: 'efectiva' as const };
+    expect(lineaSerie(base, ['rir'], 'reps', 'kg')).toBe('8 reps · RIR 2 - 80/85%');
+    expect(lineaSerie({ ...base, rir: 'SUAVE 50%' }, ['rir'], 'reps', 'kg')).toBe('8 reps · SUAVE 50%');
+  });
+  it('las listas son las que definió el equipo', () => {
+    expect(OPCIONES_RIR).toHaveLength(5);
+    expect(OPCIONES_RIR[2]).toBe('2 - 80/85%');
+    expect(OPCIONES_RPE[0]).toBe('1 MUY SUAVE');
+    expect(OPCIONES_RPE).toContain('10 MAX');
   });
 });

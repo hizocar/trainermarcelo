@@ -43,6 +43,20 @@ export interface SerieResuelta {
   set_type: TipoSet;
 }
 
+/** Opciones fijas de RIR, tal como las eligió el equipo (con su equivalencia
+ *  en % de la carga). El valor guardado es el texto sin el prefijo "RIR". */
+export const OPCIONES_RIR = ['0 - 100%', '1 - 90/95%', '2 - 80/85%', '3 - 70/75%', 'SUAVE 50%'];
+
+/** Opciones fijas de RPE, del más suave al máximo. */
+export const OPCIONES_RPE = ['1 MUY SUAVE', '2-3 SUAVE', '4-6 MODERADO', '7-8 INTENSO', '9 MUY INTENSO', '10 MAX'];
+
+/** "RIR 2 - 80/85%" / "SUAVE 50%": el prefijo solo cuando el valor empieza con número. */
+export function etiquetaEscala(escala: 'rir' | 'rpe', valor: string): string {
+  const v = valor.trim();
+  if (v === '') return '';
+  return /^\d/.test(v) ? `${escala === 'rir' ? 'RIR' : 'RPE'} ${v}` : v;
+}
+
 const txt = (v?: string | null) => (v ?? '').trim();
 const esTipoSet = (v?: string | null): v is TipoSet => TIPOS_SET.includes(v as TipoSet);
 
@@ -131,8 +145,8 @@ export function lineaSerie(
   const pct = s.pct_1rm.replace(/%+$/, '').trim();
   const fc = s.pct_fcmax.replace(/%+$/, '').trim();
   const intensidades = escalas.map((e) =>
-    e === 'rir' ? (s.rir ? `RIR ${s.rir}` : null)
-    : e === 'rpe' ? (s.rpe ? `RPE ${s.rpe}` : null)
+    e === 'rir' ? (s.rir ? etiquetaEscala('rir', s.rir) : null)
+    : e === 'rpe' ? (s.rpe ? etiquetaEscala('rpe', s.rpe) : null)
     : e === 'pct_1rm' ? (pct ? `${pct}%` : null)
     : e === 'kg' ? (s.ref_weight != null ? `${s.ref_weight} ${unidad}` : null)
     : e === 'pct_fcmax' ? (fc ? `${fc}% FCmax` : null)

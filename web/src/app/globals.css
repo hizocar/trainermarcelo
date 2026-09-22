@@ -1359,25 +1359,31 @@ select.set-scale {
 .set-cell::placeholder, .set-cell input::placeholder { color: var(--text-muted); font-weight: 600; opacity: 0.7; }
 .set-tempo::placeholder { letter-spacing: 1px; }
 .set-cell[list]::-webkit-calendar-picker-indicator { display: none !important; }
-.set-int { display: flex; align-items: center; justify-content: center; }
+.set-int { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: 0; }
+/* el número se escribe pegado a su unidad ("120 Kg", "80 %1RM") */
+.set-int input { flex: 1; min-width: 0; text-align: right; }
+.set-unidad {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+/* RIR y RPE se eligen de una lista: la casilla ES el menú */
+select.set-cell-lista {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  padding: 0 10px;
+}
 .set-int input {
-  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
   padding: 0;
   color: inherit;
   font: inherit;
-  text-align: center;
-}
-.set-int { gap: 0; font-size: 13.5px; white-space: nowrap; }
-.set-int-parte { display: inline-flex; align-items: baseline; gap: 4px; }
-.set-int-parte > input + span { margin-left: -3px; }
-.set-int-sep { margin: 0 6px; color: var(--text-muted); }
-/* el input mide exactamente su texto donde el navegador lo soporta;
-   el ancho en ch del componente queda de respaldo */
-@supports (field-sizing: content) {
-  .set-int input { field-sizing: content; width: auto !important; min-width: 1ch; }
 }
 .set-acciones { display: flex; gap: 4px; }
 .set-icono {
