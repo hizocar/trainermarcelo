@@ -799,7 +799,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
           {ampliado ? '⤡ COMPACTAR' : '⤢ AMPLIAR'}
         </button>
       </div>
-      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+      <div className="cal-scroll">
         <div className={ampliado ? 'cal-amplio' : undefined} style={{ minWidth: ampliado ? 2360 : 1400 }}>
           {semanas.map((semana, si) => (
             <section key={semana.id} className="cal-semana">
@@ -856,15 +856,18 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                         : undefined}
                     >
                       <span className="cal-col-label">{col}</span>
-                      {[...bloques, ...sueltos].map(({ d, di }) => tarjetaDia(d, di))}
+                      {/* el "+" arriba y siempre visible: abajo y al 0% de
+                          opacidad no se encontraba (reporte de Sebastián) */}
                       <button
                         type="button"
                         className="cal-add-dia"
                         onClick={() => addDay(semana.id, weekDayJs)}
                         title={`Crear un día el ${col.toLowerCase()} de esta semana`}
+                        aria-label={`Crear un día el ${col.toLowerCase()} de ${semana.name}`}
                       >
                         +
                       </button>
+                      {[...bloques, ...sueltos].map(({ d, di }) => tarjetaDia(d, di))}
                     </div>
                   );
                 })}
