@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
-import type { PlanWeek } from '@/lib/planWeeks';
+import { numeroNuevaSemana, resolveActiveWeek, type PlanWeek } from '@/lib/planWeeks';
+import { santiagoCurrentWeek } from '@/lib/weeks';
 
 // Panel de "Gestión de semanas": cada semana es un split 100% independiente
 // (sus propios días/ejercicios/series). Antes había un solo split que se
@@ -27,7 +28,7 @@ export default function WeekManager({
   async function createWeek() {
     setBusy(true);
     setError(null);
-    const nextNumber = weeks.length > 0 ? Math.max(...weeks.map(w => w.week_number)) + 1 : 1;
+    const nextNumber = numeroNuevaSemana(weeks, santiagoCurrentWeek());
     const { data, error: err } = await supabase
       .from('plan_weeks')
       .insert({ plan_id: planId, week_number: nextNumber, name: `Semana ${weeks.length + 1}` })
@@ -43,7 +44,7 @@ export default function WeekManager({
     setBusy(true);
     setError(null);
     try {
-      const nextNumber = Math.max(...weeks.map(w => w.week_number)) + 1;
+      const nextNumber = numeroNuevaSemana(weeks, santiagoCurrentWeek());
       const { data: newWeek, error: weekErr } = await supabase
         .from('plan_weeks')
         .insert({ plan_id: planId, week_number: nextNumber, name: `${source.name} (copia)`, is_deload: source.is_deload })
@@ -149,6 +150,9 @@ export default function WeekManager({
   }
 
   const sorted = [...weeks].sort((a, b) => a.week_number - b.week_number);
+  // la que el alumno ve HOY en su teléfono: misma función que usa la app
+  const laQueVeHoy = resolveActiveWeek(weeks, santiagoCurrentWeek());
+  const editandoOtra = laQueVeHoy != null && selectedWeekId != null && laQueVeHoy.id !== selectedWeekId;
 
   return (
     <div className="week-manager" style={{ marginTop: 20, marginBottom: 8 }}>
@@ -161,6 +165,28 @@ export default function WeekManager({
       <p className="muted" style={{ fontSize: 12, marginTop: 2, marginBottom: 10 }}>
         Cada semana es un split independiente. Si no planificas la siguiente, el cliente ve &quot;sin plan&quot; en vez de repetir la anterior sola — salvo que actives &quot;repetir&quot;.
       </p>
+
+      {/* Sin esto, un coach puede editar durante días una semana que su alumno
+          no ve (pasó de verdad: una semana duplicada quedó invisible). */}
+      {editandoOtra && (
+        <p style={{ fontSize: 12, marginBottom: 10, color: 'var(--warning)' }}>
+          Estás editando «{weeks.find(w => w.id === selectedWeekId)?.name}», que tu alumno
+          <strong> no ve hoy</strong>: en su teléfono ve «{laQueVeHoy!.name}».{' '}
+          <button
+            type="button"
+            onClick={() => goTo(laQueVeHoy!.id)}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+          >
+            Ir a la que ve hoy
+          </button>
+        </p>
+      )}
+      {!laQueVeHoy && (
+        <p style={{ fontSize: 12, marginBottom: 10, color: 'var(--warning)' }}>
+          Hoy tu alumno no ve ninguna semana planificada. Crea una con “+ Nueva semana”
+          (nace en la semana de hoy) o marca una como “repetir”.
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {sorted.map((w, i) => {
@@ -176,6 +202,11 @@ export default function WeekManager({
                 borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 150,
               }}
             >
+              {laQueVeHoy?.id === w.id && (
+                <span className="label" style={{ fontSize: 8, letterSpacing: 1.2, color: active ? 'var(--bg)' : 'var(--accent)' }}>
+                  LA QUE VE HOY
+                </span>
+              )}
               {renaming === w.id ? (
                 <input
                   className="input"
