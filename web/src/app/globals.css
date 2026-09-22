@@ -1736,11 +1736,13 @@ select.set-scale {
 /* biblioteca de ejercicios */
 /* Va en un portal a document.body: position fixed y coordenadas de viewport
    calculadas desde el input. Adentro de la tabla quedaba recortado por el
-   contenedor con overflow-x: auto. z-index bajo el modal (90). */
+   contenedor con overflow-x: auto. z-index POR ENCIMA del modal (90): el
+   buscador vive dentro del modal de detalle, y con 80 las sugerencias se
+   dibujaban detrás del overlay — se escribía y no aparecía nada. */
 .lib-dropdown {
   position: fixed;
   min-width: 280px;
-  z-index: 80;
+  z-index: 120;
   background: var(--card-elevated);
   border: 1px solid var(--border-light);
   border-radius: 12px;
