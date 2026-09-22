@@ -67,6 +67,7 @@ export interface Exercise {
   target_rir?: string;
   target_pct_1rm?: string | null;
   target_rpe?: string | null;
+  target_pct_fcmax?: string | null;
   /** v45: qué mide el volumen y con qué escalas se programa la intensidad */
   volume_type?: 'reps' | 'tiempo';
   intensity_types?: string[];
@@ -91,6 +92,7 @@ export interface ExerciseSeries {
   target_rir?: string | null;
   target_rpe?: string | null;
   target_pct_1rm?: string | null;
+  target_pct_fcmax?: string | null;
   ref_weight?: number | null;
   set_type?: string | null;
 }

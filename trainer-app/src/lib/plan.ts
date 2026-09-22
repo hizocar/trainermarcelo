@@ -110,7 +110,7 @@ export async function fetchFullPlan(clientId: string, calendarWeek: number = get
         exercises (
           id, day_id, name, name_en, muscle_group, superseries_group,
           reps_objective, unit, ref_weight, order_index, archived,
-          image_url, video_url, notes, tempo, rest_seconds, target_rir, target_pct_1rm, target_rpe, volume_type, intensity_types,
+          image_url, video_url, notes, tempo, rest_seconds, target_rir, target_pct_1rm, target_rpe, target_pct_fcmax, volume_type, intensity_types,
           exercise_series ( id, series_number )
         )
       `)

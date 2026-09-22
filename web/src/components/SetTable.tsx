@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  TIPOS_SET, leerDescanso, formatoDescanso, DESCANSOS_COMUNES,
+  ESCALAS, TIPOS_SET, leerDescanso, formatoDescanso, DESCANSOS_COMUNES,
   type EscalaIntensidad, type TipoSet, type TipoVolumen,
 } from '@/lib/objetivoSerie';
 
@@ -21,6 +21,7 @@ export interface EditSet {
   rir: string;
   rpe: string;
   pct_1rm: string;
+  pct_fcmax: string;
   /** texto para el input; se convierte a número al guardar */
   peso: string;
   set_type: TipoSet;
@@ -38,19 +39,18 @@ export interface SetTableProps {
   onRemove: (i: number) => void;
 }
 
-const NOMBRE_ESCALA: Record<EscalaIntensidad, string> = { rir: 'RIR', rpe: 'RPE', pct_1rm: '%1RM', kg: 'CARGA' };
-// Un solo selector (como la referencia): escalas simples y las combinaciones útiles.
-const COMBINACIONES: EscalaIntensidad[][] = [
-  ['rir'], ['rpe'], ['pct_1rm'], ['kg'],
-  ['rir', 'pct_1rm'], ['rpe', 'pct_1rm'], ['rir', 'kg'], ['rpe', 'kg'], ['pct_1rm', 'kg'], ['rir', 'rpe'],
-];
-const claveCombo = (c: readonly string[]) => c.join('+');
+// Exactamente las cinco de la referencia, UNA a la vez (v46): sin
+// combinaciones — "cada variable por separada".
+const NOMBRE_ESCALA: Record<EscalaIntensidad, string> = {
+  rir: 'RIR', rpe: 'RPE', pct_1rm: '% RM', kg: 'CARGA', pct_fcmax: '% FCMAX',
+};
 
 const NOMBRE_TIPO: Record<TipoSet, string> = { efectiva: 'SET', calentamiento: 'CALENT.', drop: 'DROP', fallo: 'FALLO' };
 const TIPO_LARGO: Record<TipoSet, string> = { efectiva: 'Set efectivo', calentamiento: 'Calentamiento', drop: 'Drop set', fallo: 'Al fallo' };
 
-const campoDe = (e: EscalaIntensidad): 'rir' | 'rpe' | 'pct_1rm' | 'peso' =>
-  e === 'rir' ? 'rir' : e === 'rpe' ? 'rpe' : e === 'pct_1rm' ? 'pct_1rm' : 'peso';
+const campoDe = (e: EscalaIntensidad): 'rir' | 'rpe' | 'pct_1rm' | 'pct_fcmax' | 'peso' =>
+  e === 'rir' ? 'rir' : e === 'rpe' ? 'rpe' : e === 'pct_1rm' ? 'pct_1rm'
+  : e === 'pct_fcmax' ? 'pct_fcmax' : 'peso';
 
 /** ancho del input según su contenido: la celda se lee como texto corrido */
 const ancho = (v: string, minimo = 1) => ({ width: `calc(${Math.max(minimo, v.length)}ch + 6px)` });
@@ -109,11 +109,7 @@ function CeldaDescanso({ valor, onCambio, etiqueta }: {
 }
 
 export default function SetTable(p: SetTableProps) {
-  const clave = claveCombo(p.intensityTypes);
-  // una combinación guardada que no está en la lista igual se muestra
-  const opciones = COMBINACIONES.some((c) => claveCombo(c) === clave)
-    ? COMBINACIONES
-    : [...COMBINACIONES, p.intensityTypes];
+  const escala: EscalaIntensidad = p.intensityTypes[0] ?? 'rir';
 
   return (
     <div className="set-table-wrap">
@@ -139,13 +135,11 @@ export default function SetTable(p: SetTableProps) {
           <label className="set-head-cell">
             <span>Intensidad</span>
             <div style={{ display: 'flex', gap: 6 }}>
-              <select className="set-scale" style={{ flex: 1 }} value={clave}
-                onChange={(e) => p.onScales({ intensityTypes: e.target.value.split('+') as EscalaIntensidad[] })}>
-                {opciones.map((c) => (
-                  <option key={claveCombo(c)} value={claveCombo(c)}>{c.map((e) => NOMBRE_ESCALA[e]).join(' + ')}</option>
-                ))}
+              <select className="set-scale" style={{ flex: 1 }} value={escala}
+                onChange={(e) => p.onScales({ intensityTypes: [e.target.value as EscalaIntensidad] })}>
+                {ESCALAS.map((e) => <option key={e} value={e}>{NOMBRE_ESCALA[e]}</option>)}
               </select>
-              {p.intensityTypes.includes('kg') && (
+              {escala === 'kg' && (
                 <select className="set-scale" value={p.unit} aria-label="Unidad de carga"
                   onChange={(e) => p.onScales({ unit: e.target.value as 'kg' | 'lb' })}>
                   <option value="kg">KG</option>
@@ -193,6 +187,7 @@ export default function SetTable(p: SetTableProps) {
                         inputMode={e === 'kg' ? 'decimal' : undefined} placeholder="–" maxLength={20}
                         onChange={(ev) => p.onSet(i, { [campo]: ev.target.value } as Partial<EditSet>)} />
                       {e === 'pct_1rm' && <span>%</span>}
+                      {e === 'pct_fcmax' && <span>% FC</span>}
                       {e === 'kg' && <span>{p.unit}</span>}
                     </span>
                   );

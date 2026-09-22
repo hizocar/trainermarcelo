@@ -6,11 +6,12 @@
 // ESPEJO: idéntico en web/src/lib y trainer-app/src/lib, con los mismos
 // casos de test (proyectos npm separados, ver CLAUDE.md).
 
-export type EscalaIntensidad = 'rir' | 'rpe' | 'pct_1rm' | 'kg';
+export type EscalaIntensidad = 'rir' | 'rpe' | 'pct_1rm' | 'kg' | 'pct_fcmax';
 export type TipoVolumen = 'reps' | 'tiempo';
 export type TipoSet = 'efectiva' | 'calentamiento' | 'drop' | 'fallo';
 
-export const ESCALAS: EscalaIntensidad[] = ['rir', 'rpe', 'pct_1rm', 'kg'];
+// el orden del desplegable, tal como lo pidió Sebastián (una sola a la vez)
+export const ESCALAS: EscalaIntensidad[] = ['rir', 'rpe', 'pct_1rm', 'kg', 'pct_fcmax'];
 export const TIPOS_SET: TipoSet[] = ['efectiva', 'calentamiento', 'drop', 'fallo'];
 
 /** Campos de objetivo tal como están en la base (ejercicio o set). */
@@ -21,6 +22,8 @@ export interface CamposObjetivo {
   target_rir?: string | null;
   target_rpe?: string | null;
   target_pct_1rm?: string | null;
+  /** % de la frecuencia cardíaca máxima (v46) */
+  target_pct_fcmax?: string | null;
   ref_weight?: number | null;
 }
 export interface CamposSerie extends CamposObjetivo {
@@ -35,6 +38,7 @@ export interface SerieResuelta {
   rir: string;
   rpe: string;
   pct_1rm: string;
+  pct_fcmax: string;
   ref_weight: number | null;
   set_type: TipoSet;
 }
@@ -51,6 +55,7 @@ export function resolverSerie(ej: CamposObjetivo, s: CamposSerie): SerieResuelta
     rir: hereda(s.target_rir, ej.target_rir),
     rpe: hereda(s.target_rpe, ej.target_rpe),
     pct_1rm: hereda(s.target_pct_1rm, ej.target_pct_1rm),
+    pct_fcmax: hereda(s.target_pct_fcmax, ej.target_pct_fcmax),
     ref_weight: s.ref_weight ?? ej.ref_weight ?? null,
     set_type: esTipoSet(s.set_type) ? s.set_type : 'efectiva',
   };
@@ -81,6 +86,7 @@ export function aplanarSeries(series: SerieResuelta[]): {
     rir: txtBase((s) => s.rir),
     rpe: txtBase((s) => s.rpe),
     pct_1rm: txtBase((s) => s.pct_1rm),
+    pct_fcmax: txtBase((s) => s.pct_fcmax),
     ref_weight: numBase((s) => s.ref_weight),
   };
   const ejercicio: Required<CamposObjetivo> = {
@@ -90,6 +96,7 @@ export function aplanarSeries(series: SerieResuelta[]): {
     target_rir: nullSiVacio(base.rir),
     target_rpe: nullSiVacio(base.rpe),
     target_pct_1rm: nullSiVacio(base.pct_1rm),
+    target_pct_fcmax: nullSiVacio(base.pct_fcmax),
     ref_weight: base.ref_weight,
   };
   // con la base así elegida, un set distinto de la base nunca está vacío
@@ -103,6 +110,7 @@ export function aplanarSeries(series: SerieResuelta[]): {
       target_rir: distinto(s.rir, base.rir),
       target_rpe: distinto(s.rpe, base.rpe),
       target_pct_1rm: distinto(s.pct_1rm, base.pct_1rm),
+      target_pct_fcmax: distinto(s.pct_fcmax, base.pct_fcmax),
       ref_weight: s.ref_weight === base.ref_weight ? null : s.ref_weight,
       set_type: s.set_type === 'efectiva' ? null : s.set_type,
     })),
@@ -121,11 +129,13 @@ export function lineaSerie(
   unidad: string,
 ): string {
   const pct = s.pct_1rm.replace(/%+$/, '').trim();
+  const fc = s.pct_fcmax.replace(/%+$/, '').trim();
   const intensidades = escalas.map((e) =>
     e === 'rir' ? (s.rir ? `RIR ${s.rir}` : null)
     : e === 'rpe' ? (s.rpe ? `RPE ${s.rpe}` : null)
     : e === 'pct_1rm' ? (pct ? `${pct}%` : null)
     : e === 'kg' ? (s.ref_weight != null ? `${s.ref_weight} ${unidad}` : null)
+    : e === 'pct_fcmax' ? (fc ? `${fc}% FCmax` : null)
     : null);
   return [
     ETIQUETA_TIPO[s.set_type] || null,

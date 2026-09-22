@@ -7,7 +7,7 @@ import type { EditSet } from '@/components/SetTable';
 export function aEditSet(r: SerieResuelta, id: string): EditSet {
   return {
     id, reps: r.reps, rest_seconds: r.rest_seconds, tempo: r.tempo,
-    rir: r.rir, rpe: r.rpe, pct_1rm: r.pct_1rm,
+    rir: r.rir, rpe: r.rpe, pct_1rm: r.pct_1rm, pct_fcmax: r.pct_fcmax,
     peso: r.ref_weight == null ? '' : String(r.ref_weight),
     set_type: r.set_type,
   };
@@ -24,7 +24,7 @@ export function pesoANumero(peso: string): number | null {
 export function aResuelta(s: EditSet): SerieResuelta {
   return {
     reps: s.reps, rest_seconds: s.rest_seconds, tempo: s.tempo,
-    rir: s.rir, rpe: s.rpe, pct_1rm: s.pct_1rm,
+    rir: s.rir, rpe: s.rpe, pct_1rm: s.pct_1rm, pct_fcmax: s.pct_fcmax,
     ref_weight: pesoANumero(s.peso), set_type: s.set_type,
   };
 }
