@@ -108,7 +108,7 @@ export default function WeekManagerScreen() {
           exercises ( name, name_en, library_id, muscle_group, superseries_group,
             reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes,
             image_url, video_url, volume_type, intensity_types,
-            exercise_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type ) )
+            exercise_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, target_pct_fcmax, ref_weight, set_type ) )
         `)
         .eq('plan_week_id', source.id).eq('archived', false);
       if (daysErr) throw daysErr;

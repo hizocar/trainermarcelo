@@ -38,8 +38,8 @@ export default async function ProgramEditorPage({
       id, template_id, template_week_id, day_number, name, week_day,
       program_template_exercises (
         id, day_id, name, name_en, library_id, muscle_group, superseries_group,
-        reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes, video_url, volume_type, intensity_types,
-        program_template_series ( id, exercise_id, series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type )
+        reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, target_pct_fcmax, tempo, notes, video_url, volume_type, intensity_types,
+        program_template_series ( id, exercise_id, series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, target_pct_fcmax, ref_weight, set_type )
       )
     `)
     .eq('template_id', id)

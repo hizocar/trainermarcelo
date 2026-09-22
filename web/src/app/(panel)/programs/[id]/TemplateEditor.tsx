@@ -358,7 +358,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
           day_number, name, week_day,
           program_template_exercises ( name, name_en, library_id, muscle_group, superseries_group,
             reps_objective, unit, ref_weight, order_index, rest_seconds, target_rir, target_pct_1rm, target_rpe, tempo, notes, video_url, volume_type, intensity_types,
-            program_template_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type ) )
+            program_template_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, target_pct_fcmax, ref_weight, set_type ) )
         `)
         .eq('template_week_id', weekId);
       if (diasErr) throw diasErr;

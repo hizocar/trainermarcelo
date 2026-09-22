@@ -93,8 +93,8 @@ Deno.serve(async (req) => {
       exercises (
         id, name, name_en, library_id, muscle_group, superseries_group,
         reps_objective, unit, ref_weight, order_index, image_url, video_url,
-        notes, tempo, rest_seconds, target_rir, target_pct_1rm, target_rpe, volume_type, intensity_types, archived,
-        exercise_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, ref_weight, set_type )
+        notes, tempo, rest_seconds, target_rir, target_pct_1rm, target_rpe, target_pct_fcmax, volume_type, intensity_types, archived,
+        exercise_series ( series_number, reps_objective, rest_seconds, tempo, target_rir, target_rpe, target_pct_1rm, target_pct_fcmax, ref_weight, set_type )
       )
     `)
     .eq('plan_week_id', sourceWeek.id);
@@ -178,6 +178,7 @@ Deno.serve(async (req) => {
             target_rir: ex.target_rir,
             target_pct_1rm: ex.target_pct_1rm,
             target_rpe: ex.target_rpe,
+            target_pct_fcmax: ex.target_pct_fcmax,
             volume_type: ex.volume_type,
             intensity_types: ex.intensity_types,
           })
@@ -195,6 +196,7 @@ Deno.serve(async (req) => {
           target_rir: s.target_rir,
           target_rpe: s.target_rpe,
           target_pct_1rm: s.target_pct_1rm,
+          target_pct_fcmax: s.target_pct_fcmax,
           ref_weight: s.ref_weight,
           set_type: s.set_type,
         }));
