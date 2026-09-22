@@ -125,6 +125,24 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
   const [libForm, setLibForm] = useState<{ di: number; ei: number; name: string; nameEn: string; muscle: string; equipment: string } | null>(null);
   const [libSaving, setLibSaving] = useState(false);
   const [editCard, setEditCard] = useState<{ di: number; ei: number } | null>(null);
+  // texto escrito en el buscador SIN elegir de la lista: cerrar así perdía el
+  // cambio y dejaba la tarjeta en "(elige el ejercicio)" (reporte de Sebastián)
+  const [pendienteLib, setPendienteLib] = useState<{ texto: string; hayResultados: boolean }>({ texto: '', hayResultados: false });
+
+  // abrir otro ejercicio empieza de cero: el texto a medio escribir no viaja
+  useEffect(() => { setPendienteLib({ texto: '', hayResultados: false }); }, [editCard?.di, editCard?.ei]);
+
+  /** Cierra el detalle, salvo que haya un ejercicio a medio elegir. */
+  function cerrarDetalle() {
+    if (pendienteLib.texto.length >= 2) {
+      setError(pendienteLib.hayResultados
+        ? `Elige “${pendienteLib.texto}” de la lista (o usa ↑ ↓ y Enter) para cambiar el ejercicio.`
+        : `“${pendienteLib.texto}” no está en la biblioteca: elígelo de la lista o agrégalo con “+ Agregar a la biblioteca”.`);
+      return;
+    }
+    setError(null);
+    setEditCard(null);
+  }
 
   // arrastre de ejercicios (tarjeta completa) y de días (bloque completo)
   const [drag, setDrag] = useState<{ di: number; ei: number } | null>(null);
@@ -865,7 +883,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
         const { di, ei } = editCard;
         const ex = days[di].exercises[ei];
         return (
-          <div className="modal-overlay" onClick={() => setEditCard(null)}>
+          <div className="modal-overlay" onClick={cerrarDetalle}>
             <div className="modal-card" style={{ maxWidth: 860 }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <MiniBody grupo={ex.muscle_group} height={84} />
@@ -884,6 +902,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                     </div>
                   ) : (
                     <LibrarySearch
+                      onPendiente={setPendienteLib}
                       onPick={(item) => pickFromLibrary(di, ei, item)}
                       onCreate={(query) => setLibForm({ di, ei, name: query, nameEn: '', muscle: '', equipment: '' })}
                     />
@@ -929,6 +948,10 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                 </div>
               </div>
 
+              {error && (
+                <p style={{ color: 'var(--warning)', fontSize: 12, marginTop: 12 }}>{error}</p>
+              )}
+
               <div className="bfield" style={{ marginTop: 12 }}>
                 <span>Observaciones del coach</span>
                 <textarea
@@ -954,7 +977,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
                     }
                   }}
                 />
-                <button className="btn btn-primary" style={{ padding: '10px 22px' }} onClick={() => setEditCard(null)}>
+                <button className="btn btn-primary" style={{ padding: '10px 22px' }} onClick={cerrarDetalle}>
                   LISTO
                 </button>
               </div>

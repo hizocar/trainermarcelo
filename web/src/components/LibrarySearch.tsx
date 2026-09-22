@@ -23,11 +23,18 @@ export interface LibItem {
  * franja de pocos píxeles por más z-index que tuviera — es recorte, no apilamiento.
  */
 export default function LibrarySearch({
-  onPick, onCreate,
-}: { onPick: (item: LibItem) => void; onCreate: (query: string) => void }) {
+  onPick, onCreate, onPendiente,
+}: {
+  onPick: (item: LibItem) => void;
+  onCreate: (query: string) => void;
+  /** avisa al modal si quedó texto escrito SIN elegir (para no cerrar y perderlo) */
+  onPendiente?: (pendiente: { texto: string; hayResultados: boolean }) => void;
+}) {
   const supabase = createClient();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<LibItem[]>([]);
+  // sugerencia resaltada: el teclado tiene que bastar para elegir
+  const [indice, setIndice] = useState(0);
   const [closed, setClosed] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const [mounted, setMounted] = useState(false); // el portal solo existe en el cliente
@@ -93,9 +100,26 @@ export default function LibrarySearch({
     };
   }, [open]);
 
+  /** elegir de verdad: es lo ÚNICO que cambia el ejercicio */
+  function elegir(item: LibItem) {
+    setClosed(true);
+    setQ('');
+    onPendiente?.({ texto: '', hayResultados: false });
+    onPick(item);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || results.length === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setIndice((i) => (i + 1) % results.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setIndice((i) => (i - 1 + results.length) % results.length); }
+    else if (e.key === 'Enter') { e.preventDefault(); elegir(results[Math.min(indice, results.length - 1)]); }
+  }
+
   function onChange(v: string) {
     setQ(v);
     setClosed(false);
+    setIndice(0);
+    onPendiente?.({ texto: v.trim(), hayResultados: false });
     if (timer.current) clearTimeout(timer.current);
     const query = v.trim();
     if (query.length < 2) { setResults([]); return; }
@@ -111,7 +135,9 @@ export default function LibrarySearch({
         .limit(40);
       // el ranking decide quién entra a los 8 visibles: básicos y propios
       // primero (antes: limit 6 sin orden = 6 filas arbitrarias de 841)
-      setResults(rankLibrary((data ?? []) as (LibItem & { coach_id: string | null })[], query, uidRef.current).slice(0, 8));
+      const rank = rankLibrary((data ?? []) as (LibItem & { coach_id: string | null })[], query, uidRef.current).slice(0, 8);
+      setResults(rank);
+      onPendiente?.({ texto: query, hayResultados: rank.length > 0 });
     }, 220);
   }
 
@@ -121,12 +147,13 @@ export default function LibrarySearch({
       className="lib-dropdown"
       style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
     >
-      {results.map((r) => (
+      {results.map((r, i) => (
         <button
           key={r.id}
           type="button"
-          className="lib-item"
-          onClick={() => { setClosed(true); onPick(r); }}
+          className={`lib-item${i === Math.min(indice, results.length - 1) ? ' lib-item-activo' : ''}`}
+          onMouseEnter={() => setIndice(i)}
+          onClick={() => elegir(r)}
         >
           <span>{r.name}</span>
           <small>{r.muscle_group}{r.equipment ? ` · ${r.equipment}` : ''}</small>
@@ -135,7 +162,7 @@ export default function LibrarySearch({
       <button
         type="button"
         className="lib-item lib-create"
-        onClick={() => { setClosed(true); onCreate(q.trim()); }}
+        onClick={() => { setClosed(true); onPendiente?.({ texto: '', hayResultados: false }); onCreate(q.trim()); }}
       >
         + Agregar “{q.trim()}” a la biblioteca
       </button>
@@ -149,8 +176,9 @@ export default function LibrarySearch({
         className="ex-input"
         value={q}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
         onFocus={() => setClosed(false)}
-        placeholder="Buscar en la biblioteca…"
+        placeholder="Escribe y elige de la lista (↑ ↓ y Enter)…"
         autoFocus
       />
       {mounted && open && menu && createPortal(menu, document.body)}
