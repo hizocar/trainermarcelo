@@ -1,4 +1,4 @@
-import { resolverSerie, aplanarSeries, lineaSerie, leerDescanso, formatoDescanso } from '../objetivoSerie';
+import { resolverSerie, aplanarSeries, lineaSerie, leerDescanso, formatoDescanso, pasoNumero } from '../objetivoSerie';
 
 // MISMOS casos que el espejo de la otra superficie (web ↔ trainer-app)
 const ej = { reps_objective: '12-15', rest_seconds: 90, target_rir: '2', ref_weight: 20, tempo: null };
@@ -89,5 +89,29 @@ describe('descanso en un campo', () => {
     expect(formatoDescanso(0)).toBe('00:00');
     expect(formatoDescanso(null)).toBe('');
     expect(leerDescanso('9999')).toBe(3600);
+  });
+});
+
+describe('pasoNumero (flechas ↑ ↓ de la tabla)', () => {
+  it('sube y baja números simples', () => {
+    expect(pasoNumero('120', 2.5)).toBe('122.5');
+    expect(pasoNumero('122.5', -2.5)).toBe('120');
+    expect(pasoNumero('2', 1)).toBe('3');
+    expect(pasoNumero('17,5', 2.5)).toBe('20');
+  });
+  it('mueve el rango entero', () => {
+    expect(pasoNumero('8-10', 1)).toBe('9-11');
+    expect(pasoNumero('8-10', -1)).toBe('7-9');
+  });
+  it('desde vacío arranca del valor inicial', () => {
+    expect(pasoNumero('', 2.5, 20)).toBe('22.5');
+    expect(pasoNumero('', 1)).toBe('1');
+  });
+  it('nunca baja de 0', () => {
+    expect(pasoNumero('1', -5)).toBe('0');
+  });
+  it('lo que no es número se deja como está', () => {
+    expect(pasoNumero('80/85', 5)).toBeNull();
+    expect(pasoNumero('al fallo', 1)).toBeNull();
   });
 });

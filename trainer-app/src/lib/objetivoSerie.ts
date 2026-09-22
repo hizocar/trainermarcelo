@@ -179,3 +179,26 @@ export function formatoDescanso(seg: number | null): string {
 
 /** Los descansos que más se programan: sugerencias del campo. */
 export const DESCANSOS_COMUNES = [30, 45, 60, 90, 120, 150, 180, 240, 300];
+
+/**
+ * Sube o baja un número escrito a mano, para las flechas ↑ ↓ de la tabla.
+ * Respeta lo que ya hay: "8-10" con paso 1 pasa a "9-11" (el rango entero se
+ * mueve), "" arranca del valor inicial, y nunca baja de 0.
+ * Devuelve null si el texto no es un número ni un rango (ej. "80/85").
+ */
+export function pasoNumero(texto: string, paso: number, inicial = 0): string | null {
+  const t = texto.trim().replace(',', '.');
+  const num = (v: string) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    const r = Math.max(0, Math.round((n + paso) * 100) / 100);
+    return String(r);
+  };
+  if (t === '') return String(Math.max(0, inicial + paso));
+  const rango = t.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+  if (rango) {
+    const a = num(rango[1]); const b = num(rango[2]);
+    return a != null && b != null ? `${a}-${b}` : null;
+  }
+  return /^\d+(\.\d+)?$/.test(t) ? num(t) : null;
+}
