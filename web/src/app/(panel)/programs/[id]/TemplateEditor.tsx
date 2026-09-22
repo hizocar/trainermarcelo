@@ -31,6 +31,9 @@ const MUSCLE_GROUPS = [
   'Gastrocnemios', 'Core',
 ];
 
+// niveles de zoom del calendario: 70% entra el programa completo, 150% se lee de corrido
+const ZOOMS = [0.7, 0.85, 1, 1.25, 1.5];
+
 // columnas del calendario (lunes primero) → week_day en numeración JS (0=Dom)
 const COLUMNAS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 const WEEKDAY_DE_COLUMNA = [1, 2, 3, 4, 5, 6, 0];
@@ -155,18 +158,27 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
   const recienArrastro = useRef(false);
   const creandoSemana1 = useRef(false);
 
-  // vista ampliada: columnas más anchas para leer los ejercicios de corrido.
-  // Se lee en efecto (no en el init) para no desalinear la hidratación de SSR.
-  const [ampliado, setAmpliado] = useState(false);
+  // ZOOM del calendario: de 70% (todo el programa de un vistazo) a 150%
+  // (leer los ejercicios de corrido). Escala tamaños con una variable CSS,
+  // NO con transform: un ancestro transformado vuelve a atrapar los modales
+  // position:fixed — el bug que se arregló en el PR #69.
+  // El nivel se lee en efecto (no en el init) para no desalinear la hidratación.
+  const [zoom, setZoom] = useState(2);
   useEffect(() => {
-    try { setAmpliado(localStorage.getItem('cal-amplio') === '1'); } catch { /* sin storage */ }
+    try {
+      const guardado = localStorage.getItem('cal-zoom');
+      if (guardado != null) setZoom(Math.min(ZOOMS.length - 1, Math.max(0, Number(guardado))));
+      else if (localStorage.getItem('cal-amplio') === '1') setZoom(3); // preferencia anterior
+    } catch { /* sin storage */ }
   }, []);
-  function toggleAmpliado() {
-    setAmpliado((v) => {
-      try { localStorage.setItem('cal-amplio', v ? '0' : '1'); } catch { /* sin storage */ }
-      return !v;
+  function cambiarZoom(delta: number) {
+    setZoom((z) => {
+      const nuevo = Math.min(ZOOMS.length - 1, Math.max(0, z + delta));
+      try { localStorage.setItem('cal-zoom', String(nuevo)); } catch { /* sin persistencia */ }
+      return nuevo;
     });
   }
+  const factor = ZOOMS[zoom];
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
@@ -745,7 +757,7 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
             >
               ⠿
             </button>
-            <MiniBody grupo={ex.muscle_group} height={ampliado ? 58 : 44} />
+            <MiniBody grupo={ex.muscle_group} height={Math.round(44 * factor)} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="board-card-name">{ex.name || '(elige el ejercicio)'}</div>
               <div className="board-card-sub">
@@ -788,19 +800,21 @@ export default function TemplateEditor({ templateId, weeks, initialDays }: {
     <div style={{ marginTop: 12 }}>
       {/* EL GRAN CALENDARIO: semanas hacia abajo, columnas Lun..Dom. La celda
           donde vive el bloque ES su día de la semana. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          style={{ padding: '6px 12px', fontSize: 11 }}
-          onClick={toggleAmpliado}
-          title={ampliado ? 'Volver a la vista compacta' : 'Columnas más anchas para leer los ejercicios de cada día'}
-        >
-          {ampliado ? '⤡ COMPACTAR' : '⤢ AMPLIAR'}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
+        <span className="label muted" style={{ letterSpacing: 1.5 }}>Zoom</span>
+        <div className="cal-zoom-ctrl">
+          <button type="button" onClick={() => cambiarZoom(-1)} disabled={zoom === 0}
+            title="Ver más chico (entra más en pantalla)" aria-label="Reducir el zoom">−</button>
+          <span className="cal-zoom-valor">{Math.round(factor * 100)}%</span>
+          <button type="button" onClick={() => cambiarZoom(1)} disabled={zoom === ZOOMS.length - 1}
+            title="Ver más grande (se lee mejor)" aria-label="Aumentar el zoom">+</button>
+        </div>
       </div>
       <div className="cal-scroll">
-        <div className={ampliado ? 'cal-amplio' : undefined} style={{ minWidth: ampliado ? 2360 : 1400 }}>
+        <div
+          className="cal-zoom"
+          style={{ ['--z' as string]: factor, minWidth: Math.round(1400 * factor) }}
+        >
           {semanas.map((semana, si) => (
             <section key={semana.id} className="cal-semana">
               <div className="cal-semana-head">

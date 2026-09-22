@@ -1638,20 +1638,78 @@ select.set-scale {
 .cal-dia .board-day-name {
   font-size: 13px;
 }
-/* vista ampliada: columnas anchas, letra de lectura */
-.cal-amplio .cal-card .board-card-name {
-  font-size: 13.5px;
-  -webkit-line-clamp: 3;
+/* ZOOM del calendario (70% → 150%): todo se mide contra --z, así que un solo
+   número cambia columnas, tarjetas y letras a la vez. Sin transform: un
+   ancestro escalado atrapa los modales position:fixed (bug del PR #69).
+   Los max(...) son el piso de legibilidad: al 70% se ve chico, no ilegible. */
+.cal-zoom { --z: 1; }
+.cal-zoom .cal-grilla { gap: calc(8px * var(--z)); }
+.cal-zoom .cal-celda {
+  min-height: calc(150px * var(--z));
+  gap: calc(8px * var(--z));
+  padding: calc(8px * var(--z)) calc(6px * var(--z)) calc(6px * var(--z));
 }
-.cal-amplio .cal-card .board-card-sub {
-  font-size: 11.5px;
-  white-space: normal;
+.cal-zoom .cal-col-label { font-size: max(8px, calc(9px * var(--z))); }
+.cal-zoom .cal-dia { gap: calc(6px * var(--z)); padding: calc(6px * var(--z)); }
+.cal-zoom .cal-dia .board-day-banner { padding: calc(6px * var(--z)) calc(8px * var(--z)); }
+.cal-zoom .cal-dia .board-day-name { font-size: max(11px, calc(13px * var(--z))); }
+.cal-zoom .cal-card { padding: calc(8px * var(--z)); gap: calc(10px * var(--z)); }
+.cal-zoom .cal-card .board-card-name {
+  font-size: max(10px, calc(12px * var(--z)));
+  -webkit-line-clamp: 2;
 }
-.cal-amplio .cal-dia .board-day-name {
-  font-size: 15px;
+.cal-zoom .cal-card .board-card-sub { font-size: max(9px, calc(10px * var(--z))); }
+.cal-zoom .cal-add-dia { font-size: calc(22px * var(--z)); padding: calc(8px * var(--z)) 0; }
+.cal-zoom .cal-card .board-card-name { white-space: normal; }
+/* El nombre es lo que importa: al achicar, el asa y los botones se comían el
+   ancho (medido al 70%: 90px fijos de 136, y 5px para el texto). Duplicar y
+   quitar salen del flujo —ya aparecían solo al pasar el mouse— y el asa
+   encoge con el zoom. */
+.cal-zoom .cal-card { position: relative; padding-right: calc(10px * var(--z)); }
+.cal-zoom .cal-card > .drag-handle {
+  width: max(12px, calc(20px * var(--z)));
+  min-width: 0;
+  font-size: max(9px, calc(13px * var(--z)));
 }
-.cal-amplio .cal-celda {
-  min-height: 180px;
+.cal-zoom .cal-card > .icon-btn {
+  position: absolute;
+  top: calc(3px * var(--z));
+  width: max(18px, calc(24px * var(--z)));
+  height: max(18px, calc(24px * var(--z)));
+}
+.cal-zoom .cal-card > .icon-btn:nth-last-child(2) { right: max(20px, calc(26px * var(--z))); }
+.cal-zoom .cal-card > .icon-btn:last-child { right: calc(3px * var(--z)); }
+.cal-zoom-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  padding: 2px;
+}
+.cal-zoom-ctrl button {
+  width: 28px;
+  height: 26px;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.cal-zoom-ctrl button:hover:not(:disabled) { background: var(--surface); }
+.cal-zoom-ctrl button:disabled { opacity: 0.35; cursor: not-allowed; }
+.cal-zoom-valor {
+  min-width: 44px;
+  text-align: center;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 /* duplicar/quitar aparecen al pasar el mouse: la tarjeta chica queda limpia */
 .cal-card > .icon-btn {
