@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, typography } from '../../theme';
@@ -35,7 +35,10 @@ export default function SubscriptionExpiredScreen() {
             : 'El gimnasio al que perteneces no tiene una suscripción activa en este momento. Contacta al dueño para regularizarla.'}
       </Text>
 
-      {user?.is_owner && (
+      {/* Google Play no acepta que una app lleve a pagar fuera de su sistema
+          (Apple sí lo aceptó). En Android se indica dónde hacerlo, sin botón
+          ni enlace: la suscripción del coach se gestiona en el panel web. */}
+      {user?.is_owner && (Platform.OS === 'ios' ? (
         <TouchableOpacity
           style={styles.btn}
           onPress={() => Linking.openURL(
@@ -45,7 +48,13 @@ export default function SubscriptionExpiredScreen() {
         >
           <Text style={styles.btnText}>{marketplace ? 'VER SOLICITUDES' : 'GESTIONAR SUSCRIPCIÓN'}</Text>
         </TouchableOpacity>
-      )}
+      ) : (
+        <Text style={styles.webHint} selectable>
+          {marketplace
+            ? 'Revisa las solicitudes desde tu panel en elitefitapp.com'
+            : 'Tu suscripción se gestiona desde tu panel en elitefitapp.com'}
+        </Text>
+      ))}
 
       <TouchableOpacity onPress={signOut} style={styles.signOutBtn}>
         <Text style={styles.signOutText}>CERRAR SESIÓN</Text>
@@ -69,6 +78,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   btnText: { color: colors.background, fontWeight: '900', fontSize: 13, letterSpacing: 2 },
+  webHint: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
   signOutBtn: { paddingVertical: spacing.sm },
   signOutText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
 });

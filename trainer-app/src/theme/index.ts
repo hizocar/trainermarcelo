@@ -1,19 +1,14 @@
-import { Platform, Settings } from 'react-native';
-import { PALETAS, esNombreTema, type NombreTema } from './paletas';
+import { Platform } from 'react-native';
+import { PALETAS, type NombreTema } from './paletas';
+import { leerTemaLocal } from './temaLocal';
 
 // El tema se decide UNA sola vez, al evaluarse este módulo — antes que
 // cualquier pantalla, porque todas importan de acá y sus StyleSheet capturan
 // estos valores al cargar. Por eso cambiar de apariencia pide reabrir la app
-// (ver lib/tema.ts). Settings (NSUserDefaults) se lee síncrono en iOS; en
-// jest o si falla, Carbón — el monocromo deliberado de siempre.
+// (ver lib/tema.ts). La lectura es SÍNCRONA en las dos plataformas (ver
+// theme/temaLocal.ts); en jest o si falla, Carbón — el monocromo de siempre.
 function temaGuardado(): NombreTema {
-  try {
-    if (Platform.OS === 'ios') {
-      const t = Settings.get('tema');
-      if (esNombreTema(t)) return t;
-    }
-  } catch { /* sin Settings disponible: Carbón */ }
-  return 'carbon';
+  return leerTemaLocal() ?? 'carbon';
 }
 
 // Las cuatro paletas (y la explicación del monocromo y del ámbar de
