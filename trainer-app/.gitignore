@@ -42,3 +42,6 @@ yarn-error.*
 .env
 .env.local
 supabase/.temp/
+
+# credencial de Google Play (NO va al repo)
+google-play-service-account.json
