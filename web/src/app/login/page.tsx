@@ -30,20 +30,11 @@ export default function LoginPage() {
       return;
     }
 
-    // Solo coaches pueden entrar al panel web
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    if (profile?.role !== 'coach') {
-      await supabase.auth.signOut();
-      setError('Este panel es solo para entrenadores. Usa la app para clientes.');
-      setLoading(false);
-      return;
-    }
-
+    // Quién entra a qué lo decide el guardia (requireCoach): un coach con el
+    // registro a medias va a /bienvenida, uno con el perfil incompleto a
+    // /perfil y un alumno a /solo-coaches. Antes el login rechazaba todo lo que
+    // no fuera coach — y un coach nuevo que dejó el registro a medias (su cuenta
+    // aún figura como alumno) no podía retomarlo nunca.
     router.push('/dashboard');
     router.refresh();
   }

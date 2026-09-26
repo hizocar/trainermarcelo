@@ -111,6 +111,8 @@ Deno.serve(async (req) => {
       gym_id: gymId,
       name,
       marketplace_status: 'pending',
+      en_buscador: true,
+      registro_completo: true,
     }).eq('id', userId);
     if (linkErr) throw new Error(linkErr.message);
 

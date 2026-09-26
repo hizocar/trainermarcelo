@@ -10,6 +10,16 @@ export interface User {
   is_owner?: boolean;
   gym_id?: string;
   gymStatus?: string; // subscription_status del gimnasio, calculado en AuthContext (no viene de la tabla users)
+  // registro propio (v49)
+  registro_completo?: boolean;
+  perfil_coach_completo?: boolean;
+  en_buscador?: boolean;
+  marketplace_status?: string | null;
+  bio?: string | null;
+  instagram?: string | null;
+  specialties?: string[] | null;
+  comunas?: string[] | null;
+  services?: string[] | null;
 }
 
 export interface Gym {

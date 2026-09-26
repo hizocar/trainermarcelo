@@ -83,7 +83,9 @@ Deno.serve(async (req) => {
   // 4. Vincular el cliente a este coach (rol forzado a 'client')
   const { error: linkErr } = await admin
     .from('users')
-    .update({ coach_id: authUser.id, role: 'client', name })
+    // registro_completo: el rol y el nombre los fijó el coach; no pasa por la
+    // pantalla obligatoria del registro propio (v49)
+    .update({ coach_id: authUser.id, role: 'client', name, registro_completo: true })
     .eq('id', created.user.id);
 
   if (linkErr) return json({ error: linkErr.message }, 500);

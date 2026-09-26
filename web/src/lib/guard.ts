@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from './supabase-server';
 import { panelLocked, type GymState } from './marketplace';
+import { destino } from './registro';
 
 export type CoachSession = {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -10,6 +11,7 @@ export type CoachSession = {
     is_owner: boolean; gym_id: string | null;
     marketplace_status: string | null; is_platform_admin: boolean;
     slug: string | null;
+    registro_completo: boolean; perfil_coach_completo: boolean; en_buscador: boolean;
   };
   gym: GymState | null;
   locked: boolean;
@@ -18,10 +20,15 @@ export type CoachSession = {
 /**
  * Única puerta del panel. `allowLocked` lo usa /marketplace, que es
  * justamente la página a la que se manda al coach bloqueado: sin esa salida,
- * el guard se redirige a sí mismo en un bucle.
+ * el guard se redirige a sí mismo en un bucle. `permitirPerfilIncompleto` lo
+ * usa /perfil por la misma razón: es adonde se manda al coach cuyo perfil falta.
+ *
+ * Registro propio (v49): cuenta sin completar → /bienvenida; alumno →
+ * /solo-coaches (la web es solo para coaches); coach sin perfil completo →
+ * /perfil?completar=1.
  */
 export async function requireCoach(
-  opts: { allowLocked?: boolean } = {},
+  opts: { allowLocked?: boolean; permitirPerfilIncompleto?: boolean } = {},
 ): Promise<CoachSession> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -29,13 +36,24 @@ export async function requireCoach(
 
   const { data: me, error } = await supabase
     .from('users')
-    .select('id, name, email, role, is_owner, gym_id, marketplace_status, is_platform_admin, slug')
+    .select('id, name, email, role, is_owner, gym_id, marketplace_status, is_platform_admin, slug, registro_completo, perfil_coach_completo, en_buscador')
     .eq('id', user.id)
     .maybeSingle();
 
   // Un error tragado acá deja pasar a cualquiera: si no se pudo leer, no se entra.
   if (error) throw error;
-  if (me?.role !== 'coach') redirect('/login');
+  if (!me) redirect('/login');
+
+  const d = destino({
+    registroCompleto: me.registro_completo,
+    role: me.role,
+    perfilCoachCompleto: me.perfil_coach_completo,
+    nombre: me.name,
+  });
+  if (d === 'onboarding') redirect('/bienvenida');
+  if (d === 'alumno' || d === 'nombre') redirect('/solo-coaches');
+  if (d === 'coach-pendiente') redirect('/login');
+  if (d === 'perfil-coach' && !opts.permitirPerfilIncompleto) redirect('/perfil?completar=1');
 
   let gym: GymState | null = null;
   if (me.gym_id) {
@@ -55,7 +73,8 @@ export async function requireCoach(
 }
 
 export async function requireAdmin(): Promise<CoachSession> {
-  const session = await requireCoach({ allowLocked: true });
+  // el panel de admin no se bloquea por el perfil de coach de Sebastián
+  const session = await requireCoach({ allowLocked: true, permitirPerfilIncompleto: true });
   if (!session.me.is_platform_admin) redirect('/dashboard');
   return session;
 }

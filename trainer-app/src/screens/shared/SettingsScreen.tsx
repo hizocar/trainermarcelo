@@ -8,6 +8,7 @@ import Card from '../../components/common/Card';
 import { isBiometricSupported, isBiometricEnabled, setBiometricEnabled, authenticate } from '../../lib/biometricLock';
 import { showAlert, showConfirm } from '../../lib/alert';
 import { supabase } from '../../lib/supabase';
+import { codigoAppleParaBorrar } from '../../lib/ingreso';
 import { temaActivo, elegirTema } from '../../lib/tema';
 import { PALETAS, NOMBRES_TEMA, TEMAS, type NombreTema } from '../../theme/paletas';
 
@@ -85,12 +86,17 @@ export default function SettingsScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { showAlert('Sesión expirada', 'Vuelve a iniciar sesión e inténtalo de nuevo.'); return; }
+      // cuenta con Apple: Apple exige revocar sus tokens; para eso pide un
+      // código recién emitido (si la persona cancela, se borra igual)
+      const apple_authorization_code = await codigoAppleParaBorrar(session.user);
       const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(apple_authorization_code ? { apple_authorization_code } : {}),
       });
       const result = await res.json().catch(() => ({}));
       if (!res.ok || !result.ok) {
