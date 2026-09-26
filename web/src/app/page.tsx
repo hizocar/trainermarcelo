@@ -44,7 +44,7 @@ export default function LandingPage() {
               >
                 Agendar una demo
               </a>
-              <Link className="btn btn-ghost" href="/signup">Crear mi cuenta</Link>
+              <Link className="btn btn-ghost" href="/signup">Probar 3 meses gratis</Link>
             </div>
 
             <div className="hero-stats fade-up d3">
@@ -137,10 +137,10 @@ export default function LandingPage() {
         <div className="container">
           <div className="section-head">
             <span className="label">Precios</span>
-            <h2>Clientes ilimitados, siempre.</h2>
+            <h2>Empieza gratis: 3 meses.</h2>
             <p className="sub">
-              El precio escala con cuántos entrenadores hay, no con cuántos clientes tengan.
-              Cancela cuando quieras.
+              Sin tarjeta, con hasta 5 alumnos. Al terminar la prueba eliges tu plan: el precio
+              escala con cuántos entrenadores hay. Cancela cuando quieras.
             </p>
           </div>
 
