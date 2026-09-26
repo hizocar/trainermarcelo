@@ -34,6 +34,13 @@ function openChatFromNotification(data: any) {
 
 // Auth
 import LoginScreen from '../screens/auth/LoginScreen';
+import WelcomeScreen from '../screens/auth/WelcomeScreen';
+import SignUpScreen from '../screens/auth/SignUpScreen';
+import VerifyCodeScreen from '../screens/auth/VerifyCodeScreen';
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
+import NombreScreen from '../screens/onboarding/NombreScreen';
+import CoachProfileSetupScreen from '../screens/onboarding/CoachProfileSetupScreen';
+import { destino } from '../lib/registro';
 
 // Coach
 import ClientListScreen from '../screens/coach/ClientListScreen';
@@ -197,17 +204,39 @@ export default function AppNavigator() {
   // el gimnasio no está al día: se pausa el panel de coach (los datos no se tocan)
   const subscriptionBlocked = user?.role === 'coach' && !!user.gymStatus && !['active', 'trialing', 'free_month'].includes(user.gymStatus);
 
+  // registro propio (v49): la misma decisión que la web (lib/registro.ts).
+  // Si el perfil no se pudo leer (usuario de respaldo sin estos campos), se
+  // asume completo: nunca atrapar a alguien en una pantalla que no puede pasar.
+  const paso = session && user ? destino({
+    registroCompleto: user.registro_completo !== false,
+    role: user.role,
+    perfilCoachCompleto: user.perfil_coach_completo !== false,
+    nombre: user.name ?? '',
+  }) : null;
+
   return (
     <NavigationContainer
       ref={navigationRef}
-      initialState={session ? initialState : undefined}
+      // el estado guardado es de las pestañas: no aplica mientras se completa el registro
+      initialState={session && (paso === 'coach' || paso === 'alumno') ? initialState : undefined}
       onStateChange={persistNavState}
     >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        ) : user?.role === 'coach_pending' ? (
+          <>
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+          </>
+        ) : paso === 'onboarding' ? (
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        ) : paso === 'nombre' ? (
+          <Stack.Screen name="Nombre" component={NombreScreen} />
+        ) : paso === 'coach-pendiente' ? (
           <Stack.Screen name="CoachPending" component={CoachPendingScreen} />
+        ) : paso === 'perfil-coach' ? (
+          <Stack.Screen name="CoachProfileSetup" component={CoachProfileSetupScreen} />
         ) : subscriptionBlocked ? (
           <Stack.Screen name="SubscriptionExpired" component={SubscriptionExpiredScreen} />
         ) : user?.role === 'coach' ? (

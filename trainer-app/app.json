@@ -16,7 +16,8 @@
       },
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.trainermarcelo.app",
@@ -72,13 +73,16 @@
       ],
       "expo-asset",
       "@sentry/react-native",
-      "expo-live-activity"
+      "expo-live-activity",
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {
         "projectId": "4ec491f8-d9e0-434f-8ee1-828f27bb57f4"
       }
     },
-    "owner": "hizocars-team"
+    "owner": "hizocars-team",
+    "scheme": "elitefitness"
   }
 }
