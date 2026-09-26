@@ -11,9 +11,8 @@ completo y se pega tal cual.
 
 ## 0. Antes de empezar — bloqueos pendientes
 
-- [ ] **Borrar cuenta desde la app + URL pública para pedirlo.** Google lo exige
-      en el formulario de Seguridad de los datos para cualquier app que permita
-      crear cuentas. Hoy solo se puede por correo. *(pendiente de construir)*
+- [x] **Borrar cuenta desde la app + URL pública** (v47 + `delete-account` +
+      Ajustes → Eliminar mi cuenta). Sale con la próxima versión de la app.
 - [ ] **Correo de soporte de la marca.** La política de privacidad y la ficha
       muestran `hizocar@gmail.com`. Google publica ese correo en la ficha.
 - [ ] **Firebase / FCM** para que lleguen las notificaciones en Android.
@@ -111,8 +110,8 @@ son proveedores que procesan datos por cuenta nuestra: según Google eso no
 cuenta como "compartir").
 
 **¿Datos cifrados en tránsito?** Sí (todo va por HTTPS).
-**¿Los usuarios pueden pedir que se borren sus datos?** Sí *(requiere §0)*.
-**URL para borrar la cuenta:** *(pendiente — ver §0)*
+**¿Los usuarios pueden pedir que se borren sus datos?** Sí (desde la app y desde la web).
+**URL para borrar la cuenta:** `https://elitefitapp.com/eliminar-cuenta`
 
 | Categoría de Google | Tipo | ¿Obligatorio? | Propósito | Qué es en la app |
 |---|---|---|---|---|
