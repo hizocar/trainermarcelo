@@ -19,7 +19,7 @@ export default function PrivacyPage() {
         <h1 className="display" style={{ fontSize: 38, marginTop: 8, marginBottom: 24 }}>
           Política de privacidad
         </h1>
-        <p className="muted" style={{ marginBottom: 32 }}>Última actualización: agosto de 2026</p>
+        <p className="muted" style={{ marginBottom: 32 }}>Última actualización: septiembre de 2026</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28, fontSize: 15, lineHeight: 1.7, color: 'var(--text-secondary)' }}>
           <section>
@@ -83,6 +83,9 @@ export default function PrivacyPage() {
             <p>
               Puedes pedir acceso, corrección o eliminación de tus datos escribiendo a{' '}
               <a href="mailto:hizocar@gmail.com" className="accent">hizocar@gmail.com</a>.
+              También puedes eliminar tu cuenta tú mismo desde la app, en Perfil → Ajustes →
+              Eliminar mi cuenta, o siguiendo los pasos de{' '}
+              <a href="/eliminar-cuenta" className="accent">elitefitapp.com/eliminar-cuenta</a>.
               Al eliminar tu cuenta, borramos tu información personal salvo lo que debamos
               conservar por obligación legal.
             </p>

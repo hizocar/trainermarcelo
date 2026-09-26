@@ -1,23 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, Linking, ActivityIndicator, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, radius, typography } from '../../theme';
 import Card from '../../components/common/Card';
 import { isBiometricSupported, isBiometricEnabled, setBiometricEnabled, authenticate } from '../../lib/biometricLock';
-import { showAlert } from '../../lib/alert';
+import { showAlert, showConfirm } from '../../lib/alert';
+import { supabase } from '../../lib/supabase';
 import { temaActivo, elegirTema } from '../../lib/tema';
 import { PALETAS, NOMBRES_TEMA, TEMAS, type NombreTema } from '../../theme/paletas';
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [checking, setChecking] = useState(true);
   const [tema, setTema] = useState<NombreTema>(() => temaActivo());
   const [guardandoTema, setGuardandoTema] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -57,8 +59,55 @@ export default function SettingsScreen() {
     }
   }
 
+  // Borrar la cuenta (Google Play y Apple lo exigen). Dos confirmaciones: es
+  // irreversible. La edge function delete-account hace el borrado completo en
+  // una transacción (v47) y se niega si hay una suscripción cobrándose.
+  const esCoach = user?.role === 'coach' || user?.role === 'coach_pending';
+
+  function pedirEliminarCuenta() {
+    showConfirm(
+      'Eliminar tu cuenta',
+      esCoach
+        ? 'Se borrarán tu perfil, tus programas, tu biblioteca y tus videos. Tus alumnos conservan su cuenta, su plan y su historial, y quedan sin coach.'
+        : 'Se borrarán tu perfil, tu plan, tu historial de entrenamientos, tus fotos y tus mensajes.',
+      () => showConfirm(
+        '¿Seguro?',
+        'Esto no se puede deshacer.',
+        eliminarCuenta,
+        'Eliminar para siempre',
+      ),
+      'Continuar',
+    );
+  }
+
+  async function eliminarCuenta() {
+    setEliminando(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { showAlert('Sesión expirada', 'Vuelve a iniciar sesión e inténtalo de nuevo.'); return; }
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        },
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result.ok) {
+        showAlert('No se pudo eliminar', result.error ?? 'Inténtalo de nuevo en un momento.');
+        return;
+      }
+      showAlert('Cuenta eliminada', 'Tu cuenta y tus datos fueron borrados.');
+      await signOut();
+    } catch {
+      showAlert('Sin conexión', 'Revisa tu señal e inténtalo de nuevo.');
+    } finally {
+      setEliminando(false);
+    }
+  }
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
@@ -143,12 +192,29 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </Card>
-    </View>
+
+      {/* al final y sin color: se encuentra, pero no invita a tocarlo */}
+      <TouchableOpacity
+        style={styles.eliminar}
+        onPress={pedirEliminarCuenta}
+        disabled={eliminando}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Eliminar mi cuenta"
+      >
+        {eliminando
+          ? <ActivityIndicator size="small" color={colors.textMuted} />
+          : <Text style={styles.eliminarTexto}>ELIMINAR MI CUENTA</Text>}
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: spacing.xl, gap: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.background },
+  contenido: { paddingTop: 60, paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
+  eliminar: { alignSelf: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
+  eliminarTexto: { ...typography.label, color: colors.textMuted, letterSpacing: 1.5, textDecorationLine: 'underline' },
   header: { gap: spacing.xs },
   backBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText: { ...typography.label, color: colors.textMuted, letterSpacing: 2 },
